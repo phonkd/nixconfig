@@ -1,0 +1,101 @@
+{ config, pkgs, ... }:
+
+{
+  flake.homeModules.code-editors = {pkgs,...}: {
+    home.packages = with pkgs; [
+      nil
+      nixd
+      yaml-language-server
+      claude-code
+      sox
+      ripgrep
+      fd
+    ];
+    programs.neovim = {
+      enable = true;
+      vimAlias = true;
+      extraPackages = with pkgs; [
+        ripgrep
+        fd
+        nil
+        nixd
+      ];
+      defaultEditor = true;
+      plugins = with pkgs.vimPlugins; [
+        {
+          plugin = catppuccin-nvim;
+          type = "lua";
+          config = ''
+            require("catppuccin").setup({
+              flavour = "mocha"
+            })
+            vim.cmd([[colorscheme catppuccin]])
+          '';
+        }
+        {
+          plugin = telescope-nvim;
+          type = "lua";
+          config = ''
+            local builtin = require('telescope.builtin')
+            vim.keymap.set('n', 'ff', builtin.find_files, {})
+            vim.keymap.set('n', 'fg', builtin.live_grep, {})
+            vim.keymap.set('n', 'fb', builtin.buffers, {})
+            vim.keymap.set('n', 'fh', builtin.help_tags, {})
+          '';
+        }
+        plenary-nvim # telescope dependency
+        vim-nix
+        luasnip
+        cmp_luasnip
+        cmp-nvim-lsp
+        {
+          plugin = nvim-cmp;
+          type = "lua";
+          config = ''
+            local cmp = require('cmp')
+            cmp.setup({
+              snippet = {
+                expand = function(args)
+                  require('luasnip').lsp_expand(args.body)
+                end,
+              },
+              mapping = cmp.mapping.preset.insert({
+                ['<C-Space>'] = cmp.mapping.complete(),
+                ['<C-e>'] = cmp.mapping.abort(),
+                ['<CR>'] = cmp.mapping.confirm({ select = true }),
+                ['<Tab>'] = cmp.mapping.select_next_item(),
+                ['<S-Tab>'] = cmp.mapping.select_prev_item(),
+              }),
+              sources = cmp.config.sources({
+                { name = 'nvim_lsp' },
+                { name = 'luasnip' },
+              }),
+            })
+          '';
+        }
+        {
+          plugin = nvim-lspconfig;
+          type = "lua";
+          config = ''
+            local capabilities = require('cmp_nvim_lsp').default_capabilities()
+
+            vim.lsp.config('nixd', {
+              capabilities = capabilities,
+              cmd = { 'nixd' },
+              filetypes = { 'nix' },
+            })
+            vim.lsp.enable('nixd')
+          '';
+        }
+        {
+          plugin = neoscroll-nvim;
+          type = "lua";
+          config = ''
+            require('neoscroll').setup()
+          '';
+        }
+      ];
+    };
+  };
+
+}

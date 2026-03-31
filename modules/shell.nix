@@ -1,0 +1,56 @@
+{ inputs, ... }:
+
+{
+  flake.homeModules.shell =
+    { pkgs, ... }:
+    {
+      programs.zsh = {
+        enable = true;
+
+        shellAliases = {
+          stealmusic = "yt-dlp -x --audio-format mp3 --embed-thumbnail --embed-metadata";
+        };
+        siteFunctions = {
+          cpp = ''
+            cat "$1" | pbcopy
+          '';
+        };
+        enableCompletion = true;
+        completionInit = ''
+          autoload -U compinit && compinit
+          zstyle ':completion:*' menu select
+        '';
+        autosuggestion.enable = true;
+        history.size = 1000000;
+      };
+      programs.starship = {
+        enable = true;
+        enableZshIntegration = true;
+        enableFishIntegration = true;
+        presets = [ "nerd-font-symbols" ];
+        settings = {
+          kubernetes = {
+            disabled = false;
+          };
+        };
+      };
+      programs.zoxide = {
+        enable = true;
+        enableZshIntegration = true;
+        enableFishIntegration = true;
+      };
+      programs.kubecolor = {
+        enable = true;
+        enableZshIntegration = true;
+        #enableAlias = true;
+      };
+      home.packages = with pkgs; [
+        nerd-fonts.symbols-only
+      ];
+      programs.fzf = {
+        enable = true;
+        enableZshIntegration = true;
+        enableFishIntegration = false;
+      };
+    };
+}
