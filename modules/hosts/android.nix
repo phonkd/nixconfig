@@ -12,7 +12,7 @@
       {
         home-manager.config = {pkgs, lib, ...}: {
           imports = [ self.homeModules.base ];
-          home.username = "nix-on-droid";
+          home.username = lib.mkForce "nix-on-droid";
           home.stateVersion = lib.mkForce "24.05";
         };
       }
