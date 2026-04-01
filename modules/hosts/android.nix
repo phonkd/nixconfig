@@ -6,7 +6,7 @@
 }:
 {
   imports = [
-    inputs.nix-on-droid
+    #inputs.nix-on-droid
     inputs.home-manager.flakeModules.home-manager
   ];
   flake.darwinConfigurations."Eliss-MacBook-Pro" = inputs.nix-darwin.lib.darwinSystem {
