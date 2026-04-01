@@ -9,7 +9,7 @@
     inputs.nix-on-droid
     inputs.home-manager.flakeModules.home-manager
   ];
-  flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidSystem {
+  flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidConfiguration {
     modules = [
       {
         home-manager.config = {pkgs, ...}: {
