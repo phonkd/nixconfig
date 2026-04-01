@@ -6,7 +6,7 @@
 }:
 {
   flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidConfiguration {
-    pkgs = import inputs.nixpkgs { system = "aarch64-linux"; };
+    pkgs = import inputs.nixpkgs-unstable-droid { system = "aarch64-linux"; };
     home-manager-path = inputs.home-manager.outPath;
     modules = [
       {
