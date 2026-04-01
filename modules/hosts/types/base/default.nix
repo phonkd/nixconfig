@@ -12,7 +12,7 @@
       ...
     }:
     {
-      imports = [
+      modules = [
         self.homeModules.shell
       ];
     };
