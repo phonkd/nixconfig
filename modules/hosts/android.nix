@@ -9,10 +9,10 @@
     pkgs = import inputs.nixpkgs { system = "aarch64-linux"; };
     modules = [
       {
-        home-manager.config = {pkgs, ...}: {
+        home-manager.config = {pkgs, lib, ...}: {
           imports = [ self.homeModules.base ];
           home.username = "nix-on-droid";
-          home.stateVersion = "24.05";
+          home.stateVersion = lib.mkForce "24.05";
         };
       }
     ];
