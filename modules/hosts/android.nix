@@ -11,6 +11,7 @@
       {
         home-manager.config = {pkgs, ...}: {
           imports = [ self.homeModules.base ];
+          home.username = "nix-on-droid";
         };
       }
     ];
