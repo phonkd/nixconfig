@@ -10,6 +10,7 @@
     home-manager-path = inputs.home-manager.outPath;
     modules = [
       {
+        system.stateVersion = "24.05";
         home-manager.config = {pkgs, lib, ...}: {
           imports = [ self.homeModules.base ];
           home.username = lib.mkForce "nix-on-droid";
@@ -17,7 +18,6 @@
         };
       }
     ];
-    system.stateVersion = "24.05";
 
   };
 }
