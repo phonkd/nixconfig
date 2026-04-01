@@ -12,7 +12,7 @@
       ...
     }:
     {
-      modules = [
+      imports = [
         self.homeModules.shell
         self.homeModules.system-minimal
         self.homeModules.code-editors
