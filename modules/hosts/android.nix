@@ -10,7 +10,7 @@
     modules = [
       {
         home-manager.config = {pkgs, ...}: {
-          imports = [ self.homeModules.shell ];
+          imports = [ self.homeModules.base ];
         };
       }
     ];
