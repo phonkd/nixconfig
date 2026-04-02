@@ -9,6 +9,7 @@
         #withOpenASAR = true;
         withVencord = true; # can do this here too
       })
+      claude-code
     ];
   };
 

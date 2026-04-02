@@ -6,7 +6,6 @@
       nil
       nixd
       yaml-language-server
-      claude-code
       sox
       ripgrep
       fd
