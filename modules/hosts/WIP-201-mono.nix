@@ -21,6 +21,7 @@
     ];
   };
   flake.nixosModules."201-mono" = {config, pkgs, lib, ...}: {
+    nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
     label.labels = [ "vm" ];
     boot.loader.grub.device = "/dev/vda";
     networking.interfaces.ens18.ipv4.addresses = [
