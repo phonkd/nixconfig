@@ -12,15 +12,18 @@
   flake.darwinConfigurations."Eliss-MacBook-Pro" = inputs.nix-darwin.lib.darwinSystem {
     modules = [
       self.darwinModules.macm4
+      self.darwinModules.dns
       inputs.home-manager.darwinModules.home-manager
       {
-        imports = [ self.module.darwin.work ];
+        imports = [
+          self.module.darwin.work
+        ];
       }
     ];
 
   };
   flake.darwinModules."macm4" =
-    { pkgs, ... }:
+    { pkgs, config, ... }:
     {
       home-manager.users.phonkd.imports = [
         self.homeModules.gui

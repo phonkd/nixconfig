@@ -1,12 +1,22 @@
 { self, inputs, ...}:
 {
   flake.nixosModules.server-applist =
-    { config, pkgs, lib, ...}:
+    { config, self, pkgs, lib, ...}:
     # modules/my-apps.nix
     let
       t = lib.types;
     in
     {
+      imports = [
+        self.nixosModules.homelab-orphans
+      ];
+      options.label = {
+        labels = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          description = "Labels to categorize machines.";
+        };
+      };
       options.phonkds.modules = lib.mkOption {
         description = "Central definition for all my homelab apps";
         default = { };
