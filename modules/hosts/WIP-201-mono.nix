@@ -1,11 +1,10 @@
 {
   self,
   inputs,
-  pkgs,
   ...
 }:
 {
-  flake.nixosConfigurations."201-mono" = pkgs.lib.nixosSystem {
+  flake.nixosConfigurations."201-mono" = inputs.nixpkgs.lib.nixosSystem {
     modules = [
       self.nixosModules."201-mono"
       self.nixosModules."201-shares"
