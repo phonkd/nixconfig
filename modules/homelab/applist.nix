@@ -1,7 +1,7 @@
 { self, inputs, ...}:
 {
   flake.nixosModules.server-applist =
-    { config, self, pkgs, lib, ...}:
+    { config, pkgs, lib, ...}:
     # modules/my-apps.nix
     let
       t = lib.types;
