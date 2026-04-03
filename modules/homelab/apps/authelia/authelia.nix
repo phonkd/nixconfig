@@ -24,19 +24,19 @@
         };
       };
       sops.secrets.authelia_jwt_secret = {
-        sopsFile = ./authelia-secret.yamll;
+        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
       sops.secrets.authelia_session_secret = {
-        sopsFile = ./authelia-secret.yamll;
+        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
       sops.secrets.authelia_storage_encryption_key = {
-        sopsFile = ./authelia-secret.yamll;
+        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
       sops.secrets.authelia_users_database = {
-        sopsFile = ./authelia-secret.yamll;
+        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
 
