@@ -2,13 +2,14 @@
 
 {
   flake.homeModules.shell =
-    { pkgs, config, ... }:
+    { pkgs, lib, config, ... }:
     {
       programs.zsh = {
         enable = true;
 
         shellAliases = {
           stealmusic = "yt-dlp -x --audio-format mp3 --embed-thumbnail --embed-metadata";
+          k = lib.mkDefault "kubecolor";
         };
         siteFunctions = {
           cpp = ''
