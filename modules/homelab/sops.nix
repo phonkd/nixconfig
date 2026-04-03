@@ -6,28 +6,13 @@
 {
   flake.nixosModules."server-sops" = { config, pkgs, lib, ... }:
     {
-      # Install dependencies
-      environment.systemPackages = with pkgs; [
-        curl
-        jq
+      imports = [
+        inputs.sops-nix.nixosModules.sops
       ];
-
-      # Install the script
-      environment.etc."local/bin/cloudflare-ddns.sh" = {
-        text = ddnsScript;
-        mode = "0755";
+      sops.age = lib.mkIf isVM {
+        keyFile = "/home/phonkd/.config/sops/age/keys.txt";
       };
-
-      # Cron job every 15 minutes
-      services.cron = {
-        enable = true;
-        systemCronJobs = [
-          "*/15 * * * * root /etc/local/bin/cloudflare-ddns.sh >/dev/null 2>&1"
-        ];
-      };
-
-      # Your existing SOPS secret
-      sops.secrets.cfapikey = { };
+      sops.defaultSopsFile = ./global-secrets/secret.yaml;
     };
 
 }
