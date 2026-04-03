@@ -23,6 +23,15 @@
     ];
   };
   flake.nixosModules."201-mono" = {config, pkgs, lib, ...}: {
+    fileSystems."/" =
+      { device = "/dev/disk/by-uuid/f222513b-ded1-49fa-b591-20ce86a2fe7f";
+        fsType = "ext4";
+      };
+
+    fileSystems."/boot" =
+      { device = "/dev/disk/by-uuid/12CE-A600";
+        fsType = "vfat";
+      };
     nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
     label.labels = [ "vm" ];
     boot.loader.grub.device = "/dev/vda";
