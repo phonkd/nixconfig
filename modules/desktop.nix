@@ -14,28 +14,7 @@
       (yt-dlp.override { javascriptSupport = false; })
       nvtopPackages.full
       cool-retro-term
-      jq
       yubikey-manager
-      sshpass
-      ffmpeg
-      wget
-      kubectl
-      kubectx
-      kubectl-view-secret
-      kube-capacity
-      kubernetes-helm
-      clusterctl
-      kubectx
-      kconf
-      kustomize
-      kustomize-sops
-      k9s
-      stern
-      tree
-      minio-client
-      yq
-      sops
-      prek
     ];
     xdg.enable = true;
     #news.display = "silent";

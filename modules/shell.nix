@@ -49,6 +49,27 @@
       };
       home.packages = with pkgs; [
         nerd-fonts.symbols-only
+        jq
+        ffmpeg
+        sshpass
+        wget
+        kubectl
+        kubectx
+        kubectl-view-secret
+        kube-capacity
+        kubernetes-helm
+        clusterctl
+        kubectx
+        kconf
+        kustomize
+        kustomize-sops
+        k9s
+        stern
+        tree
+        minio-client
+        yq
+        sops
+        prek
       ];
       programs.fzf = {
         enable = true;
