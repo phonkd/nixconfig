@@ -13,9 +13,15 @@
         home-manager.config = {pkgs, lib, ...}: {
           imports = [ self.homeModules.base ];
           home.username = lib.mkForce "nix-on-droid";
+          # home.packages = with pkgs; [
+          #   openssh
+          # ];
           #home.stateVersion = lib.mkForce "24.05";
         };
         user.shell = pkgs.zsh;
+        environment.packages = with pkgs; [
+          openssh
+        ];
       })
     ];
 
