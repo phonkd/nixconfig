@@ -13,6 +13,7 @@
           confirm-close-surface = false;
           keybind = [ "super+enter=new_split:auto" ];
         };
+        enableZshIntegration = true;
       };
       programs.kitty = {
         enable = false;

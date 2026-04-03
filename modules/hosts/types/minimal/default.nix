@@ -60,6 +60,9 @@
       };
     };
   flake.nixosModules.system-minimal = {
+    imports = [
+      inputs.sops-nix.nixosModules.sops
+    ];
     time.timeZone = "Europe/Zurich";
     i18n.defaultLocale = "en_US.UTF-8";
 
@@ -79,6 +82,7 @@
     sops.age = {
       keyFile = "/home/phonkd/.config/sops/age/keys.txt";
     };
+    programs.zsh.enable = true;
     nixpkgs.config.allowUnfree = true;
   };
 }

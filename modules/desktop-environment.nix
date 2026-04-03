@@ -1,14 +1,14 @@
-{ self, config, pkgs, ... }:
+{ self, inputs, config, pkgs, ... }:
 
 {
   flake.homeModules.desktop-environment = { pkgs, lib, config, ... }: {
     imports = [
-      self.nixosModules.homeModules.hyprland
-      self.nixosModules.homeModules.bar-nstuff
+      self.homeModules.hyprland
+      self.homeModules.bar-nstuff
     ];
   };
   flake.homeModules.hyprland = { pkgs, lib, config, ... }: {
-    users.users.phonkd.packages = with pkgs; [
+    home.packages = with pkgs; [
       waypaper
       swaybg
       grimblast
@@ -41,7 +41,7 @@
       ];
       sourceFirst = false;
       #extraConfig = builtins.readFile ../dotconfig/hypr/hyprland.conf;
-      wayland.windowManager.hyprland.extraConfig = ''
+      extraConfig = ''
         misc {
            vrr = 1
         }
@@ -382,7 +382,7 @@
     };
 
   };
-  flake.homeModules.bar-nstuff = { pkgs, lib, config, inputs, ...}: {
+  flake.homeModules.bar-nstuff = { pkgs, lib, config, ...}: {
     imports = [
       inputs.noctalia.homeModules.default
     ];

@@ -27,9 +27,9 @@
     }:
     {
       imports = [
-        self.nixosModules.homeModules.desktop-nixos-specific
-        self.nixosModules.homeModules.gui
-        self.nixosModules.homeModules.desktop-environment
+        self.homeModules.desktop-nixos-specific
+        self.homeModules.gui
+        self.homeModules.desktop-environment
       ];
     };
 }

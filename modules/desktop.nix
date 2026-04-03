@@ -28,7 +28,7 @@
     services.easyeffects.enable = true;
     home.packages = with pkgs; [
       dracula-theme
-      claude-code
+      #claude-code
     ];
     qt = {
       enable = false;

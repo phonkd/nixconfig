@@ -1,7 +1,6 @@
 {
   self,
   inputs,
-  pkgs,
   ...
 }:
 {
@@ -9,17 +8,22 @@
     inputs.home-manager.flakeModules.home-manager
   ];
 
-  flake.nixosConfigurations."blac" = pkgs.lib.nixosSystem {
+  flake.nixosConfigurations."blac" = inputs.nixpkgs.lib.nixosSystem {
     modules = [
+      /etc/nixos/hardware-configuration.nix
+      inputs.home-manager.nixosModules.home-manager
       {
         home-manager.users.phonkd.imports = [
           self.homeModules.gui-nixos
         ];
       }
+      self.nixosModules.base
       self.nixosModules.blac
     ];
   };
   flake.nixosModules.blac = {config, pkgs, lib, ...}: {
+    system.stateVersion = "26.05";
+    users.users.phonkd.extraGroups = [ "dialout" ];
     networking.networkmanager.enable = true;
     # Use declarative networking with secondary IP
     #networking.useDHCP = true;
@@ -57,8 +61,6 @@
       "amd_iommu=on"
       "iommu=nopt"
     ];
-
-    users.users.phonkd.extraGroups = [ "dialout" ];
 
     hardware.nvidia = {
       open = true;
