@@ -73,6 +73,7 @@
       isNormalUser = true;
       description = "phonkd";
       extraGroups = [ "wheel" ];
+      group = "phonkd";
     };
     sops.age = {
       keyFile = "/home/phonkd/.config/sops/age/keys.txt";
