@@ -10,6 +10,8 @@
       self.nixosModules."201-shares"
       self.nixosModules."201-wireguard"
       self.nixosModules."201-traefik"
+      self.nixosModules.server-nixos
+      self.nixosModules.server-applist
       self.nixosModules.homelab-authelia
       self.nixosModules.homelab-garage
       self.nixosModules.homelab-dashboard
