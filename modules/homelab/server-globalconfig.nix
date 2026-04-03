@@ -28,9 +28,7 @@
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN9TT4ul2FQbw+qzK+Ttic2TD07Ug9wxmFhnQ2ROcsjV phonkd@blac"
       ];
       sops.defaultSopsFormat = "yaml";
-      boot.loader.grub.enable = true;
-      boot.loader.grub.device = lib.mkDefault "/dev/sda";
-      boot.loader.grub.useOSProber = true;
+
       system.stateVersion = lib.mkForce "25.11";
 
 
