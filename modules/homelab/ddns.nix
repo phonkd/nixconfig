@@ -98,6 +98,6 @@
 
       # Your existing SOPS secret
       sops.secrets.cfapikey = { };
-    }
+    };
 
 }
