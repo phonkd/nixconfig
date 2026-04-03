@@ -59,4 +59,24 @@
         enable = true;
       };
     };
+  flake.nixosModules.system-minimal = {
+    time.timeZone = "Europe/Zurich";
+    i18n.defaultLocale = "en_US.UTF-8";
+
+    # Configure keymap
+    services.xserver.xkb = {
+      layout = "ch";
+      variant = "";
+    };
+    console.keyMap = "sg";
+    users.users.phonkd = {
+      isNormalUser = true;
+      description = "phonkd";
+      extraGroups = [ "wheel" ];
+    };
+    sops.age = {
+      keyFile = "/home/phonkd/.config/sops/age/keys.txt";
+    };
+    nixpkgs.config.allowUnfree = true;
+  };
 }

@@ -14,4 +14,9 @@
       self.modules.darwin.work-privoxy
     ];
   };
+  flake.module.nixos."work" = {pkgs, ...}: {
+    imports = [
+      self.nixosModules.work-privoxy
+    ];
+  };
 }

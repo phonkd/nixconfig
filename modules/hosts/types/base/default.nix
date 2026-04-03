@@ -18,4 +18,16 @@
         self.homeModules.code-editors
       ];
     };
+  flake.nixosModules.base =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    {
+      imports = [
+        self.nixosModules.system-minimal
+      ];
+    };
 }

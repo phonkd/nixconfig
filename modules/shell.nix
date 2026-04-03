@@ -2,7 +2,7 @@
 
 {
   flake.homeModules.shell =
-    { pkgs, ... }:
+    { pkgs, config, ... }:
     {
       programs.zsh = {
         enable = true;
@@ -21,7 +21,10 @@
           zstyle ':completion:*' menu select
         '';
         autosuggestion.enable = true;
-        history.size = 1000000;
+        history = {
+          size = 1000000;
+          path = "${config.home.homeDirectory}/.zsh_history";
+        };
       };
       programs.starship = {
         enable = true;
@@ -51,6 +54,15 @@
         enable = true;
         enableZshIntegration = true;
         enableFishIntegration = false;
+      };
+      programs.btop = {
+        enable = true;
+      };
+      programs.bat = {
+        enable = true;
+      };
+      programs.obsidian = {
+        enable = true;
       };
     };
 }

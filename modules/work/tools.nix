@@ -16,7 +16,6 @@
           k9s
           stern
           # misc
-          terraform
           minio-client
           yq
           prek

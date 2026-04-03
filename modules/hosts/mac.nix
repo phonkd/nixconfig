@@ -46,5 +46,9 @@
       system.primaryUser = "phonkd";
 
       users.users.phonkd.home = "/Users/phonkd";
+      homebrew = {
+        enable = true;
+        enableZshIntegration = true;
+      };
     };
 }
