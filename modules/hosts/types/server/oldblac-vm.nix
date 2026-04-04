@@ -5,9 +5,9 @@
   ...
 }:
 {
-  flake.nixosModules.oldblac-server = {
+  flake.nixosModules.oldblac-server = { modulesPath, ... }: {
     imports = [
-      #(modulesPath + "/profiles/qemu-guest.nix")
+      (modulesPath + "/profiles/qemu-guest.nix")
     ];
     fileSystems."/" = lib.mkDefault {
       device = "/dev/disk/by-path/pci-0000:01:01.0-scsi-0:0:0:0-part/by-partnum/1";

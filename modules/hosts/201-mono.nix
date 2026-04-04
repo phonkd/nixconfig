@@ -20,7 +20,7 @@
       self.nixosModules.homelab-syncthing
       self.nixosModules.homelab-vaultwarden
       self.nixosModules.homelab-paperless
-      self.nixosModulesh.homelab-arr
+      self.nixosModules.homelab-arr
     ];
   };
   flake.nixosModules."201-mono" = {config, pkgs, lib, ...}: {
