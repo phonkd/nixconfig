@@ -11,6 +11,7 @@
           stealmusic = "yt-dlp -x --audio-format mp3 --embed-thumbnail --embed-metadata";
           k = lib.mkDefault "kubecolor";
           mystrom = "curl https://192.168.1.19/toggle";
+          nix-shell = "NIXPKGS_ALLOW_UNFREE=1 nix shell --impure";
         };
         siteFunctions = {
           cpp = ''
@@ -72,6 +73,7 @@
         yq
         sops
         prek
+        curl
       ];
       programs.fzf = {
         enable = true;

@@ -30,6 +30,9 @@
                 default_shell "zsh"
                 show_startup_tips false
                '';
+               settings = { 
+                 theme = "everforest-dark";
+               };
               };
 
             };
@@ -45,7 +48,6 @@
             flake = inputs.nixpkgs-unstable-droid;
           };
           nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable-droid}" ];
-
 
         }
       )
