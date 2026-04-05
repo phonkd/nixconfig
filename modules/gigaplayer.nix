@@ -64,6 +64,7 @@
             cache_path = "/var/cache/spotifyd";
             volume_controller = "softvol";
             zeroconf_port = 57621;
+            max_cache_size = 5000000000; # like 5gb for max cache size so disk doesnt fill up
           };
         };
       };

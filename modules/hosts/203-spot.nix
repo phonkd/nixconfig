@@ -32,7 +32,7 @@
       networking.firewall.allowedTCPPorts = [
         22
       ];
-      nix.gc = {
+      nix.gc = lib.mkForce {
         automatic = true;
         dates = "daily";
         options = "--delete-older-than 3d";
