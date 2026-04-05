@@ -25,7 +25,7 @@
           user.shell = pkgs.zsh;
           environment.packages = with pkgs; [
             openssh
-            awk
+            gawk
           ];
         }
       )
