@@ -19,6 +19,7 @@
       }
       self.nixosModules.base
       self.nixosModules.blac
+      self.nixosModules.nvidia-desktop
     ];
   };
   flake.nixosModules.blac = {config, pkgs, lib, ...}: {

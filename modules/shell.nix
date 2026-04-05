@@ -10,6 +10,7 @@
         shellAliases = {
           stealmusic = "yt-dlp -x --audio-format mp3 --embed-thumbnail --embed-metadata";
           k = lib.mkDefault "kubecolor";
+          mystrom = "curl https://192.168.1.19/toggle";
         };
         siteFunctions = {
           cpp = ''
