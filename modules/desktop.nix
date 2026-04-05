@@ -59,6 +59,7 @@
     };
   };
   flake.nixosModules.desktop = { pkgs, lib, config, ... }: {
+    programs.dconf.enable = true;
     users.users.phonkd.packages = with pkgs; [
       gst_all_1.gstreamer
       gst_all_1.gst-plugins-base
@@ -149,6 +150,7 @@
     ];
   };
   flake.nixosModules.nvidia-desktop = { pkgs, lib, config, ... }: {
+    imports = [ self.nixosModules.desktop ];
     environment.variables = {
       LIBVA_DRIVER_NAME = "nvidia";
     };
