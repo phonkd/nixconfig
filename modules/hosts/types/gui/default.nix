@@ -43,13 +43,8 @@
       imports = [
         self.nixosModules.base
       ];
-      modules = [
-        inputs.home-manager.nixosModules.home-manager
-        {
-          home-manager.users.phonkd.imports = [
-            self.homeModules.gui-nixos
-          ];
-        }
+      home-manager.users.phonkd.imports = [
+        self.homeModules.gui-nixos
       ];
     };
 }
