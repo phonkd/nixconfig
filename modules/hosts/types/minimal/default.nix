@@ -37,6 +37,7 @@
           }
         ];
       };
+      programs.fastfetch.enable = true;
       programs.ssh = {
         enable = true;
         matchBlocks = {

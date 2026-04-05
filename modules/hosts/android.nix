@@ -21,12 +21,32 @@
               #   openssh
               # ];
               #home.stateVersion = lib.mkForce "24.05";
+              programs.zellij = {
+               enable = true;
+               enableZshIntegration = true;
+               attachExistingSession = true;  # reattach if session exists
+               exitShellOnExit = true;        # exit zsh when you exit zellij
+               extraConfig = ''
+                default_shell "zsh"
+                show_startup_tips false
+               '';
+              };
+
             };
           user.shell = pkgs.zsh;
           environment.packages = with pkgs; [
             openssh
             gawk
           ];
+          nix.extraOptions = ''
+            experimental-features = nix-command flakes
+          '';
+          nix.registry.nixpkgs = { 
+            flake = inputs.nixpkgs-unstable-droid;
+          };
+          nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable-droid}" ];
+
+
         }
       )
     ];
