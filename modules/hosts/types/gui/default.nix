@@ -32,4 +32,24 @@
         self.homeModules.desktop-environment
       ];
     };
+  flake.nixosModules.gui =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    {
+      imports = [
+        self.nixosModules.base
+      ];
+      modules = [
+        inputs.home-manager.nixosModules.home-manager
+        {
+          home-manager.users.phonkd.imports = [
+            self.homeModules.gui-nixos
+          ];
+        }
+      ];
+    };
 }
