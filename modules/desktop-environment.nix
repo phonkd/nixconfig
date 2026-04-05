@@ -50,6 +50,7 @@
         $fileManager = thunar
         $menu = rofi -show combi -modes combi -combi-modes "window,drun,run" -show-icons
         #exec = waybar --config ~/.config/waybar/config_laptop
+        exec-once = noctalia-shell
         exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
         exec-once = lxqt-policykit-agent
         exec-once = waypaper --restore
@@ -389,5 +390,8 @@
     programs.noctalia-shell = {
       enable = true;
     };
+    home.packages = [
+      inputs.noctalia.packages.${pkgs.system}.default
+    ];
   };
 }
