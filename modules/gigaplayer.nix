@@ -51,10 +51,8 @@
       };
       systemd.services.pipewire-pulse.wantedBy = [ "multi-user.target" ];
 
-      # 2. Spotifyd Service (Unstable)
       services.spotifyd = {
         enable = true;
-        # package = pkgs.unstable.spotifyd; # User removed this
         settings = {
           global = {
             device_name = "nixos-headless";
@@ -151,7 +149,7 @@
           x11vnc
           python3Packages.websockify
           dbus
-          pkgs.unstable.easyeffects
+          easyeffects
           bluez
           bluez-tools
         ];
