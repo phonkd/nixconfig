@@ -37,5 +37,6 @@
         dates = "daily";
         options = "--delete-older-than 3d";
       };
+      nix.settings.require-sigs = false;
     };
 }
