@@ -1,6 +1,12 @@
 { inputs, ... }:
 
 {
+  flake.darwinModules.shell = { pkgs, lib, config, ...}:
+    {
+      environment.systemPackages = with pkgs; [
+        coreutils-full
+      ];
+    };
   flake.homeModules.shell =
     { pkgs, lib, config, ... }:
     {

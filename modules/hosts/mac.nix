@@ -13,6 +13,7 @@
     modules = [
       self.darwinModules.macm4
       self.darwinModules.dns
+      self.darwinModules.shell
       inputs.home-manager.darwinModules.home-manager
       {
         imports = [
