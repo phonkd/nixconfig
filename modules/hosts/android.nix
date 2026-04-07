@@ -5,7 +5,11 @@
 }:
 {
   flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidConfiguration {
-    pkgs = import inputs.nixpkgs-unstable-droid { system = "aarch64-linux"; };
+    pkgs = import inputs.nixpkgs-unstable-droid {
+      system = "aarch64-linux";
+      nixpkgs.config.allowUnfree = true;
+
+    };
     home-manager-path = inputs.home-manager.outPath;
     modules = [
       (
@@ -30,14 +34,14 @@
                 default_shell "zsh"
                 show_startup_tips false
                '';
-               settings = { 
+               settings = {
                  theme = "everforest-dark";
                };
               };
 
             };
             user.shell = pkgs.zsh;
-            nixpkgs.config.allowUnfree = true;
+            #nixpkgs.config.allowUnfree = true;
 
           environment.packages = with pkgs; [
             openssh
@@ -47,7 +51,7 @@
           nix.extraOptions = ''
             experimental-features = nix-command flakes
           '';
-          nix.registry.nixpkgs = { 
+          nix.registry.nixpkgs = {
             flake = inputs.nixpkgs-unstable-droid;
           };
           nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable-droid}" ];
