@@ -8,6 +8,7 @@
         self.homeModules.work-tools
         self.homeModules.work-external-config
       ];
+      programs.git.signing.signByDefault = true;
     };
   flake.module.darwin."work" = {pkgs, ...}: {
     imports = [

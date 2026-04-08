@@ -60,6 +60,10 @@
       services.ssh-agent = {
         enable = true;
       };
+      services.gpg-agent = {
+        enable = true;
+        enableZshIntegration = true;
+      };
     };
   flake.nixosModules.system-minimal = {
     imports = [
