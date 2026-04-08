@@ -255,7 +255,7 @@
           $ipc = qs -c noctalia-shell ipc call
           bind = $mainMod, d, exec, $ipc launcher toggle
 
-          bind = ALT_L, v, exec, $terminal
+          bind = ALT, v, exec, $terminal
           bind = $mainMod, Q, killactive,
           bind = $mainMod SHIFT, E, exit
           bind = $mainMod, E, exec, $fileManager

@@ -66,7 +66,7 @@
         defaultCacheTtl = 7200;
       };
     };
-  flake.nixosModules.system-minimal = {
+  flake.nixosModules.system-minimal = { pkgs, ... }: {
     imports = [
       inputs.sops-nix.nixosModules.sops
     ];
@@ -84,6 +84,7 @@
       description = "phonkd";
       extraGroups = [ "wheel" ];
       group = "phonkd";
+      shell = pkgs.zsh;
     };
     users.groups.phonkd = { };
     sops.age = {

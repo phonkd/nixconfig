@@ -36,9 +36,6 @@
       ...
     }:
     {
-      imports = [
-        self.homeModules.hyprland
-      ];
       services.easyeffects.enable = true;
       home.packages = with pkgs; [
         dracula-theme
