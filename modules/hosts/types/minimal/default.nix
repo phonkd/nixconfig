@@ -63,7 +63,7 @@
       services.gpg-agent = {
         enable = true;
         enableZshIntegration = true;
-        defaultCacheTtl = 1800;
+        defaultCacheTtl = 7200;
       };
     };
   flake.nixosModules.system-minimal = {
