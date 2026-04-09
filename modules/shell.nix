@@ -23,6 +23,9 @@
           cpp = ''
             cat "$1" | pbcopy
           '';
+          kgi = ''
+            kubectl get ingress "$@" -o custom-columns="NAME:.metadata.name,HOST:.spec.rules[*].host,PATH:.spec.rules[*].http.paths[*].path,BACKEND:.spec.rules[*].http.paths[*].backend.service.name"
+          '';
         };
         enableCompletion = true;
         completionInit = ''

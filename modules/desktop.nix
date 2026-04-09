@@ -22,6 +22,7 @@
         nvtopPackages.full
         cool-retro-term
         yubikey-manager
+        wireguard-tools
       ];
       xdg.enable = true;
       #news.display = "silent";
