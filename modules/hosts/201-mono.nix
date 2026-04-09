@@ -39,6 +39,7 @@
           prefixLength = 24;
         }
       ];
+      security.sudo.wheelNeedsPassword = false;
       networking.hostName = "201-mono"; # Define your hostname.
       networking.networkmanager.dhcp = "internal";
       # Groups:
