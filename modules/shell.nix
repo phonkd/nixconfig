@@ -1,4 +1,4 @@
-{ inputs, ... }:
+{ inputs, self, ... }:
 
 {
   flake.darwinModules.shell = { pkgs, lib, config, ...}:
@@ -83,6 +83,7 @@
         sops
         prek
         curl
+
       ];
       programs.fzf = {
         enable = true;

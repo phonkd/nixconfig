@@ -1,0 +1,4 @@
+creation_rules:
+  - path_regex: secrets/wg-endpoint.json
+    encrypted_regex: "^(private_key|public_key)$"
+    age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"

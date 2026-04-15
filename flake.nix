@@ -5,7 +5,8 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";
 
-    #wrapper-modules.url = "github:BirdeeHub/nix-wrapper-modules";
+    wrapper-modules.url = "github:BirdeeHub/nix-wrapper-modules";
+    wrapper-modules.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin = {
       url = "github:nix-darwin/nix-darwin/master";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -26,5 +27,19 @@
     };
   };
 
-  outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-parts,
+      import-tree,
+      wrapper-modules,
+      ...
+    }@inputs:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      imports = [
+        wrapper-modules.flakeModules.default
+        (import-tree ./modules)
+      ];
+    };
 }

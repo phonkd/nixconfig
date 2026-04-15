@@ -65,6 +65,10 @@
 
           # # 3. Generate the public key from that private key
           # wg pubkey < private.key > public.key
+          #
+          # create client keys the same way
+          # (umask 077; wg genkey > client_private.key)
+          # wg pubkey < client_private.key > client_public.key
           privateKeyFile = "/etc/wireguard/private.key";
           listenPort = 51820;
 
@@ -73,7 +77,7 @@
           # Add peers here (clients)
           peers = [
             {
-              publicKey = "9xiKWRgAU3vE17FpOsKhgzeoCH/UmLtlSg/ZSG2q6n0=";
+              publicKey = "GLthf683uYXbVPTAcHDCjxIuzBN5QLvU9foJ+g070XM=";
               # The internal IP assigned to this specific client
               allowedIPs = [ "10.8.0.2/32" ];
             }
