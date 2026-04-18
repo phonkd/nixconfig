@@ -77,7 +77,7 @@
           # Add peers here (clients)
           peers = [
             {
-              publicKey = "GLthf683uYXbVPTAcHDCjxIuzBN5QLvU9foJ+g070XM=";
+              publicKey = "CCr+3q0HCQKSBX2GV0l4OeflCYGdlbOqQ17rn0Khv3I=";
               # The internal IP assigned to this specific client
               allowedIPs = [ "10.8.0.2/32" ];
             }
