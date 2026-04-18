@@ -31,6 +31,8 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.desktop-environment
+        inputs.nix-index-database.homeModules.default
+        { programs.nix-index-database.comma.enable = true; }
       ];
     };
   flake.nixosModules.gui =
