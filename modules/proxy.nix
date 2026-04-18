@@ -20,6 +20,7 @@
         #   format = "json";
         #   key = "";
         # };
+        proxy.ipRanges = [ "192.168.1.47/32" "192.168.1.201/32" "192.168.1.203" "192.168.1.46" "192.168.1.200" ];
 
         programs.ssh.matchBlocks = lib.listToAttrs (map (range:
           let ip = builtins.head (lib.splitString "/" range);
@@ -29,17 +30,18 @@
         ) config.proxy.ipRanges);
 
         home.packages = [
-          (self.wrappers.sing-box-wg.wrap {
+          (self.wrappers.sing-box-sel.wrap {
             inherit pkgs;
             ipRanges = config.proxy.ipRanges;
             # secretsFile = config.sops.secrets.wg-endpoint.path;
             secretsFile = "${config.home.homeDirectory}/.config/wg-endpoint.json";
+            additionalConfigFile = "${config.home.homeDirectory}/git/bedag-setup/singbox.json";
           })
         ];
       };
     };
 
-  flake.wrappers.sing-box-wg =
+  flake.wrappers.sing-box-sel =
     { config, pkgs, wlib, lib, ... }:
     {
       imports = [ wlib.modules.default ];
@@ -48,6 +50,10 @@
         secretsFile = lib.mkOption {
           type = lib.types.str;
           description = "Path to sops-decrypted WireGuard endpoint config merged into sing-box.";
+        };
+        additionalConfigFile = lib.mkOption {
+          type = lib.types.str;
+          description = "Path to additional sing-box config file.";
         };
         wgLocalAddress = lib.mkOption {
           type = lib.types.listOf lib.types.str;
@@ -99,6 +105,7 @@
           "run"
           "--config" config.constructFiles.singBoxConfig.path
           "--config" config.secretsFile
+          "--config" config.additionalConfigFile
         ];
       };
     };

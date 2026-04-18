@@ -15,11 +15,6 @@
       self.darwinModules.dns
       self.darwinModules.shell
       inputs.home-manager.darwinModules.home-manager
-      {
-        imports = [
-          self.module.darwin.work
-        ];
-      }
     ];
 
   };
@@ -29,9 +24,7 @@
       home-manager.users.phonkd.imports = [
         self.homeModules.gui
         self.homeModules.work
-        self.homeModules.proxy
         {
-          proxy.ipRanges = [ "192.168.1.47/32" "192.168.1.201/32" "192.168.1.203" "192.168.1.46" "192.168.1.200" ];
           #home.stateVersion = "26.05";
           targets.darwin = { copyApps.enable = false; linkApps.enable = true; };
         }
