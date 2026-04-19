@@ -16,7 +16,7 @@
           #withOpenASAR = true;
           withVencord = true; # can do this here too
         })
-        #claude-code
+        claude-code-bin
         scrcpy
         (yt-dlp.override { javascriptSupport = false; })
         nvtopPackages.full

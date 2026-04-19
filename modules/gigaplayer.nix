@@ -133,7 +133,12 @@
         environment = {
           "DISPLAY" = ":5";
           "PIPEWIRE_RUNTIME_DIR" = "/run/pipewire";
+          "PULSE_SERVER" = "unix:/run/pulse/native";
+          "PULSE_RUNTIME_PATH" = "/run/pulse";
           "XDG_RUNTIME_DIR" = "/run/easyeffects";
+          "XDG_CONFIG_HOME" = "/var/lib/easyeffects/.config";
+          "XDG_CACHE_HOME" = "/var/lib/easyeffects/.cache";
+          "XDG_DATA_HOME" = "/var/lib/easyeffects/.local/share";
           "GDK_BACKEND" = "x11";
           "QT_QPA_PLATFORM" = "xcb";
           "LIBGL_ALWAYS_SOFTWARE" = "1";
@@ -144,32 +149,50 @@
 
         path = with pkgs; [
           bash
+          procps
           xorg.xorgserver
           xorg.xauth
           x11vnc
           python3Packages.websockify
           dbus
           easyeffects
+          openbox
           bluez
           bluez-tools
         ];
 
         script = ''
-          rm -f /tmp/.X5-lock /tmp/.X11-unix/X5
+          # Use a dbus session for the entire stack
+          exec ${pkgs.dbus}/bin/dbus-run-session -- bash -c '
+            cleanup() {
+              echo "Cleaning up child processes..."
+              kill $XVFB_PID $OPENBOX_PID $X11VNC_PID $WEBSOCKIFY_PID 2>/dev/null || true
+              wait
+            }
+            trap cleanup EXIT
 
-          ${pkgs.dbus}/bin/dbus-run-session -- bash -c '
             # 1. Start Xvfb
             Xvfb :5 -screen 0 1920x1080x24 &
+            XVFB_PID=$!
             sleep 2
 
-            # 2. Start VNC Server
-            x11vnc -display :5 -forever -shared -nopw -bg -q
+            # 2. Start openbox window manager
+            openbox &
+            OPENBOX_PID=$!
+            sleep 1
 
-            # 3. Start WebSockify (Background)
-            ${pkgs.python3Packages.websockify}/bin/websockify -D --web ${pkgs.novnc}/share/webapps/novnc 8085 localhost:5900
+            # 3. Start VNC Server
+            x11vnc -display :5 -forever -shared -nopw -q &
+            X11VNC_PID=$!
+            sleep 1
 
-            # 4. Start EasyEffects (Blocking)
-            exec easyeffects
+            # 4. Start WebSockify
+            ${pkgs.python3Packages.websockify}/bin/websockify --web ${pkgs.novnc}/share/webapps/novnc 8085 localhost:5900 &
+            WEBSOCKIFY_PID=$!
+            sleep 1
+
+            # 5. Start EasyEffects (blocking foreground process)
+            easyeffects
           '
         '';
 
@@ -177,8 +200,15 @@
           User = "easyeffects";
           Group = "easyeffects";
           Restart = "always";
+          RestartSec = "5s";
           RuntimeDirectory = "easyeffects";
           RuntimeDirectoryMode = "0700";
+          KillMode = "control-group";
+          TimeoutStopSec = "10s";
+          # preStart needs root to kill orphaned Xvfb and clean /tmp
+          ExecStartPre = [
+            "+${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -9 -x Xvfb || true; sleep 1; rm -f /tmp/.X5-lock /tmp/.X11-unix/X5 /tmp/easyeffects.lock; mkdir -p /var/lib/easyeffects/.config /var/lib/easyeffects/.cache /var/lib/easyeffects/.local/share; chown -R easyeffects:easyeffects /var/lib/easyeffects'"
+          ];
         };
       };
       ## AirPlay receiver (uxplay)
