@@ -39,6 +39,6 @@
         options = "--delete-older-than 3d";
       };
       nix.settings.require-sigs = false;
-      boot.loader.grub.devices = [ "/dev/sdb" ];
+      #boot.loader.grub.devices = [ "/dev/sdb" ];
     };
 }
