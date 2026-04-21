@@ -90,6 +90,7 @@
     sops.age = {
       keyFile = "/home/phonkd/.config/sops/age/keys.txt";
     };
+    nix.settings.experimental-features = [ "nix-command" "flakes" ];
     programs.zsh.enable = true;
     nixpkgs.config.allowUnfree = true;
   };
