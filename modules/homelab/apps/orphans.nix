@@ -61,6 +61,18 @@
               extraMiddlewares = [ "pve-headers" ];
             };
           };
+          "46" = {
+            ip = "192.168.1.46";
+            port = 9090;
+            traefik = {
+              enable = true;
+              domain = "46.int.w.phonkd.net";
+              scheme = "https"; # Requires the update above
+              transport = "insecureTransport"; # Requires the update above
+              ipfilter = true;
+              extraMiddlewares = [ "pve-headers" ];
+            };
+          };
           zyxel = {
             ip = "192.168.1.1";
             port = 443;
