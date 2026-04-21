@@ -20,6 +20,9 @@
       ...
     }:
     {
+      imports = [
+        /etc/nixos/hardware-configuration.nix
+      ];
       networking.useDHCP = lib.mkDefault true;
       networking.interfaces.ens18.ipv4.addresses = [
         {
