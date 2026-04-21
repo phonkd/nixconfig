@@ -22,12 +22,12 @@
         # };
         proxy.ipRanges = [ "192.168.1.47/32" "192.168.1.201/32" "192.168.1.203" "192.168.1.46" "192.168.1.200" ];
 
-        programs.ssh.matchBlocks = lib.listToAttrs (map (range:
-          let ip = builtins.head (lib.splitString "/" range);
-          in lib.nameValuePair ip {
-            proxyCommand = "nc -X 5 -x 127.0.0.1:2080 %h %p";
-          }
-        ) config.proxy.ipRanges);
+        # programs.ssh.matchBlocks = lib.listToAttrs (map (range:
+        #   let ip = builtins.head (lib.splitString "/" range);
+        #   in lib.nameValuePair ip {
+        #     proxyCommand = "nc -X 5 -x 127.0.0.1:2080 %h %p";
+        #   }
+        # ) config.proxy.ipRanges);
 
         home.packages = [
           (self.wrappers.sing-box-sel.wrap {
@@ -37,6 +37,7 @@
             secretsFile = "${config.home.homeDirectory}/.config/wg-endpoint.json";
             additionalConfigFile = "${config.home.homeDirectory}/git/bedag-setup/singbox.json";
           })
+          pkgs.socat
         ];
       };
     };
