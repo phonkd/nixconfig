@@ -271,4 +271,8 @@
         };
       };
     };
+    networking.firewall = {
+      allowedUDPPorts = [ 1900 ];
+      allowedTCPPortRanges = [ { from = 49152; to = 65535; } ];
+    };
 }
