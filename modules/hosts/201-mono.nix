@@ -82,6 +82,10 @@
               # The internal IP assigned to this specific client
               allowedIPs = [ "10.8.0.2/32" ];
             }
+            {
+              publicKey = "8Cu7eXjrMef0k1CN0amimPLI2YKP/nKyFgHAH0sDMyg=";
+              allowedIPs = [ "10.8.0.3/32" ];
+            }
           ];
         };
       };
