@@ -16,9 +16,9 @@
           };
           traefik = {
             enable = true;
-            auth = true;
+            auth = false;
             domain = "paperless.w.phonkd.net";
-            ipfilter = false;
+            ipfilter = true;
           };
           teleport = {
             enable = true;
