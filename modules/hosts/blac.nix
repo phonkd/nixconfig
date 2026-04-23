@@ -45,7 +45,11 @@
       networking.enableIPv6 = false;
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 
-      boot.loader.systemd-boot.enable = true;
+      boot.loader.systemd-boot.enable = false;
+      boot.loader.limine = {
+        enable = true;
+        secureBoot.enable = true;
+      };
       boot.loader.efi.canTouchEfiVariables = true;
       services.hardware.bolt.enable = true;
 
@@ -72,6 +76,7 @@
       hardware.nvidia = {
         open = true;
         modesetting.enable = true;
+        powerManagement.enable = true;
         package = config.boot.kernelPackages.nvidiaPackages.latest;
       };
 
