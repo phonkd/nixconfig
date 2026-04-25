@@ -20,6 +20,7 @@
       self.nixosModules.gui
       self.nixosModules.blac
       self.nixosModules.nvidia-desktop
+      self.nixosModules.gigaplayer-client
     ];
   };
   flake.nixosModules.blac =
@@ -30,6 +31,8 @@
       ...
     }:
     {
+      programs.steam.enable = true;
+      hardware.bluetooth.enable = true;
       system.stateVersion = "26.05";
       users.users.phonkd.extraGroups = [ "dialout" ];
       networking.networkmanager.enable = true;

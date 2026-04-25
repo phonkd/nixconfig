@@ -22,7 +22,6 @@
       self.nixosModules.homelab-vaultwarden
       self.nixosModules.homelab-paperless
       self.nixosModules.homelab-arr
-      self.nixosModules.gigaplayer-client
     ];
   };
   flake.nixosModules."201-mono" =
