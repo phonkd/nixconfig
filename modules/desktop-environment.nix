@@ -68,11 +68,13 @@
           # Set programs that you use
           $terminal = ghostty
           $fileManager = thunar
-          $menu = rofi -show combi -modes combi -combi-modes "window,drun,run" -show-icons
+          $menu = noctalia-shell ipc call launcher toggle
           #exec = waybar --config ~/.config/waybar/config_laptop
           exec-once = noctalia-shell
           exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
           exec-once = lxqt-policykit-agent
+
+          monitor = ,preferred,auto,1.25
 
           env = XCURSOR_SIZE,40
           env = XCURSOR_THEME,Bibata-Modern-Amber
@@ -251,10 +253,6 @@
           # See https://wiki.hyprland.org/Configuring/Keywords/
           $mainMod = SUPER # Sets "Windows" key as main modifier
 
-          # noctalia
-          $ipc = qs -c noctalia-shell ipc call
-          bind = $mainMod, d, exec, $ipc launcher toggle
-
           bind = ALT, v, exec, $terminal
           bind = $mainMod, Q, killactive,
           bind = $mainMod SHIFT, E, exit
@@ -264,7 +262,7 @@
 
           bind = $mainMod, o, exec, rofi -show rofi-obsidian:rofi-obsidian
           bind = $mainMod SHIFT, o, exec, ~/.config/rofi-pulse-select sink
-          bind = SUPER, V, exec, cliphist list | rofi -dmenu | cliphist decode | wl-copy
+          bind = SUPER, V, exec, noctalia-shell ipc call launcher clipboard
           bind = $mainMod, z, exec, rofi-zed-recent
           ## brightness
 
@@ -375,6 +373,9 @@
           windowrule = match:title (Authentication Required), stay_focused on
           windowrule = match:class ^(Waydroid)$, opacity 1 1
           windowrule = match:class ^(Waydroid)$, float on
+
+          # Noctalia HVE (Hyprland Visual Effects)
+          source = ~/.cache/noctalia/HVE/overlay.conf
         '';
       };
 
@@ -392,9 +393,14 @@
       ];
       programs.noctalia-shell = {
         enable = true;
+        settings = builtins.fromJSON (builtins.readFile ../dotconfig/noctalia/settings.json);
       };
       home.packages = [
         inputs.noctalia.packages.${pkgs.system}.default
       ];
+      home.file.".config/rofi-pulse-select" = {
+        source = ../dotconfig/rofi-pulse-select;
+        executable = true;
+      };
     };
 }

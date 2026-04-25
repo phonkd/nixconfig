@@ -13,9 +13,7 @@
       /etc/nixos/hardware-configuration.nix
       inputs.home-manager.nixosModules.home-manager
       {
-        # home-manager.users.phonkd.imports = [
-        #   self.homeModules.gui-nixos
-        # ];
+        home-manager.backupFileExtension = "hm-backup";
       }
       self.nixosModules.gui
       self.nixosModules.blac
