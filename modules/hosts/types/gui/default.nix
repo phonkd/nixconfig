@@ -17,6 +17,7 @@
         self.homeModules.terminal
         self.homeModules.desktop
         self.homeModules.proxy
+        self.homeModules.gaming
       ];
     };
   flake.homeModules.gui-nixos =
