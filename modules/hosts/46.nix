@@ -40,5 +40,6 @@
       };
       nix.settings.require-sigs = false;
       boot.loader.grub.devices = [ "/dev/sdc" ];
+
     };
 }
