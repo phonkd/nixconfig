@@ -393,7 +393,7 @@
       ];
       programs.noctalia-shell = {
         enable = true;
-        settings = builtins.fromJSON (builtins.readFile ../dotconfig/noctalia/settings.json);
+        settings = (builtins.fromJSON (builtins.readFile ../dotconfig/noctalia/settings.json)).settings;
       };
       home.packages = [
         inputs.noctalia.packages.${pkgs.system}.default

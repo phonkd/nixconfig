@@ -30,7 +30,7 @@
     }:
     {
       imports = [
-        "${builtins.fetchGit { url = "https://github.com/NixOS/nixos-hardware.git";}}/asus/zephyrus/ga401"
+        "${builtins.fetchGit { url = "https://github.com/NixOS/nixos-hardware.git"; }}/asus/zephyrus/ga401"
       ];
       programs.steam.enable = true;
       hardware.bluetooth.enable = true;
@@ -51,7 +51,7 @@
       boot.loader.systemd-boot.enable = false;
       boot.loader.limine = {
         enable = true;
-       # secureBoot.enable = true;
+        # secureBoot.enable = true;
       };
       boot.loader.efi.canTouchEfiVariables = true;
       services.hardware.bolt.enable = true;
@@ -92,8 +92,9 @@
       systemd.services.nvidia-powerd = {
         unitConfig.StartLimitAction = "none";
         serviceConfig.Restart = "no";
-        wantedBy = lib.mkForce [];
+        wantedBy = lib.mkForce [ ];
       };
+      services.upower.enable = true;
     };
 
 }
