@@ -27,6 +27,14 @@
         {
           #home.stateVersion = "26.05";
           targets.darwin = { copyApps.enable = false; linkApps.enable = true; };
+          proxy.ipRanges = [
+            "192.168.1.47/32"
+            "192.168.1.201/32"
+            "192.168.1.46/32"
+            "192.168.1.200/32"
+            "192.168.1.150/32"
+            "192.168.1.203"
+          ];
         }
       ];
       nixpkgs.hostPlatform = "aarch64-darwin";

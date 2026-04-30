@@ -51,6 +51,23 @@
       };
       systemd.services.pipewire-pulse.wantedBy = [ "multi-user.target" ];
 
+      # Restore ALSA mixer state on boot. Without this, headless system-wide
+      # PipeWire leaves the HDA codec output amps at 0 and the analog jacks
+      # are silent even though network sinks deliver audio correctly.
+      environment.systemPackages = [ pkgs.alsa-utils ];
+      systemd.services.alsa-restore = {
+        description = "Restore ALSA mixer state";
+        wantedBy = [ "sound.target" ];
+        before = [ "sound.target" ];
+        after = [ "local-fs.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          ExecStart = "${pkgs.alsa-utils}/bin/alsactl restore";
+          ExecStop = "${pkgs.alsa-utils}/bin/alsactl store";
+        };
+      };
+
       services.spotifyd = {
         enable = true;
         settings = {

@@ -37,6 +37,14 @@
       system.stateVersion = "26.05";
       users.users.phonkd.extraGroups = [ "dialout" ];
       networking.networkmanager.enable = true;
+      home-manager.users.phonkd.proxy.ipRanges = [
+        "192.168.1.47/32"
+        "192.168.1.201/32"
+        "192.168.1.46/32"
+        "192.168.1.200/32"
+        "192.168.1.150/32"
+        "192.168.1.203"
+      ];
       # Use declarative networking with secondary IP
       networking.hostName = "g14";
       networking.nameservers = [

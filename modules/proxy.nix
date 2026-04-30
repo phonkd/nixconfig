@@ -20,8 +20,6 @@
         #   format = "json";
         #   key = "";
         # };
-        proxy.ipRanges = [ "192.168.1.47/32" "192.168.1.201/32" "192.168.1.203/32" "192.168.1.46/32" "192.168.1.200/32" "192.168.1.150/32" ];
-
         # programs.ssh.matchBlocks = lib.listToAttrs (map (range:
         #   let ip = builtins.head (lib.splitString "/" range);
         #   in lib.nameValuePair ip {
