@@ -12,6 +12,7 @@ in
         "${bedagSetup}/shell.nix"
         "${bedagSetup}/options.nix"
         "${bedagSetup}/gitconfig.nix"
+        "${bedagSetup}/ica-proxy.nix"
       ];
     };
 }
