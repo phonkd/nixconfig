@@ -36,6 +36,17 @@
           zstyle ':completion:*' menu select
         '';
         autosuggestion.enable = true;
+        plugins = [
+          {
+            name = "fzf-tab";
+            src = pkgs.zsh-fzf-tab;
+            file = "share/fzf-tab/fzf-tab.plugin.zsh";
+          }
+        ];
+        initContent = ''
+          bindkey '^I' expand-or-complete
+          bindkey '^K' fzf-tab-complete
+        '';
         history = {
           size = 1000000;
           path = "${config.home.homeDirectory}/.zsh_history";
