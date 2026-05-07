@@ -37,6 +37,11 @@
           })
           pkgs.socat
         ];
+        home.sessionVariables = {
+          http_proxy = "http://localhost:2080";
+          https_proxy = "http://localhost:2080";
+          no_proxy = "localhost,127.0.0.1";
+        };
       };
     };
 

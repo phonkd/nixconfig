@@ -10,6 +10,10 @@
   flake.homeModules.shell =
     { pkgs, lib, config, ... }:
     {
+      imports = [
+        inputs.kubectl-aliases.homeManagerModules.default
+      ];
+      programs.kubectl-aliases.enable = true;
       programs.zsh = {
         enable = true;
 
@@ -71,7 +75,7 @@
       programs.kubecolor = {
         enable = true;
         enableZshIntegration = true;
-        #enableAlias = true;
+        enableAlias = true;
       };
       home.packages = with pkgs; [
         nerd-fonts.symbols-only

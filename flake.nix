@@ -29,6 +29,10 @@
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    kubectl-aliases = {
+        url = "github:phonkd/kubectl-aliases"; 
+        inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -38,6 +42,7 @@
       flake-parts,
       import-tree,
       wrapper-modules,
+      kubectl-aliases,
       ...
     }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {
