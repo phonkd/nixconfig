@@ -22,6 +22,7 @@
       self.nixosModules.homelab-vaultwarden
       self.nixosModules.homelab-paperless
       self.nixosModules.homelab-arr
+      self.nixosModules.homelab-aislop
     ];
   };
   flake.nixosModules."201-mono" =
