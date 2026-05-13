@@ -21,7 +21,7 @@
         enable = true;
         package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.open-webui;
         port = 11111;
-        host = "openwebui.int.w.phonkd.net";
+        host = "0.0.0.0";
       };
       nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
         "open-webui"
