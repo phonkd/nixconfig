@@ -17,7 +17,7 @@
           ipfilter = true;
         };
       };
-      services.openwebui = {
+      services.open-webui = {
         enable = true;
         port = 11111;
         host = "openwebui.int.w.phonkd.net";
