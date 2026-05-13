@@ -19,6 +19,7 @@
       };
       services.open-webui = {
         enable = true;
+        package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.open-webui;
         port = 11111;
         host = "openwebui.int.w.phonkd.net";
       };

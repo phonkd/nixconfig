@@ -5,6 +5,7 @@
 }:
 {
   flake.nixosConfigurations."201-mono" = inputs.nixpkgs.lib.nixosSystem {
+    specialArgs = { inherit inputs; };
     modules = [
       self.nixosModules.oldblac-vm
       self.nixosModules."201-mono"
