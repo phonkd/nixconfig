@@ -93,6 +93,16 @@
             require('neoscroll').setup()
           '';
         }
+        vim-markdown
+        bullets-vim
+        vim-table-mode
+        {
+          plugin = render-markdown-nvim;
+          type = "lua";
+          config = ''
+            require('render-markdown').setup({})
+          '';
+        }
       ];
     };
   };

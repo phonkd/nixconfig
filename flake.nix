@@ -30,8 +30,12 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     kubectl-aliases = {
-        url = "github:phonkd/kubectl-aliases"; 
+        url = "github:phonkd/kubectl-aliases";
         inputs.nixpkgs.follows = "nixpkgs";
+    };
+    try-rs = {
+      url = "github:phonkd/try-rs";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 

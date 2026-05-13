@@ -12,7 +12,7 @@
         dashboard.enable = true;
         traefik = {
           enable = true;
-          domain = "jellyfin.w.phonkd.net";
+          domain = "jellyfin.int.w.phonkd.net";
           auth = true;
           ipfilter = false;
         };

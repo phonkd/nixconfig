@@ -12,7 +12,11 @@
     {
       imports = [
         inputs.kubectl-aliases.homeManagerModules.default
+        inputs.try-rs.homeModules.default
       ];
+      programs.try-rs = {
+        enable = true;
+      };
       programs.kubectl-aliases.enable = true;
       programs.zsh = {
         enable = true;
