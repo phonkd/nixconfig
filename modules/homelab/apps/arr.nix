@@ -13,8 +13,8 @@
         traefik = {
           enable = true;
           domain = "jellyfin.int.w.phonkd.net";
-          auth = true;
-          ipfilter = false;
+          auth = false;
+          ipfilter = true;
         };
       };
       services.jellyfin.enable = true;
