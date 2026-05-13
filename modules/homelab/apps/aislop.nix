@@ -23,5 +23,8 @@
         port = 11111;
         host = "openwebui.int.w.phonkd.net";
       };
+      nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
+                   "open-webui"
+                 ]
     };
 }
