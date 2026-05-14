@@ -25,6 +25,7 @@
       self.nixosModules.homelab-arr
       self.nixosModules.homelab-aislop
       self.nixosModules.homelab-filestash
+      self.nixosModules.homelab-notes
     ];
   };
   flake.nixosModules."201-mono" =
