@@ -30,6 +30,11 @@
       services.dnsmasq = {
         enable = true;
         settings = {
+          # Don't grab port 53 on podman bridges — aardvark-dns needs it
+          # for container name resolution (--network-alias).
+          bind-dynamic = true;
+          except-interface = "podman*";
+
           # wildcard DNS
           address = [
             "/.int.phonkd.net/192.168.1.201"
