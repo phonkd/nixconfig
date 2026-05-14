@@ -19,7 +19,7 @@
           traefik = {
             enable = true;
             auth = false;
-            domain = "filestash.w.phonkd.net";
+            domain = "filestash.int.w.phonkd.net";
             ipfilter = true;
           };
           teleport = {
