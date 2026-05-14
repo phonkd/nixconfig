@@ -24,7 +24,6 @@
       self.nixosModules.homelab-paperless
       self.nixosModules.homelab-arr
       self.nixosModules.homelab-aislop
-      self.nixosModules.homelab-filestash
       self.nixosModules.homelab-notes
     ];
   };
