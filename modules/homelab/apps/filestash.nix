@@ -23,11 +23,7 @@
             ipfilter = true;
           };
           teleport = {
-            enable = true;
-            name = "filestash";
-            rewriteHeaders = [
-              "Host: filestash.teleport.phonkd.net"
-            ];
+            enable = false;
           };
         };
       };
