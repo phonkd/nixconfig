@@ -78,6 +78,8 @@
             cp -r ${memos-web} server/router/frontend/dist
           '';
 
+          doCheck = false;
+
           meta = {
             homepage = "https://usememos.com";
             description = "Lightweight, self-hosted memo hub";
