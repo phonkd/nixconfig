@@ -73,6 +73,10 @@
 
           vendorHash = "sha256-QNJosdRo1DauCOGFB+GrasSoKSmRhc3EjRfjm4TG0Jo=";
 
+          ldflags = [
+            "-X github.com/usememos/memos/server/version.Version=${version}"
+          ];
+
           preBuild = ''
             rm -rf server/router/frontend/dist
             cp -r ${memos-web} server/router/frontend/dist
