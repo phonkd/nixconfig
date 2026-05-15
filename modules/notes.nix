@@ -74,7 +74,7 @@
           vendorHash = "sha256-QNJosdRo1DauCOGFB+GrasSoKSmRhc3EjRfjm4TG0Jo=";
 
           ldflags = [
-            "-X github.com/usememos/memos/server/version.Version=${version}"
+            "-X github.com/usememos/memos/internal/version.Version=${version}"
           ];
 
           preBuild = ''
