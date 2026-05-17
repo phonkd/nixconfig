@@ -94,6 +94,8 @@
         sops.secrets."nzblife-api-key" = { };
         sops.secrets."sabnzbd-api-key" = { };
         sops.secrets."sabnzbd-nzb-key" = { };
+        sops.secrets."sabnbduser" = { };
+        sops.secrets."sabnzbdpw" = { };
         sops.secrets."seerr-api-key" = { };
         sops.secrets."jellyfin-api-key" = { };
         sops.secrets."jellyfin-admin-password" = { };
@@ -155,6 +157,18 @@
             settings.misc.nzb_key = {
               _secret = "/run/secrets/sabnzbd-nzb-key";
             };
+            settings.servers = [
+              {
+                name = "newshosting";
+                displayname = "Newshosting";
+                host = "news.newshosting.com";
+                port = 563;
+                ssl = true;
+                connections = 50;
+                username._secret = "/run/secrets/sabnbduser";
+                password._secret = "/run/secrets/sabnzbdpw";
+              }
+            ];
           };
 
           seerr = {
