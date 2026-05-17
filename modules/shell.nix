@@ -52,8 +52,13 @@
           }
         ];
         initContent = ''
+          bindkey -e
           bindkey '^I' expand-or-complete
           bindkey '^K' fzf-tab-complete
+          bindkey '^[[1;5C' forward-word
+          bindkey '^[[1;5D' backward-word
+          bindkey '^[[H' beginning-of-line
+          bindkey '^[[F' end-of-line
         '';
         history = {
           size = 1000000;

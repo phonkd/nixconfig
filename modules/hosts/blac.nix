@@ -53,6 +53,7 @@
       };
       boot.loader.efi.canTouchEfiVariables = true;
       services.hardware.bolt.enable = true;
+      services.gvfs.enable = true;
 
       services.xserver.enable = true;
 
