@@ -94,7 +94,7 @@
         sops.secrets."nzblife-api-key" = { };
         sops.secrets."sabnzbd-api-key" = { };
         sops.secrets."sabnzbd-nzb-key" = { };
-        sops.secrets."sabnbduser" = { };
+        sops.secrets."sabnzbduser" = { };
         sops.secrets."sabnzbdpw" = { };
         sops.secrets."seerr-api-key" = { };
         sops.secrets."jellyfin-api-key" = { };
@@ -165,7 +165,7 @@
                 port = 563;
                 ssl = true;
                 connections = 50;
-                username._secret = "/run/secrets/sabnbduser";
+                username._secret = "/run/secrets/sabnzbduser";
                 password._secret = "/run/secrets/sabnzbdpw";
               }
             ];
