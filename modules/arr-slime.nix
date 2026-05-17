@@ -138,7 +138,7 @@
               };
               indexers = [
                 {
-                  name = "nzb.life";
+                  name = "Nzb.life";
                   apiKey._secret = "/run/secrets/nzblife-api-key";
                 }
               ];
