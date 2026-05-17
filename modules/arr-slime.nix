@@ -91,6 +91,7 @@
           usenetClients.sabnzbd = {
             enable = true;
             settings.misc.port = 8085;
+            settings.misc.host_whitelist = "sabnzbd.int.w.phonkd.net";
             settings.misc.api_key = {
               _secret = "/run/secrets/sabnzbd-api-key";
             };
