@@ -64,7 +64,9 @@
         };
 
         sops.secrets."sonarr-api-key" = { };
+        sops.secrets."sonarr-password" = { };
         sops.secrets."prowlarr-api-key" = { };
+        sops.secrets."prowlarr-password" = { };
         sops.secrets."sabnzbd-api-key" = { };
         sops.secrets."sabnzbd-nzb-key" = { };
 
@@ -76,15 +78,25 @@
 
           sonarr = {
             enable = true;
-            config.apiKey = {
-              _secret = "/run/secrets/sonarr-api-key";
+            config = {
+              apiKey._secret = "/run/secrets/sonarr-api-key";
+              hostConfig = {
+                username = "phonkd";
+                password._secret = "/run/secrets/sonarr-password";
+                authenticationRequired = "disabledForLocalAddresses";
+              };
             };
           };
 
           prowlarr = {
             enable = true;
-            config.apiKey = {
-              _secret = "/run/secrets/prowlarr-api-key";
+            config = {
+              apiKey._secret = "/run/secrets/prowlarr-api-key";
+              hostConfig = {
+                username = "phonkd";
+                password._secret = "/run/secrets/prowlarr-password";
+                authenticationRequired = "disabledForLocalAddresses";
+              };
             };
           };
 
