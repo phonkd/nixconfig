@@ -64,7 +64,7 @@ let
     homelab-arr-slime
     homelab-aislop
     homelab-garage
-    homelab-notes
+    #homelab-notes
   ];
 
   # Darwin-side: cross-host feature modules.
