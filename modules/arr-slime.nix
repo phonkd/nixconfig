@@ -52,7 +52,7 @@
           };
           sabnzbd = {
             ip = "127.0.0.1";
-            port = 8080;
+            port = 8085;
             dashboard.enable = true;
             traefik = {
               enable = true;
@@ -90,6 +90,7 @@
 
           usenetClients.sabnzbd = {
             enable = true;
+            settings.misc.port = 8085;
             settings.misc.api_key = {
               _secret = "/run/secrets/sabnzbd-api-key";
             };
