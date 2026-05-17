@@ -4,8 +4,8 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-arr" = { config, pkgs, lib, ... }:
-    {
+  flake.nixosModules."homelab-arr" = { config, pkgs, lib, noughtyLib, ... }:
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       phonkds.modules.jellyfin = {
         ip = "127.0.0.1";
         port = 8096;

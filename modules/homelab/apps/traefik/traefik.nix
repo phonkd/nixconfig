@@ -4,10 +4,10 @@
   ...
 }:
 {
-  flake.nixosModules."201-traefik" = { config, pkgs, lib, ... }:
+  flake.nixosModules.homelab-traefik = { config, pkgs, lib, noughtyLib, ... }:
     let
       # apps are sourced across all nixos modules containing phonkds.modules configs
-      # the definition of the module is in applist.nix
+      # the option type lives in modules/phonkds-options.nix
       # Filter apps that have traefik enabled and a domain configured
       traefikservices = lib.filterAttrs (
         name: app: app.traefik.enable && app.traefik.domain != null
@@ -93,7 +93,7 @@
 
       };
     in
-    {
+    lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       sops.secrets.CF_DNS_API_TOKEN = {
         sopsFile = ./traefik-secret.txt;
         format = "binary";

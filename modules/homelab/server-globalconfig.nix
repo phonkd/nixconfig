@@ -11,7 +11,7 @@
       lib,
       ...
     }:
-    {
+    lib.mkIf config.noughty.host.is.server {
       nix.gc = {
         automatic = true;
         dates = "weekly";

@@ -5,6 +5,7 @@
       config,
       pkgs,
       lib,
+      noughtyLib,
       ...
     }:
     let
@@ -26,7 +27,7 @@
         })
       ) teleportApps;
     in
-    {
+    lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       services.teleport.enable = true;
       sops.secrets.teleport_authkey = {
         owner = "root";

@@ -4,8 +4,8 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-paperless" = { config, pkgs, lib, ... }:
-    {
+  flake.nixosModules."homelab-paperless" = { config, pkgs, lib, noughtyLib, ... }:
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       phonkds.modules = {
         paperless = {
           ip = "127.0.0.1";

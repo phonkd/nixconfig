@@ -4,8 +4,8 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-vaultwarden" = { config, pkgs, lib, ... }:
-    {
+  flake.nixosModules."homelab-vaultwarden" = { config, pkgs, lib, noughtyLib, ... }:
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       phonkds.modules.vaultwarden = {
           ip = "127.0.0.1";
           port = 8000;

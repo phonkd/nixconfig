@@ -9,10 +9,11 @@
       config,
       pkgs,
       lib,
+      noughtyLib,
       ...
     }:
 
-    {
+    lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       phonkds.modules.authelia = {
         ip = "127.0.0.1";
         port = 9091;

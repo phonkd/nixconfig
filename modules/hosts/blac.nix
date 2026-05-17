@@ -1,26 +1,11 @@
+# Host-specific NixOS config for blac.
+#
+# This file used to wire `flake.nixosConfigurations.blac` by hand and
+# pick a module list. That responsibility moved to lib/registry.nix +
+# modules/_builder.nix. Here we only declare what the *blac* host should
+# do, and self-gate so the module is safe to import into any host.
+{ ... }:
 {
-  self,
-  inputs,
-  ...
-}:
-{
-  imports = [
-    inputs.home-manager.flakeModules.home-manager
-  ];
-
-  flake.nixosConfigurations."blac" = inputs.nixpkgs.lib.nixosSystem {
-    modules = [
-      /etc/nixos/hardware-configuration.nix
-      inputs.home-manager.nixosModules.home-manager
-      {
-        home-manager.backupFileExtension = "hm-backup";
-      }
-      self.nixosModules.gui
-      self.nixosModules.blac
-      self.nixosModules.nvidia-desktop
-      self.nixosModules.gigaplayer-client
-    ];
-  };
   flake.nixosModules.blac =
     {
       config,
@@ -28,21 +13,18 @@
       lib,
       ...
     }:
-    {
+    lib.mkIf (config.noughty.host.name == "blac") {
       programs.steam.enable = true;
       hardware.bluetooth.enable = true;
       system.stateVersion = "26.05";
       users.users.phonkd.extraGroups = [ "dialout" ];
       networking.networkmanager.enable = true;
-      # Use declarative networking with secondary IP
-      #networking.useDHCP = true;
       networking.hostName = "blac";
       networking.nameservers = [
         "192.168.1.201"
         "1.1.1.1"
       ];
 
-      # Disable IPv6
       networking.enableIPv6 = false;
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 
@@ -68,7 +50,6 @@
       };
 
       boot.kernelParams = [
-        #"pcie_aspm=off"
         "pci=noaer"
         "btusb.enable_autosuspend=n"
         "amd_iommu=on"
@@ -94,7 +75,6 @@
       };
       services.ollama = {
         enable = true;
-        #acceleration = "cuda";
       };
 
       environment.etc."libinput/local-overrides.quirks".text = ''
@@ -103,5 +83,4 @@
         ModelBouncingKeys=1
       '';
     };
-
 }

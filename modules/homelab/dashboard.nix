@@ -5,6 +5,7 @@
       config,
       pkgs,
       lib,
+      noughtyLib,
       ...
     }:
     let
@@ -42,7 +43,7 @@
         };
       }) teleportApps;
     in
-    {
+    lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       services.homepage-dashboard = {
         enable = true;
         openFirewall = false; # Expose the dashboard port (default 8082)

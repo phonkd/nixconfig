@@ -4,8 +4,8 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-aislop" = { config, pkgs, lib, ... }:
-    {
+  flake.nixosModules."homelab-aislop" = { config, pkgs, lib, noughtyLib, ... }:
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       phonkds.modules.aislop = {
         ip = "127.0.0.1";
         port = 11111;

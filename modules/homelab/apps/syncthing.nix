@@ -4,8 +4,8 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-syncthing" = { config, pkgs, lib, ... }:
-    {
+  flake.nixosModules."homelab-syncthing" = { config, pkgs, lib, noughtyLib, ... }:
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       phonkds.modules = {
           syncthing = {
             ip = "127.0.0.1";

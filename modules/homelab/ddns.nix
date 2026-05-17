@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-ddns" = { config, pkgs, lib, ... }:
+  flake.nixosModules."homelab-ddns" = { config, pkgs, lib, noughtyLib, ... }:
     let
       ddnsScript = ''
         #!/usr/bin/env bash
@@ -75,7 +75,7 @@
         fi
       '';
     in
-    {
+    lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       # Install dependencies
       environment.systemPackages = with pkgs; [
         curl

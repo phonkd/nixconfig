@@ -168,6 +168,9 @@
         )
       ];
     };
+  # Self-gating module: imports stay unconditional, but its config block
+  # only activates when the host has an NVIDIA GPU. Safe to import into
+  # any host -- which is why modules/_builder.nix puts it in alwaysImport.
   flake.nixosModules.nvidia-desktop =
     {
       pkgs,
@@ -177,19 +180,19 @@
     }:
     {
       imports = [ self.nixosModules.desktop ];
-      environment.variables = {
-        LIBVA_DRIVER_NAME = "nvidia";
-      };
-      services.xserver.videoDrivers = [ "nvidia" ];
-      environment.systemPackages = with pkgs; [
-        nvidia-vaapi-driver
-      ];
-      hardware.graphics = {
-        extraPackages = with pkgs; [
+      config = lib.mkIf config.noughty.host.gpu.hasNvidia {
+        environment.variables.LIBVA_DRIVER_NAME = "nvidia";
+        services.xserver.videoDrivers = [ "nvidia" ];
+        environment.systemPackages = with pkgs; [
           nvidia-vaapi-driver
-          libvdpau-va-gl
-          libvdpau
         ];
+        hardware.graphics = {
+          extraPackages = with pkgs; [
+            nvidia-vaapi-driver
+            libvdpau-va-gl
+            libvdpau
+          ];
+        };
       };
     };
 }

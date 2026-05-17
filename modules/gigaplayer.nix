@@ -4,9 +4,15 @@
   ...
 }:
 {
+  # Self-gates on the "gigaplayer-client" host tag.
   flake.nixosModules.gigaplayer-client =
-    { pkgs, ... }:
     {
+      pkgs,
+      lib,
+      noughtyLib,
+      ...
+    }:
+    lib.mkIf (noughtyLib.hostHasTag "gigaplayer-client") {
       systemd.user.services.pipewire-network-sink = {
         description = "Load PipeWire Network Sink for 203-spot";
         after = [ "pipewire-pulse.service" ];
@@ -23,13 +29,15 @@
         };
       };
     };
+  # Self-gates on the "gigaplayer-server" host tag.
   flake.nixosModules.gigaplayer-server =
     {
       pkgs,
       lib,
+      noughtyLib,
       ...
     }:
-    {
+    lib.mkIf (noughtyLib.hostHasTag "gigaplayer-server") {
       # 1. Audio Setup (PipeWire System-Wide)
       security.rtkit.enable = true;
       services.pipewire = {

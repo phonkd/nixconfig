@@ -4,8 +4,8 @@
   ...
 }:
 {
-  flake.nixosModules."homelab-garage" = { config, pkgs, lib, ... }:
-    {
+  flake.nixosModules."homelab-garage" = { config, pkgs, lib, noughtyLib, ... }:
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       phonkds.modules = {
         s3-public = {
           ip = "127.0.0.1";

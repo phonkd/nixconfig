@@ -1,19 +1,37 @@
-{ self, inputs, ...}:
+# Central type declaration for `phonkds.modules.*` — the homelab app
+# registry that producers (homelab-*) write into and consumers (traefik,
+# dashboard, teleport) read from.
+#
+# Always-imported because:
+#   * Producers may eventually run on hosts other than the reverse proxy;
+#     they need the option type in scope to set `phonkds.modules.<x>`.
+#   * The consumers (gated on `reverse-proxy`) also need the option in
+#     scope. Declaring it everywhere is cheap (empty default) and
+#     decouples producer/consumer placement.
+#
+# Also declares `label.labels`, a freeform host-classification list used
+# by a few legacy sites (e.g. 201-mono sets `label.labels = ["vm"]`).
 {
-  flake.nixosModules.server-applist =
-    { config, pkgs, lib, ...}:
-    # modules/my-apps.nix
+  self,
+  inputs,
+  ...
+}:
+{
+  flake.nixosModules.phonkds-options =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
     let
       t = lib.types;
     in
     {
-      imports = [
-        self.nixosModules.homelab-orphans
-      ];
       options.label = {
         labels = lib.mkOption {
-          type = lib.types.listOf lib.types.str;
-          default = [];
+          type = t.listOf t.str;
+          default = [ ];
           description = "Labels to categorize machines.";
         };
       };
@@ -25,7 +43,6 @@
             { config, ... }:
             {
               options = {
-                # We group all traefik settings here
                 ip = lib.mkOption { type = t.str; };
                 port = lib.mkOption { type = t.int; };
                 traefik = {
@@ -34,17 +51,14 @@
                     default = false;
                     description = "Enable Traefik Integration";
                   };
-
                   domain = lib.mkOption {
                     type = t.nullOr t.str;
                     default = null;
                   };
-
                   auth = lib.mkOption {
                     type = t.bool;
                     default = false;
                   };
-
                   ipfilter = lib.mkOption {
                     type = t.bool;
                     default = false;
@@ -59,7 +73,6 @@
                     default = "http";
                     description = "Protocol scheme (http, https, h2c)";
                   };
-                  # NEW: Allow selecting a specific transport (e.g. "insecureTransport")
                   transport = lib.mkOption {
                     type = t.nullOr t.str;
                     default = null;
@@ -85,7 +98,7 @@
                   rewriteHeaders = lib.mkOption {
                     type = t.listOf t.str;
                     default = [ ];
-                    description = "List of rewrite headers for the teleport app (e.g. ['Host: myapp.teleport.phonkd.net'])";
+                    description = "List of rewrite headers for the teleport app";
                   };
                   insecure = lib.mkOption {
                     type = t.bool;
@@ -107,12 +120,12 @@
                   icon = lib.mkOption {
                     type = t.nullOr t.str;
                     default = null;
-                    description = "Custom icon for the dashboard (e.g. 'my-icon.png'). Defaults to '<app-name>.png' if null.";
+                    description = "Custom icon for the dashboard. Defaults to '<app-name>.png'.";
                   };
                   link = lib.mkOption {
                     type = t.nullOr t.str;
                     default = null;
-                    description = "Custom link for the dashboard. Defaults to 'https://<traefik.domain>' if null.";
+                    description = "Custom link for the dashboard. Defaults to 'https://<traefik.domain>'.";
                   };
                 };
               };
@@ -121,5 +134,4 @@
         );
       };
     };
-
 }
