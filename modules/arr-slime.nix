@@ -87,6 +87,8 @@
 
         sops.secrets."sonarr-api-key" = { };
         sops.secrets."sonarr-password" = { };
+        sops.secrets."radarr-api-key" = { };
+        sops.secrets."radarr-password" = { };
         sops.secrets."prowlarr-api-key" = { };
         sops.secrets."prowlarr-password" = { };
         sops.secrets."sabnzbd-api-key" = { };
@@ -108,6 +110,17 @@
               hostConfig = {
                 username = "phonkd";
                 password._secret = "/run/secrets/sonarr-password";
+                authenticationRequired = "disabledForLocalAddresses";
+              };
+            };
+          };
+          radarr = {
+            enable = true;
+            config = {
+              apiKey._secret = "/run/secrets/radarr-api-key";
+              hostConfig = {
+                username = "phonkd";
+                password._secret = "/run/secrets/radarr-password";
                 authenticationRequired = "disabledForLocalAddresses";
               };
             };
@@ -154,17 +167,6 @@
             users.phonkd = {
               password._secret = "/run/secrets/jellyfin-admin-password";
               policy.isAdministrator = true;
-            };
-          };
-          radarr = {
-            enable = true;
-            config = {
-              apiKey._secret = "/run/secrets/sonarr-api-key";
-              hostConfig = {
-                username = "phonkd";
-                password._secret = "/run/secrets/sonarr-password";
-                authenticationRequired = "disabledForLocalAddresses";
-              };
             };
           };
         };
