@@ -61,6 +61,17 @@
               ipfilter = true;
             };
           };
+          seerr = {
+            ip = "127.0.0.1";
+            port = 5055;
+            dashboard.enable = true;
+            traefik = {
+              enable = true;
+              domain = "seerr.int.w.phonkd.net";
+              auth = false;
+              ipfilter = true;
+            };
+          };
         };
 
         sops.secrets."sonarr-api-key" = { };
@@ -69,6 +80,9 @@
         sops.secrets."prowlarr-password" = { };
         sops.secrets."sabnzbd-api-key" = { };
         sops.secrets."sabnzbd-nzb-key" = { };
+        sops.secrets."seerr-api-key" = { };
+        sops.secrets."jellyfin-api-key" = { };
+        sops.secrets."jellyfin-admin-password" = { };
 
         nixflix = {
           enable = true;
@@ -112,10 +126,22 @@
             };
           };
 
-          jellyfin.enable = false;
+          seerr = {
+            enable = true;
+            apiKey._secret = "/run/secrets/seerr-api-key";
+          };
+
+          jellyfin = {
+            enable = true;
+            apiKey._secret = "/run/secrets/jellyfin-api-key";
+            users.phonkd = {
+              password._secret = "/run/secrets/jellyfin-admin-password";
+              policy.isAdministrator = true;
+            };
+          };
         };
 
-        services.jellyfin.enable = true;
+
         boot.kernelParams = [ "i915.enable_guc=3" ];
         boot.initrd.kernelModules = [ "i915" ];
         hardware.graphics = {
