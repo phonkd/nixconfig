@@ -17,7 +17,7 @@
           traefik = {
             enable = true;
             auth = false;
-            domain = "paperless.w.phonkd.net";
+            domain = "paperless.int.w.phonkd.net";
             ipfilter = true;
           };
         };
@@ -27,13 +27,13 @@
         enable = true;
         address = "0.0.0.0";
         settings = {
-          PAPERLESS_CSRF_TRUSTED_ORIGINS = "https://paperless.w.phonkd.net";
+          PAPERLESS_CSRF_TRUSTED_ORIGINS = "https://paperless.int.w.phonkd.net";
           ALLOWED_HOSTS = [
-            "paperless.w.phonkd.net"
+            "paperless.int.w.phonkd.net"
           ];
-          PAPERLESS_CORS_ALLOWED_ORIGINS = "https://paperless.w.phonkd.net";
+          PAPERLESS_CORS_ALLOWED_ORIGINS = "https://paperless.int.w.phonkd.net";
 
-          PAPERLESS_CORS_ALLOWED_HOSTS = "https://paperless.w.phonkd.net";
+          PAPERLESS_CORS_ALLOWED_HOSTS = "https://paperless.int.w.phonkd.net";
         };
       };
     };

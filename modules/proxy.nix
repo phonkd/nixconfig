@@ -20,12 +20,12 @@
         #   format = "json";
         #   key = "";
         # };
-        # programs.ssh.matchBlocks = lib.listToAttrs (map (range:
-        #   let ip = builtins.head (lib.splitString "/" range);
-        #   in lib.nameValuePair ip {
-        #     proxyCommand = "nc -X 5 -x 127.0.0.1:2080 %h %p";
-        #   }
-        # ) config.proxy.ipRanges);
+        programs.ssh.matchBlocks = lib.listToAttrs (map (range:
+          let ip = builtins.head (lib.splitString "/" range);
+          in lib.nameValuePair ip {
+            proxyCommand = "nc -X 5 -x 127.0.0.1:2080 %h %p";
+          }
+        ) config.proxy.ipRanges);
 
         home.packages = [
           (self.wrappers.sing-box-sel.wrap {
