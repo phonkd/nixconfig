@@ -154,6 +154,7 @@
                 password._secret = "/run/secrets/sonarr-password";
                 authenticationRequired = "disabledForLocalAddresses";
               };
+            };
           };
         };
 
