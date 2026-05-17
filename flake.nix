@@ -31,11 +31,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     kubectl-aliases = {
-        url = "github:phonkd/kubectl-aliases";
-        inputs.nixpkgs.follows = "nixpkgs";
+      url = "github:phonkd/kubectl-aliases";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     try-rs = {
       url = "github:phonkd/try-rs";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    nixflix = {
+      url = "github:kiriwalawren/nixflix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -48,6 +52,7 @@
       import-tree,
       wrapper-modules,
       kubectl-aliases,
+      nixflix,
       ...
     }@inputs:
     flake-parts.lib.mkFlake { inherit inputs; } {

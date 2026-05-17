@@ -61,7 +61,7 @@ let
     homelab-syncthing
     homelab-vaultwarden
     homelab-paperless
-    homelab-arr
+    homelab-arr-slime
     homelab-aislop
     homelab-garage
     homelab-notes
