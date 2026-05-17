@@ -129,6 +129,12 @@
           seerr = {
             enable = true;
             apiKey._secret = "/run/secrets/seerr-api-key";
+            sonarr.main = {
+              apiKey._secret = "/run/secrets/sonarr-api-key";
+              activeDirectory = "/mnt/Shares/nixflix/tv";
+              isDefault = true;
+              syncEnabled = true;
+            };
           };
 
           jellyfin = {
