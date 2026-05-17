@@ -47,7 +47,6 @@
           };
           dashboard = {
             enable = true;
-            #link = "https://s3.teleport.phonkd.net";
             icon = "sh-garage";
           };
         };

@@ -27,7 +27,6 @@
         systemd.tmpfiles.rules = [
           "d /mnt/syncthing/data 0755 syncthing syncthing -"
         ];
-        #services.syncthing.guiAddress = "syncthing.teleport.phonkd.net";
         fileSystems."/mnt/syncthing" = {
           device = "/dev/disk/by-id/virtio-vm-202-disk-3";
           fsType = "ext4";

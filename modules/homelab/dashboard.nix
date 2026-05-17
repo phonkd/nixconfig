@@ -27,21 +27,6 @@
         };
       }) enabledApps;
 
-      # Filter apps that have Teleport enabled AND Dashboard enabled
-      teleportApps = lib.filterAttrs (_: v: v.teleport.enable && v.dashboard.enable) apps;
-
-      # Convert teleport apps into the homepage-dashboard service format
-      teleportServiceList = lib.mapAttrsToList (name: app: {
-        "${name}" = {
-          icon = if app.dashboard.icon != null then app.dashboard.icon else "${name}.png";
-          href =
-            if app.dashboard.link != null then
-              app.dashboard.link
-            else
-              "https://${if app.teleport.name != null then app.teleport.name else name}.teleport.phonkd.net";
-          description = "Teleport: ${if app.teleport.name != null then app.teleport.name else name}";
-        };
-      }) teleportApps;
     in
     lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       services.homepage-dashboard = {
@@ -91,9 +76,6 @@
         services = [
           {
             "Reverse proxied" = serviceList;
-          }
-          {
-            "Teleported" = teleportServiceList;
           }
         ];
         allowedHosts = config.phonkds.modules.homepage.traefik.domain;

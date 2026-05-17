@@ -1,7 +1,7 @@
 # Routing entries for services that don't run on the homelab itself --
 # external boxes (router, easyeffects on 203, oldblac PVE, etc.)
 # Belongs on the reverse-proxy host because these are pure routing
-# declarations consumed by traefik / dashboard / teleport.
+# declarations consumed by traefik / dashboard.
 {
   self,
   inputs,
@@ -25,12 +25,6 @@
           dashboard = {
             enable = true;
             icon = "traefik";
-          };
-          teleport = {
-            enable = true;
-            insecure = true;
-            name = "traefik";
-            scheme = "http";
           };
         };
         easyeffects = {

@@ -113,9 +113,6 @@
             domain = "memos.int.w.phonkd.net";
             ipfilter = true;
           };
-          teleport = {
-            enable = false;
-          };
         };
       };
     };

@@ -56,7 +56,6 @@ let
     homelab-ddns
     homelab-authelia
     homelab-orphans
-    server-teleport
 
     # Homelab service producers (gated on hostHasTag "homelab-server").
     homelab-syncthing

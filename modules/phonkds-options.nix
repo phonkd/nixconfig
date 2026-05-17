@@ -1,6 +1,6 @@
 # Central type declaration for `phonkds.modules.*` — the homelab app
 # registry that producers (homelab-*) write into and consumers (traefik,
-# dashboard, teleport) read from.
+# dashboard) read from.
 #
 # Always-imported because:
 #   * Producers may eventually run on hosts other than the reverse proxy;
@@ -83,33 +83,6 @@
                   type = t.nullOr t.str;
                   default = null;
                   description = "Http path";
-                };
-                teleport = {
-                  enable = lib.mkOption {
-                    type = t.bool;
-                    default = false;
-                    description = "Enable teleport app service for this app";
-                  };
-                  name = lib.mkOption {
-                    type = t.nullOr t.str;
-                    default = null;
-                    description = "Name for the app that will spawn in teleport";
-                  };
-                  rewriteHeaders = lib.mkOption {
-                    type = t.listOf t.str;
-                    default = [ ];
-                    description = "List of rewrite headers for the teleport app";
-                  };
-                  insecure = lib.mkOption {
-                    type = t.bool;
-                    default = false;
-                    description = "Enables insecure";
-                  };
-                  scheme = lib.mkOption {
-                    type = t.str;
-                    default = "http";
-                    description = "Protocol scheme (http, https)";
-                  };
                 };
                 dashboard = {
                   enable = lib.mkOption {
