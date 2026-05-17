@@ -54,13 +54,6 @@
             enable = true;
             icon = "sh-proxmox";
           };
-          teleport = {
-            enable = true;
-            name = "oldblac";
-            scheme = "https";
-            insecure = true;
-            rewriteHeaders = [ "Host: oldblac.teleport.phonkd.net" ];
-          };
           ip = "192.168.1.47";
           port = 8006;
           traefik = {
@@ -79,11 +72,12 @@
             enable = true;
             icon = "router";
           };
-          teleport = {
+          traefik = {
             enable = true;
-            name = "zyxel";
+            domain = "1.int.phonkd.net";
             scheme = "https";
-            insecure = true;
+            transport = "insecureTransport";
+            ipfilter = true;
           };
         };
       };

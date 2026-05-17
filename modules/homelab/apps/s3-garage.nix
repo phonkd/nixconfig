@@ -40,9 +40,10 @@
         s3-webui = {
           ip = "127.0.0.1";
           port = 3909;
-          teleport = {
+          traefik = {
             enable = true;
-            name = "s3";
+            domain = "webui.s3.w.phonkd.net";
+            ipfilter = true;
           };
           dashboard = {
             enable = true;

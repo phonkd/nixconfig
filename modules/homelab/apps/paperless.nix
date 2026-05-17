@@ -20,13 +20,6 @@
             domain = "paperless.w.phonkd.net";
             ipfilter = true;
           };
-          teleport = {
-            enable = true;
-            name = "paperless";
-            rewriteHeaders = [
-              "Host: paperless.teleport.phonkd.net"
-            ];
-          };
         };
       };
 
@@ -34,14 +27,13 @@
         enable = true;
         address = "0.0.0.0";
         settings = {
-          PAPERLESS_CSRF_TRUSTED_ORIGINS = "https://paperless.teleport.phonkd.net,https://paperless.w.phonkd.net";
+          PAPERLESS_CSRF_TRUSTED_ORIGINS = "https://paperless.w.phonkd.net";
           ALLOWED_HOSTS = [
-            "paperless.teleport.phonkd.net"
             "paperless.w.phonkd.net"
           ];
-          PAPERLESS_CORS_ALLOWED_ORIGINS = "https://paperless.teleport.phonkd.net,https://paperless.w.phonkd.net";
+          PAPERLESS_CORS_ALLOWED_ORIGINS = "https://paperless.w.phonkd.net";
 
-          PAPERLESS_CORS_ALLOWED_HOSTS = "https://paperless.teleport.phonkd.net,https://paperless.w.phonkd.net";
+          PAPERLESS_CORS_ALLOWED_HOSTS = "https://paperless.w.phonkd.net";
         };
       };
     };

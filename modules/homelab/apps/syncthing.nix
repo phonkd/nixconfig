@@ -14,9 +14,10 @@
               enable = true;
               icon = "syncthing";
             };
-            teleport = {
+            traefik = {
               enable = true;
-              name = "syncthing";
+              domain = "syncthing.w.phonkd.net";
+              ipfilter = true;
             };
           };
         };

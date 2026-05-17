@@ -17,7 +17,6 @@
         self.homeModules.terminal
         self.homeModules.desktop
         self.homeModules.proxy
-        self.homeModules.gaming
       ];
     };
   flake.homeModules.gui-nixos =
@@ -31,6 +30,7 @@
       imports = [
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
+        self.homeModules.gaming
         self.homeModules.desktop-environment
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }

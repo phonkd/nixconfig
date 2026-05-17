@@ -114,11 +114,7 @@
             ipfilter = true;
           };
           teleport = {
-            enable = true;
-            name = "memos";
-            rewriteHeaders = [
-              "Host: memos.teleport.phonkd.net"
-            ];
+            enable = false;
           };
         };
       };
