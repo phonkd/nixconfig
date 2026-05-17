@@ -110,7 +110,6 @@
         sops
         prek
         curl
-        nodejs
 
       ];
       programs.fzf = {

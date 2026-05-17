@@ -145,6 +145,16 @@
               policy.isAdministrator = true;
             };
           };
+          radarr = {
+            enable = true;
+            config = {
+              apiKey._secret = "/run/secrets/sonarr-api-key";
+              hostConfig = {
+                username = "phonkd";
+                password._secret = "/run/secrets/sonarr-password";
+                authenticationRequired = "disabledForLocalAddresses";
+              };
+          };
         };
 
         # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires
