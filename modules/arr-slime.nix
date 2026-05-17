@@ -147,6 +147,13 @@
           };
         };
 
+        # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires
+        # on seerr-radarr.service even when radarr is disabled, blocking
+        # the oneshot from running. Force-drop the bad ref.
+        systemd.services.seerr-sonarr = {
+          after = lib.mkForce [ "sonarr-config.service" ];
+          requires = lib.mkForce [ "sonarr-config.service" ];
+        };
 
         boot.kernelParams = [ "i915.enable_guc=3" ];
         boot.initrd.kernelModules = [ "i915" ];
