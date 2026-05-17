@@ -91,6 +91,7 @@
         sops.secrets."radarr-password" = { };
         sops.secrets."prowlarr-api-key" = { };
         sops.secrets."prowlarr-password" = { };
+        sops.secrets."nzblife-api-key" = { };
         sops.secrets."sabnzbd-api-key" = { };
         sops.secrets."sabnzbd-nzb-key" = { };
         sops.secrets."seerr-api-key" = { };
@@ -135,6 +136,12 @@
                 password._secret = "/run/secrets/prowlarr-password";
                 authenticationRequired = "disabledForLocalAddresses";
               };
+              indexers = [
+                {
+                  name = "nzb.life";
+                  apiKey._secret = "/run/secrets/nzblife-api-key";
+                }
+              ];
             };
           };
 
