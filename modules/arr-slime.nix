@@ -72,6 +72,17 @@
               ipfilter = true;
             };
           };
+          radarr = {
+            ip = "127.0.0.1";
+            port = 7878;
+            dashboard.enable = true;
+            traefik = {
+              enable = true;
+              domain = "radarr.int.w.phonkd.net";
+              auth = false;
+              ipfilter = true;
+            };
+          };
         };
 
         sops.secrets."sonarr-api-key" = { };
