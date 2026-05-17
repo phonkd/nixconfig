@@ -18,6 +18,7 @@
       config,
       pkgs,
       lib,
+      noughtyLib,
       ...
     }:
     let
@@ -93,7 +94,7 @@
         }
       ) { };
     in
-    {
+    lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       services.memos = {
         enable = true;
         package = memos-0_27_1;

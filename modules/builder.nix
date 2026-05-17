@@ -36,19 +36,19 @@ let
     # duplicate definitions of unique options. `nixosModules.base` is
     # just a wrapper for system-minimal -- skip it here.
     system-minimal
-    phonkds-options     # declares `phonkds.modules.*` type everywhere
+    phonkds-options # declares `phonkds.modules.*` type everywhere
 
     # Hardware / GPU.
-    nvidia-desktop      # gated on host.gpu.hasNvidia
+    nvidia-desktop # gated on host.gpu.hasNvidia
 
     # Misc feature modules.
-    gigaplayer-client   # gated on hostHasTag "gigaplayer-client"
-    gigaplayer-server   # gated on hostHasTag "gigaplayer-server"
-    gui                 # gated on host.is.nixosDesktop
+    gigaplayer-client # gated on hostHasTag "gigaplayer-client"
+    gigaplayer-server # gated on hostHasTag "gigaplayer-server"
+    gui # gated on host.is.nixosDesktop
 
     # Server baseline (gated on host.is.server).
     server-globalconfig
-    server-sops         # long-form: imports sops-nix unconditionally
+    server-sops # long-form: imports sops-nix unconditionally
 
     # Reverse-proxy stack (gated on hostHasTag "reverse-proxy").
     homelab-traefik
@@ -65,11 +65,12 @@ let
     homelab-arr
     homelab-aislop
     homelab-garage
+    homelab-notes
   ];
 
   # Darwin-side: cross-host feature modules.
   alwaysImportDarwin = with self.darwinModules; [
-    gui-darwin          # gated on host.is.darwinDesktop
+    gui-darwin # gated on host.is.darwinDesktop
   ];
 
   # Always-on Home Manager wiring. Safe on hosts with no HM users
