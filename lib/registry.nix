@@ -78,6 +78,7 @@
         self.nixosModules."201-mono"
         self.nixosModules."201-shares"
         self.nixosModules."201-wireguard"
+        self.nixosModules."homelab-dns"
       ];
   };
 
