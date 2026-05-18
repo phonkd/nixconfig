@@ -62,320 +62,198 @@
         sourceFirst = false;
         #extraConfig = builtins.readFile ../dotconfig/hypr/hyprland.conf;
         extraConfig = ''
-          misc {
-             vrr = 1
+          -- Programs
+          local terminal    = "ghostty"
+          local fileManager = "thunar"
+          local menu        = "noctalia-shell ipc call launcher toggle"
+          local mainMod     = "SUPER"
+
+          -- Autostart (was `exec-once = ...`)
+          hl.on("hyprland.start", function()
+            hl.exec_cmd("noctalia-shell")
+            hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
+            hl.exec_cmd("lxqt-policykit-agent")
+          end)
+
+          -- Env vars: hl.env(name, value), one call per var
+          hl.env("XCURSOR_SIZE",       "40")
+          hl.env("XCURSOR_THEME",      "Bibata-Modern-Amber")
+          hl.env("HYPRCURSOR_SIZE",    "40")
+          hl.env("HYPRCURSOR_THEME",   "Bibata-Modern-Amber")
+          hl.env("MOZ_ENABLE_WAYLAND", "1")
+          hl.env("QT_CURSOR_THEME",    "Bibata-Modern-Amber")
+          hl.env("QT_CURSOR_SIZE",     "40")
+
+          -- Monitor (was `monitor = ,preferred,auto,1.25`)
+          hl.monitor({ output = "", mode = "preferred", position = "auto", scale = 1.25 })
+
+          -- Main config tree
+          hl.config({
+            misc = {
+              vrr = 1,
+              force_default_wallpaper = 0,
+              disable_hyprland_logo = true,
+            },
+            general = {
+              gaps_in = 5,
+              gaps_out = 15,
+              border_size = 3,
+              ["col.active_border"]   = "rgba(f1f1f1aa)",
+              ["col.inactive_border"] = "rgba(000000aa)",
+              layout = "dwindle",
+            },
+            decoration = {
+              rounding = 15,
+              active_opacity = 0.8,
+              inactive_opacity = 0.6,
+              fullscreen_opacity = 1.0,
+              blur = {
+                enabled = true,
+                size = 4,
+                passes = 3,
+                vibrancy = 0.8,
+                ignore_opacity = true,
+              },
+            },
+            animations = { enabled = true },
+            -- dwindle.pseudotile is no longer a config key in 0.55+; it's a dispatcher (`pseudo`).
+            dwindle    = { preserve_split = true },
+            master     = { new_status = "master" },
+            input = {
+              kb_layout  = "ch",
+              kb_variant = "de_nodeadkeys",
+              follow_mouse = 1,
+              sensitivity = 0,
+              touchpad = {
+                natural_scroll = false,
+                disable_while_typing = false,
+              },
+            },
+          })
+
+          -- hy3 plugin block — left as a Lua block comment for now; port if/when re-enabled.
+          --[[
+          plugin.hy3 = {
+            no_gaps_when_only = 0, node_collapse_policy = 2,
+            group_inset = 10, tab_first_window = false,
+            tabs = {
+              height = 22, padding = 6, from_top = false, radius = 6,
+              border_width = 2, render_text = true, text_center = true,
+              text_font = "Sans", text_height = 8, text_padding = 3,
+              ["col.active"] = "rgba(33ccff40)",
+              -- ... (full color set omitted)
+              blur = true, opacity = 1.0,
+            },
+            autotile = { enable = true, ephemeral_groups = true, trigger_width = 0, trigger_height = 0, workspaces = "all" },
           }
-          # Set programs that you use
-          $terminal = ghostty
-          $fileManager = thunar
-          $menu = noctalia-shell ipc call launcher toggle
-          #exec = waybar --config ~/.config/waybar/config_laptop
-          exec-once = noctalia-shell
-          exec-once = dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
-          exec-once = lxqt-policykit-agent
+          --]]
 
-          monitor = ,preferred,auto,1.25
+          -- Beziers + animations
+          hl.curve("myBezier", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.05 } } })
+          hl.animation({ leaf = "windows",     enabled = true, speed = 7,  bezier = "myBezier" })
+          hl.animation({ leaf = "windowsOut",  enabled = true, speed = 7,  bezier = "default", style = "popin 80%" })
+          hl.animation({ leaf = "border",      enabled = true, speed = 10, bezier = "default" })
+          hl.animation({ leaf = "borderangle", enabled = true, speed = 8,  bezier = "default" })
+          hl.animation({ leaf = "fade",        enabled = true, speed = 7,  bezier = "default" })
+          hl.animation({ leaf = "workspaces",  enabled = true, speed = 6,  bezier = "default" })
 
-          env = XCURSOR_SIZE,40
-          env = XCURSOR_THEME,Bibata-Modern-Amber
-          env = HYPRCURSOR_SIZE,40
-          env = HYPRCURSOR_THEME,Bibata-Modern-Amber
-          env = MOZ_ENABLE_WAYLAND,1
-          env = QT_CURSOR_THEME,Bibata-Modern-Amber
-          env = QT_CURSOR_SIZE,40
+          -- Per-device input
+          hl.device({ name = "logitech-usb-receiver",                     sensitivity = -0.4, accel_profile = "flat" })
+          hl.device({ name = "haste-2-wireless-mouse",                    sensitivity = -0.4, accel_profile = "flat" })
+          hl.device({ name = "hp,-inc-hyperx-pulsefire-haste-2-wireless", sensitivity = -0.4, accel_profile = "flat" })
+          hl.device({ name = "company--usb-device--1",                    sensitivity = -0.4, accel_profile = "flat" })
 
 
-          general {
-              gaps_in = 5
-              gaps_out = 15
-              border_size = 3
-              col.active_border = rgba(f1f1f1aa)
-              col.inactive_border = rgba(000000aa)
-              layout = dwindle
-              #layout = hy3
-          }
+          --------------------------------------------------------------------
+          -- Keybinds
+          --------------------------------------------------------------------
+          hl.bind("ALT+V",                  hl.dsp.exec_cmd(terminal))
+          hl.bind(mainMod .. "+Q",          hl.dsp.window.close())
+          hl.bind(mainMod .. "+SHIFT+E",    hl.dsp.exit())
+          hl.bind(mainMod .. "+E",          hl.dsp.exec_cmd(fileManager))
+          hl.bind(mainMod .. "+W",          hl.dsp.exec_cmd("librewolf"))
 
-          #plugin {
-          #  hy3 {
-          #    no_gaps_when_only = 0
-          #    node_collapse_policy = 2
-          #    group_inset = 10
-          #    tab_first_window = false
-          #
-          #    tabs {
-          #      height = 22
-          #      padding = 6
-          #      from_top = false
-          #      radius = 6
-          #      border_width = 2
-          #      render_text = true
-          #      text_center = true
-          #      text_font = Sans
-          #      text_height = 8
-          #      text_padding = 3
-          #      col.active = rgba(33ccff40)
-          #      col.active.border = rgba(33ccffee)
-          #      col.active.text = rgba(ffffffff)
-          #      col.active_alt_monitor = rgba(60606040)
-          #      col.active_alt_monitor.border = rgba(808080ee)
-          #      col.active_alt_monitor.text = rgba(ffffffff)
-          #      col.focused = rgba(60606040)
-          #      col.focused.border = rgba(808080ee)
-          #      col.focused.text = rgba(ffffffff)
-          #      col.inactive = rgba(30303020)
-          #      col.inactive.border = rgba(606060aa)
-          #      col.inactive.text = rgba(ffffffff)
-          #      col.urgent = rgba(ff223340)
-          #      col.urgent.border = rgba(ff2233ee)
-          #      col.urgent.text = rgba(ffffffff)
-          #      col.locked = rgba(90903340)
-          #      col.locked.border = rgba(909033ee)
-          #      col.locked.text = rgba(ffffffff)
-          #      blur = true
-          #      opacity = 1.0
-          #    }
-          #
-          #    autotile {
-          #      enable = true
-          #      ephemeral_groups = true
-          #      trigger_width = 0
-          #      trigger_height = 0
-          #      workspaces = all
-          #    }
-          #  }
-          #}
+          -- Applets
+          hl.bind(mainMod .. "+O",          hl.dsp.exec_cmd("rofi -show rofi-obsidian:rofi-obsidian"))
+          hl.bind(mainMod .. "+SHIFT+O",    hl.dsp.exec_cmd("~/.config/rofi-pulse-select sink"))
+          hl.bind("SUPER+V",                hl.dsp.exec_cmd("noctalia-shell ipc call launcher clipboard"))
+          hl.bind(mainMod .. "+Z",          hl.dsp.exec_cmd("rofi-zed-recent"))
 
-          decoration {
-              rounding = 15
+          -- Brightness
+          hl.bind(mainMod .. "+I",          hl.dsp.exec_cmd("light -A 5"))
+          hl.bind(mainMod .. "+SHIFT+I",    hl.dsp.exec_cmd("light -U 5"))
 
-              # Change transparency of focused and unfocused windows
-              active_opacity = 0.8
-              inactive_opacity = 0.6
-              fullscreen_opacity = 1.0
+          -- Music
+          hl.bind(mainMod .. "+B",          hl.dsp.exec_cmd("playerctl play-pause"))
+          hl.bind(mainMod .. "+N",          hl.dsp.exec_cmd("playerctl next"))
+          hl.bind(mainMod .. "+SHIFT+N",    hl.dsp.exec_cmd("playerctl previous"))
+          hl.bind(mainMod .. "+M",          hl.dsp.exec_cmd("pactl set-sink-volume @DEFAULT_SINK@ +5%"))
+          hl.bind(mainMod .. "+SHIFT+M",    hl.dsp.exec_cmd("pactl set-sink-volume @DEFAULT_SINK@ -5%"))
+          -- ALT_L isn't a modifier name; just use ALT (same physical key in practice).
+          hl.bind("ALT+SHIFT+M",            hl.dsp.exec_cmd([[bash -c 'for input in $(pactl list short sink-inputs | awk "{print $1}"); do pactl set-sink-input-volume "$input" -5%; done']]))
+          hl.bind("ALT+M",                  hl.dsp.exec_cmd([[bash -c 'for input in $(pactl list short sink-inputs | awk "{print $1}"); do pactl set-sink-input-volume "$input" +5%; done']]))
+
+          -- Screenshot
+          hl.bind(mainMod .. "+C",          hl.dsp.exec_cmd("grimblast save area - | swappy -f -"))
+
+          -- Layout
+          hl.bind(mainMod .. "+SPACE",      hl.dsp.window.float())
+          hl.bind(mainMod .. "+D",          hl.dsp.exec_cmd(menu))
+          hl.bind(mainMod .. "+F",          hl.dsp.window.fullscreen({ mode = "fullscreen" }))
+
+          -- Focus
+          hl.bind(mainMod .. "+H", hl.dsp.focus({ direction = "left"  }))
+          hl.bind(mainMod .. "+L", hl.dsp.focus({ direction = "right" }))
+          hl.bind(mainMod .. "+K", hl.dsp.focus({ direction = "up"    }))
+          hl.bind(mainMod .. "+J", hl.dsp.focus({ direction = "down"  }))
+
+          -- Move window
+          hl.bind("SUPER+SHIFT+H", hl.dsp.window.move({ direction = "left"  }))
+          hl.bind("SUPER+SHIFT+L", hl.dsp.window.move({ direction = "right" }))
+          hl.bind("SUPER+SHIFT+K", hl.dsp.window.move({ direction = "up"    }))
+          hl.bind("SUPER+SHIFT+J", hl.dsp.window.move({ direction = "down"  }))
+
+          -- hy3 dispatchers / i3-style tabgroups (commented; restore when hy3 plugin re-enabled)
+          -- hl.bind(mainMod .. ", H",        hl.plugin.hy3.movefocus("l"))
+          -- hl.bind(mainMod .. ", comma",    hl.plugin.hy3.changegroup("opposite"))
+          -- hl.bind(mainMod .. " SHIFT, comma", hl.plugin.hy3.changegroup("toggletab"))
 
 
-              # https://wiki.hyprland.org/Configuring/Variables/#blur
-              blur {
-                  enabled = true
-                  size = 4
-                  passes = 3
-                  vibrancy = 0.8
-                  ignore_opacity = true
-              }
-          }
+          -- Workspaces 1..9 + move-to-workspace
+          -- Switch: focus dispatcher with workspace selector. Move window: window.move with workspace.
+          for i = 1, 9 do
+            hl.bind(mainMod .. "+" .. i,       hl.dsp.focus({ workspace = i }))
+            hl.bind(mainMod .. "+SHIFT+" .. i, hl.dsp.window.move({ workspace = i }))
+          end
+          hl.bind(mainMod .. "+SHIFT+0", hl.dsp.window.move({ workspace = 10 }))
 
-          # https://wiki.hyprland.org/Configuring/Variables/#animations
-          animations {
-              enabled = true
+          -- Groups
+          hl.bind(mainMod .. "+SHIFT+W", hl.dsp.group.toggle())
+          -- changegroupactive f/b → group.next / group.prev
+          hl.bind(mainMod .. "+right",   hl.dsp.group.next())
+          hl.bind(mainMod .. "+left",    hl.dsp.group.prev())
 
-              # Default animations, see https://wiki.hyprland.org/Configuring/Animations/ for more
+          -- Scroll workspaces (relative): e+1 / e-1 are valid workspace selector strings
+          hl.bind(mainMod .. "+mouse_down", hl.dsp.focus({ workspace = "e+1" }))
+          hl.bind(mainMod .. "+mouse_up",   hl.dsp.focus({ workspace = "e-1" }))
 
-              bezier = myBezier, 0.05, 0.9, 0.1, 1.05
+          -- Mouse drag (was `bindm`)
+          hl.bind(mainMod .. "+mouse:272", hl.dsp.window.drag(),   { drag = true })
+          hl.bind(mainMod .. "+mouse:273", hl.dsp.window.resize(), { drag = true })
 
-              animation = windows, 1, 7, myBezier
-              animation = windowsOut, 1, 7, default, popin 80%
-              animation = border, 1, 10, default
-              animation = borderangle, 1, 8, default
-              animation = fade, 1, 7, default
-              animation = workspaces, 1, 6, default
-          }
+          --------------------------------------------------------------------
+          -- Window rules
+          --------------------------------------------------------------------
+          -- (cosmetic red border for floating windows omitted — `floating` isn't a valid match key in the new API)
+          hl.window_rule({ match = { class = ".*" },                      name = "suppress_event maximize" })
+          hl.window_rule({ match = { title = "Authentication Required" }, name = "float on" })
+          hl.window_rule({ match = { title = "Authentication Required" }, name = "stay_focused on" })
+          hl.window_rule({ match = { class = "^(Waydroid)$" },            name = "opacity 1 1" })
+          hl.window_rule({ match = { class = "^(Waydroid)$" },            name = "float on" })
 
-          # See https://wiki.hyprland.org/Configuring/Dwindle-Layout/ for more
-          dwindle {
-              pseudotile = true # Master switch for pseudotiling. Enabling is bound to mainMod + P in the keybinds section below
-              preserve_split = true # You probably want this
-          }
-
-          # See https://wiki.hyprland.org/Configuring/Master-Layout/ for more
-          master {
-              new_status = master
-          }
-
-          # https://wiki.hyprland.org/Configuring/Variables/#misc
-          misc {
-              force_default_wallpaper = 0 # Set to 0 or 1 to disable the anime mascot wallpapers
-              disable_hyprland_logo = true # If true disables the random hyprland logo / anime girl background. :(
-          }
-
-
-          #############
-          ### INPUT ###
-          #############
-
-          # https://wiki.hyprland.org/Configuring/Variables/#input
-          input {
-              kb_layout = ch
-              kb_variant = de_nodeadkeys
-              kb_model =
-              kb_options =
-              kb_rules =
-
-              follow_mouse = 1
-
-              sensitivity = 0
-              touchpad {
-                  natural_scroll = false
-                  disable_while_typing = false
-              }
-          }
-          # https://wiki.hyprland.org/Configuring/Variables/#gestures
-
-
-          # Example per-device config
-          # See https://wiki.hyprland.org/Configuring/Keywords/#per-device-input-configs for more
-
-          device {
-              name = logitech-usb-receiver
-              sensitivity = -0.4
-              accel_profile = flat
-          }
-          device {
-              name = haste-2-wireless-mouse
-              sensitivity = -0.4
-              accel_profile = flat
-          }
-          device {
-              name = hp,-inc-hyperx-pulsefire-haste-2-wireless
-              sensitivity = -0.4
-              accel_profile = flat
-          }
-          device {
-              name = company--usb-device--1
-              sensitivity = -0.4
-              accel_profile = flat
-          }
-
-
-          ####################
-          ### KEYBINDINGSS ###
-          ####################
-
-          # See https://wiki.hyprland.org/Configuring/Keywords/
-          $mainMod = SUPER # Sets "Windows" key as main modifier
-
-          bind = ALT, v, exec, $terminal
-          bind = $mainMod, Q, killactive,
-          bind = $mainMod SHIFT, E, exit
-          bind = $mainMod, E, exec, $fileManager
-          bind = $mainMod, W, exec, librewolf
-          ## Applets:
-
-          bind = $mainMod, o, exec, rofi -show rofi-obsidian:rofi-obsidian
-          bind = $mainMod SHIFT, o, exec, ~/.config/rofi-pulse-select sink
-          bind = SUPER, V, exec, noctalia-shell ipc call launcher clipboard
-          bind = $mainMod, z, exec, rofi-zed-recent
-          ## brightness
-
-          bind = $mainMod, i, exec, light -A 5
-          bind = $mainMod SHIFT, i, exec, light -U 5
-
-          # music
-
-          bind = $mainMod, b, exec, playerctl play-pause
-          bind = $mainMod, n, exec, playerctl next
-          bind = $mainMod SHIFT, n, exec, playerctl previous
-
-          bind = $mainMod, m, exec, pactl set-sink-volume @DEFAULT_SINK@ +5%
-          bind = $mainMod SHIFT, m, exec, pactl set-sink-volume @DEFAULT_SINK@ -5%
-
-
-          bind = ALT_L SHIFT, m, exec, bash -c 'for input in $(pactl list short sink-inputs | awk "{print $1}"); do pactl set-sink-input-volume "$input" -5%; done'
-          bind = ALT_L, m, exec, bash -c 'for input in $(pactl list short sink-inputs | awk "{print $1}"); do pactl set-sink-input-volume "$input" +5%; done'
-
-
-          # screenshot
-
-          bind = $mainMod, c, exec, grimblast save area - | swappy -f -
-
-
-          ## Layout binds
-          bind = $mainMod, SPACE, togglefloating,
-          bind = $mainMod, D, exec, $menu
-          bind = $mainMod, F, fullscreen, 2
-
-          # Move focus with mainMod + arrow keys
-          # Fallback to regular dispatchers if hy3 not loaded
-          bind = $mainMod, h, movefocus, l
-          bind = $mainMod, l, movefocus, r
-          bind = $mainMod, k, movefocus, u
-          bind = $mainMod, j, movefocus, d
-
-          # Try hy3 dispatchers (will override if plugin loaded)
-          #bind = $mainMod, h, hy3:movefocus, l
-          #bind = $mainMod, l, hy3:movefocus, r
-          #bind = $mainMod, k, hy3:movefocus, u
-          #bind = $mainMod, j, hy3:movefocus, d
-
-
-          bind = SUPER SHIFT,h, movewindow, l
-          bind = SUPER SHIFT,l, movewindow, r
-          bind = SUPER SHIFT,k, movewindow, u
-          bind = SUPER SHIFT,j, movewindow, d
-
-          #bind = SUPER SHIFT,h, hy3:movewindow, l
-          #bind = SUPER SHIFT,l, hy3:movewindow, r
-          #bind = SUPER SHIFT,k, hy3:movewindow, u
-          #bind = SUPER SHIFT,j, hy3:movewindow, d
-
-          # i3 like tabgroups
-          #bind = $mainMod, comma, hy3:changegroup, opposite
-          #bind = $mainMod SHIFT, comma, hy3:changegroup, toggletab
-          # bind = $mainMod, S, hy3:makegroup, opposite, force_ephemeral
-
-
-
-
-
-          # Switch workspaces with mainMod + [0-9]
-          bind = $mainMod, 1, workspace, 1
-          bind = $mainMod, 2, workspace, 2
-          bind = $mainMod, 3, workspace, 3
-          bind = $mainMod, 4, workspace, 4
-          bind = $mainMod, 5, workspace, 5
-          bind = $mainMod, 6, workspace, 6
-          bind = $mainMod, 7, workspace, 7
-          bind = $mainMod, 8, workspace, 8
-          bind = $mainMod, 9, workspace, 9
-          #bind = $mainMod, 0, workspace, 10
-
-          # Move active window to a workspace with mainMod + SHIFT + [0-9]
-          bind = $mainMod SHIFT, 1, movetoworkspace, 1
-          bind = $mainMod SHIFT, 2, movetoworkspace, 2
-          bind = $mainMod SHIFT, 3, movetoworkspace, 3
-          bind = $mainMod SHIFT, 4, movetoworkspace, 4
-          bind = $mainMod SHIFT, 5, movetoworkspace, 5
-          bind = $mainMod SHIFT, 6, movetoworkspace, 6
-          bind = $mainMod SHIFT, 7, movetoworkspace, 7
-          bind = $mainMod SHIFT, 8, movetoworkspace, 8
-          bind = $mainMod SHIFT, 9, movetoworkspace, 9
-          bind = $mainMod SHIFT, 0, movetoworkspace, 10
-
-          # gruops:
-          bind = $mainMod SHIFT, w, togglegroup
-          bind = $mainMod, right, changegroupactive, f
-          bind = $mainMod, left, changegroupactive, b
-
-          # Scroll through existing workspaces with mainMod + scroll
-          bind = $mainMod, mouse_down, workspace, e+1
-          bind = $mainMod, mouse_up, workspace, e-1
-
-          # Move/resize windows with mainMod + LMB/RMB and dragging
-          bindm = $mainMod, mouse:272, movewindow
-          bindm = $mainMod, mouse:273, resizewindow
-
-
-          ##############################
-          ### WINDOWS AND WORKSPACES ###
-          ##############################
-          windowrule = match:float true, border_color rgba(F40009AA) rgba(40009AA)
-          windowrule = match:class .*, suppress_event maximize # You'll probably like this.
-          windowrule = match:title (Authentication Required), float on
-          windowrule = match:title (Authentication Required), stay_focused on
-          windowrule = match:class ^(Waydroid)$, opacity 1 1
-          windowrule = match:class ^(Waydroid)$, float on
-
-          # Noctalia HVE (Hyprland Visual Effects)
-          source = ~/.cache/noctalia/HVE/overlay.conf
+          -- Noctalia HVE overlay: hyprlang `source = ...conf` has no direct Lua API.
+          -- If/when noctalia ships a .lua overlay, use:
+          --   dofile(os.getenv("HOME") .. "/.cache/noctalia/HVE/overlay.lua")
         '';
       };
 
