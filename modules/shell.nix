@@ -74,6 +74,9 @@
           kubernetes = {
             disabled = false;
           };
+          git_branch = {
+            style = "bold green";
+          };
         };
       };
       programs.zoxide = {

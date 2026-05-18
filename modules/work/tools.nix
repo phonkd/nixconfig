@@ -21,6 +21,7 @@
           prek
           remmina
           devbox
+          terraform
           (pkgs.buildGoModule rec {
               pname = "subst";
               version = "1.0.1";
