@@ -200,6 +200,37 @@
           requires = lib.mkForce [ "sonarr-config.service" ];
         };
 
+        sops.templates."homepage.env".content = ''
+          HOMEPAGE_VAR_SABNZBD_KEY=${config.sops.placeholder."sabnzbd-api-key"}
+        '';
+
+        services.homepage-dashboard = {
+          environmentFile = config.sops.templates."homepage.env".path;
+          services = [
+            {
+              "Downloaders" = [
+                {
+                  "SABnzbd" = {
+                    icon = "sabnzbd.png";
+                    href = "https://sabnzbd.int.w.phonkd.net";
+                    description = "sabnzbd.int.w.phonkd.net";
+                    widget = {
+                      type = "sabnzbd";
+                      url = "http://127.0.0.1:8085";
+                      key = "{{HOMEPAGE_VAR_SABNZBD_KEY}}";
+                      fields = [
+                        "rate"
+                        "queue"
+                        "timeleft"
+                      ];
+                    };
+                  };
+                }
+              ];
+            }
+          ];
+        };
+
         boot.kernelParams = [ "i915.enable_guc=3" ];
         boot.initrd.kernelModules = [ "i915" ];
         hardware.graphics = {
