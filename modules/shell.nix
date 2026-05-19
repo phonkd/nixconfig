@@ -17,6 +17,7 @@
       programs.try-rs = {
         enable = true;
       };
+      programs.nix-your-shell.enable = true;
       programs.kubectl-aliases.enable = true;
       programs.zsh = {
         enable = true;
