@@ -93,6 +93,7 @@
         "d /mnt/Shares/Public 2775 smbpublic smbpublic -"
         "d /mnt/Shares/SemiPublic 2770 phonkd phonkd -"
         "d /mnt/Shares/this-is-my-own-private-property-and-you-are-not-welcome-here 0750 phonkd phonkd -"
+        "d /mnt/Shares/ipmi 2770 ipmi ipmi -"
       ];
 
       users.users.smbpublic = {
@@ -103,6 +104,14 @@
       };
 
       users.groups.smbpublic = { };
+
+      users.users.ipmi = {
+        isSystemUser = true;
+        description = "Samba user for Supermicro IPMI virtual media";
+        group = "ipmi";
+        home = "/var/empty";
+      };
+      users.groups.ipmi = { };
       services.samba = {
         enable = true;
         securityType = "user";
@@ -118,6 +127,20 @@
             "guest account" = "smbpublic";
             "map to guest" = "bad user";
             "host msdfs" = "no";
+            "server min protocol" = "NT1";
+            "client min protocol" = "NT1";
+            "ntlm auth" = "yes";
+          };
+          "ipmi" = {
+            "path" = "/mnt/Shares/ipmi";
+            "browseable" = "yes";
+            "read only" = "yes";
+            "guest ok" = "no";
+            "valid users" = "ipmi";
+            "create mask" = "0660";
+            "directory mask" = "2770";
+            "force user" = "ipmi";
+            "force group" = "ipmi";
           };
           "public" = {
             "path" = "/mnt/Shares/Public";
