@@ -48,7 +48,7 @@
               inherit (finalAttrs) pname version src;
               sourceRoot = "${finalAttrs.src.name}/web";
               fetcherVersion = 3;
-              hash = "sha256-NTPP9nHAtiTmIUpchxAvWLN6s99UKVXF7E+Z4JpiFT8=";
+              hash = "sha256-fo8ACqY7RwbCfwkc9vxiKDARse/89ydpm3WcnP3tuEo=";
             };
             pnpmRoot = "web";
             nativeBuildInputs = [
