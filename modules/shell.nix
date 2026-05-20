@@ -4,7 +4,7 @@
   flake.darwinModules.shell = { pkgs, lib, config, ...}:
     {
       environment.systemPackages = with pkgs; [
-        coreutils-full
+        uutils-coreutils-noprefix
       ];
     };
   flake.homeModules.shell =
@@ -114,7 +114,8 @@
         sops
         prek
         curl
-
+        fd
+        ripgrep
       ];
       programs.fzf = {
         enable = true;
@@ -126,6 +127,10 @@
       };
       programs.bat = {
         enable = true;
+      };
+      programs.eza = {
+        enable = true;
+        enableZshIntegration = true;
       };
       programs.obsidian = {
         enable = true;

@@ -7,8 +7,6 @@
       nixd
       yaml-language-server
       sox
-      ripgrep
-      fd
     ];
     programs.neovim = {
       enable = true;
