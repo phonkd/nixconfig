@@ -28,7 +28,7 @@
           };
         };
         easyeffects = {
-          ip = "192.168.1.203";
+          ip = "192.168.3.203";
           port = 8085;
           dashboard = {
             enable = true;
@@ -60,7 +60,7 @@
           };
         };
         zyxel = {
-          ip = "192.168.1.1";
+          ip = "192.168.1.2";
           port = 443;
           dashboard = {
             enable = true;

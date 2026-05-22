@@ -20,7 +20,7 @@
         wants = [ "pipewire-pulse.service" ];
         wantedBy = [ "default.target" ];
         script = ''
-          ${pkgs.pulseaudio}/bin/pactl load-module module-tunnel-sink server=tcp:192.168.1.203:4713 sink_name=spot-203
+          ${pkgs.pulseaudio}/bin/pactl load-module module-tunnel-sink server=tcp:192.168.3.203:4713 sink_name=spot-203
         '';
         serviceConfig = {
           Restart = "on-failure";
@@ -114,7 +114,7 @@
           ];
           extraInputRules = ''
             # Allow noVNC (8085) only from the Traefik VM
-            ip saddr 192.168.1.201 tcp dport 8085 accept
+            ip saddr 192.168.3.201 tcp dport 8085 accept
           '';
         };
       };

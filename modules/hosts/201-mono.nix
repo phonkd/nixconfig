@@ -25,7 +25,7 @@
       label.labels = [ "vm" ];
       networking.interfaces.ens18.ipv4.addresses = [
         {
-          address = "192.168.1.201";
+          address = "192.168.3.201";
           prefixLength = 24;
         }
       ];
@@ -122,7 +122,7 @@
             "server string" = "baaaalright";
             "netbios name" = "smbnix";
             "security" = "user";
-            "hosts allow" = "192.168.1.0/24 10.89.0.0/24 127.0.0.1 localhost 10.8.0.1/24";
+            "hosts allow" = "192.168.3.0/24 192.168.1.0/24 10.89.0.0/24 127.0.0.1 localhost 10.8.0.1/24";
             "hosts deny" = "0.0.0.0/0";
             "guest account" = "smbpublic";
             "map to guest" = "bad user";

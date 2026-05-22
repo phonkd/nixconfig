@@ -21,7 +21,7 @@
       networking.networkmanager.enable = true;
       networking.hostName = "blac";
       networking.nameservers = [
-        "192.168.1.201"
+        "192.168.3.201"
         "1.1.1.1"
       ];
 

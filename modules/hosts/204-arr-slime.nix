@@ -24,7 +24,7 @@
       networking.useDHCP = lib.mkDefault true;
       networking.interfaces.ens18.ipv4.addresses = [
         {
-          address = "192.168.1.204";
+          address = "192.168.3.204";
           prefixLength = 24;
         }
       ];

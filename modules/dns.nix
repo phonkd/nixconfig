@@ -18,10 +18,9 @@
 
         # Local domain resolution
         addresses = {
-          ".int.phonkd.net" = "192.168.1.201";
-          ".w.int.phonkd.net" = "192.168.1.201";
-          ".segglaecloud.phonkd.net" = "192.168.1.123";
-          ".w.phonkd.net" = "192.168.1.201";
+          ".int.phonkd.net" = "192.168.3.201";
+          ".w.int.phonkd.net" = "192.168.3.201";
+          ".w.phonkd.net" = "192.168.3.201";
         };
       };
     };
@@ -37,11 +36,11 @@
 
           # wildcard DNS
           address = [
-            "/.int.phonkd.net/192.168.1.201"
+            "/.int.phonkd.net/192.168.3.201"
             "/.int.phonkd.net/::"
-            "/.segglaecloud.phonkd.net/192.168.1.123"
+            "/.segglaecloud.phonkd.net/192.168.3.123"
             "/.segglaecloud.phonkd.net/::"
-            "/.w.phonkd.net/192.168.1.201"
+            "/.w.phonkd.net/192.168.3.201"
             "/.w.phonkd.net/::"
           ];
           #filter-aaaa = true;

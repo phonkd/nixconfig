@@ -189,6 +189,11 @@
               password._secret = "/run/secrets/jellyfin-admin-password";
               policy.isAdministrator = true;
             };
+            encoding = {
+              enableHardwareEncoding = true;
+              hardwareAccelerationType = "vaapi";
+              vaapiDevice = "/dev/dri/renderD128";
+            };
           };
         };
 

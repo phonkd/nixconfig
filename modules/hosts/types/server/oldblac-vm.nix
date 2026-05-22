@@ -38,10 +38,10 @@
       services.qemuGuest.enable = true;
       boot.loader.grub.enable = true;
       boot.loader.grub.useOSProber = true;
-      networking.defaultGateway = "192.168.1.1";
+      networking.defaultGateway = "192.168.3.1";
       networking.nameservers = [
-        "192.168.1.201"
-        "192.168.1.1"
+        "192.168.3.201"
+        "192.168.3.1"
       ];
     };
 }

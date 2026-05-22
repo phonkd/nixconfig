@@ -42,7 +42,7 @@
         enable = true;
         matchBlocks = {
           "homelab" = {
-            host = "192.168.1.*";
+            host = "192.168.3.*";
             identityFile = "~/.ssh/id_ed25519_priv";
             identitiesOnly = true;
             user = "phonkd";
