@@ -71,7 +71,7 @@
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
-          ExecStart = "${pkgs.alsa-utils}/bin/alsactl restore";
+          ExecStart = "-${pkgs.alsa-utils}/bin/alsactl restore";
           ExecStop = "${pkgs.alsa-utils}/bin/alsactl store";
         };
       };
