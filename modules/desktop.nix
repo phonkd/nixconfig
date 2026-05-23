@@ -78,7 +78,7 @@
       config,
       ...
     }:
-    {
+    lib.mkIf config.noughty.host.is.nixosDesktop {
       programs.dconf.enable = true;
       users.users.phonkd.packages = with pkgs; [
         gst_all_1.gstreamer
