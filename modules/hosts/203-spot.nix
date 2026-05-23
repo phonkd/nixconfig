@@ -24,6 +24,12 @@
       networking.firewall.allowedTCPPorts = [
         22
       ];
+      swapDevices = [
+        {
+          device = "/var/lib/swapfile";
+          size = 4 * 1024;
+        }
+      ];
       nix.gc = lib.mkForce {
         automatic = true;
         dates = "daily";
