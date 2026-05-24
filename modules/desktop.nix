@@ -118,8 +118,12 @@
         cava
         pulseaudio
         roomeqwizard
+        warehouse
       ];
 
+      services.flatpak.enable = true;
+      xdg.portal.enable = true;
+      xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-hyprland ];
       services.pulseaudio.enable = false;
       security.rtkit.enable = true;
       services.pipewire = {

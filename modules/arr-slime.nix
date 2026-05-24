@@ -236,17 +236,19 @@
           ];
         };
 
-        boot.kernelParams = [ "i915.enable_guc=3" ];
-        boot.initrd.kernelModules = [ "i915" ];
+        # NVIDIA RTX 3060 Ti (Ampere, GA104) passed through to the VM ->
+        # Jellyfin NVENC/NVDEC. Was Intel iGPU (i915 + VAAPI/iHD) before.
+        services.xserver.videoDrivers = [ "nvidia" ];
+        hardware.nvidia = {
+          open = true; # Ampere is supported by the open kernel modules
+          modesetting.enable = true;
+          nvidiaSettings = false; # headless server, no GUI
+          package = config.boot.kernelPackages.nvidiaPackages.stable;
+        };
         hardware.graphics = {
           enable = true;
           extraPackages = with pkgs; [
-            intel-media-driver
-            intel-vaapi-driver
-            libva-vdpau-driver
-            libvdpau-va-gl
-            intel-compute-runtime
-            vpl-gpu-rt
+            nvidia-vaapi-driver # optional VAAPI shim over NVDEC
           ];
         };
         users.users.jellyfin = {
@@ -255,9 +257,6 @@
             "video"
             "phonkd"
           ];
-        };
-        systemd.services.jellyfin.environment = {
-          LIBVA_DRIVER_NAME = "iHD";
         };
         hardware.enableRedistributableFirmware = true;
       };
