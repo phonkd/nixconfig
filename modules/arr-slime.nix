@@ -191,8 +191,7 @@
             };
             encoding = {
               enableHardwareEncoding = true;
-              hardwareAccelerationType = "vaapi";
-              vaapiDevice = "/dev/dri/renderD128";
+              hardwareAccelerationType = "nvenc";
             };
           };
         };
