@@ -206,7 +206,7 @@
                     #implementationName = "Generic Newznab;
 
                     baseUrl = "https://scenenzbs.com/";
-                    apiKey = "/run/secrets/sceneznbs-api-key";
+                    apiKey._secret = "/run/secrets/sceneznbs-api-key";
                     #appProfileId = 1;
                   }
                 ];
