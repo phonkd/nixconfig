@@ -17,6 +17,7 @@
     }:
     lib.mkIf (config.noughty.host.name == "203-media") {
       label.labels = [ "vm" ];
+      networking.hostName = "203-media";
       networking.useDHCP = lib.mkForce false;
       networking.interfaces = {
         ens18.ipv4.addresses = [
@@ -45,9 +46,15 @@
         interface = "ens18";
       };
       networking.iproute2.enable = true;
+      # `onlink` is required: this service can run before ens19 has its
+      # 192.168.3.203/24 address, and without it `ip route add ... via
+      # 192.168.3.1` fails with "Nexthop has invalid gateway" (the gateway
+      # isn't yet on-link), which aborts the whole script before the ip rule
+      # is installed. onlink forces the kernel to treat the gateway as
+      # directly reachable on ens19 regardless of address-assignment timing.
       networking.localCommands = ''
         ip route flush table 203 2>/dev/null || true
-        ip route add default via 192.168.3.1 dev ens19 table 203
+        ip route add default via 192.168.3.1 dev ens19 table 203 onlink
         ip rule del from 192.168.3.203 lookup 203 2>/dev/null || true
         ip rule add from 192.168.3.203 lookup 203
       '';
@@ -70,10 +77,8 @@
     };
 
   # Samba file shares, moved from 201-mono together with the data disk.
-  # The disk was reassigned to the 203 VM in Proxmox, so it now appears
-  # under a vm-203 by-id path. VERIFY the exact serial after the move with:
-  #   ls -l /dev/disk/by-id/ | grep virtio
-  # and adjust the disk slot number below if it isn't disk-1.
+  # The disk was reassigned to the 203 VM in Proxmox with the serial
+  # "shares", so it appears at /dev/disk/by-id/virtio-shares.
   flake.nixosModules."203-shares" =
     {
       config,
@@ -170,7 +175,7 @@
         };
       };
       fileSystems."/mnt/Shares" = {
-        device = "/dev/disk/by-id/virtio-vm-203-disk-1";
+        device = "/dev/disk/by-id/virtio-shares";
         fsType = "ext4";
         autoFormat = true;
         autoResize = true;
