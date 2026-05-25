@@ -144,6 +144,7 @@
           sops.secrets."prowlarr-api-key" = { };
           sops.secrets."prowlarr-password" = { };
           sops.secrets."nzblife-api-key" = { };
+          sops.secrets."nzbgeek-api-key" = { };
           sops.secrets."sabnzbd-api-key" = { };
           sops.secrets."sabnzbd-nzb-key" = { };
           sops.secrets."sabnzbduser" = { };
@@ -194,6 +195,18 @@
                   {
                     name = "Nzb.life";
                     apiKey._secret = "/run/secrets/nzblife-api-key";
+                  }
+                  {
+                    name = "NZBgeek";
+                    apiKey._secret = "/run/secrets/nzbgeek-api-key";
+                  }
+                  {
+                    name = "SceneNZBs";
+                    implementationName = "Generic Newznab";
+
+                    baseUrl = "https://scenenzbs.com/";
+                    apiKey = "/run/secrets/sceneznbs-api-key";
+                    #appProfileId = 1;
                   }
                 ];
               };
