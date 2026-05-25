@@ -4,7 +4,14 @@
   ...
 }:
 {
-  flake.nixosModules.homelab-traefik = { config, pkgs, lib, noughtyLib, ... }:
+  flake.nixosModules.homelab-traefik =
+    {
+      config,
+      pkgs,
+      lib,
+      noughtyLib,
+      ...
+    }:
     let
       # apps are sourced across all nixos modules containing phonkds.modules configs
       # the option type lives in modules/phonkds-options.nix
@@ -124,7 +131,7 @@
           };
 
           log = {
-            level = "DEBUG";
+            level = "INFO";
             filePath = "${config.services.traefik.dataDir}/traefik.log";
             format = "json";
           };
