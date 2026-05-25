@@ -38,7 +38,7 @@
       # arriving on ens19 go back out ens19 (so both addresses stay reachable
       # from remote subnets, not just their own /24).
       networking.defaultGateway = {
-        address = "192.168.1.1";
+        address = lib.mkForce "192.168.1.1";
         interface = "ens18";
       };
       networking.iproute2.enable = true;
