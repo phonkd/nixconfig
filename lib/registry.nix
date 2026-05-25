@@ -79,7 +79,6 @@
       [
         self.nixosModules.oldblac-vm
         self.nixosModules."201-mono"
-        self.nixosModules."201-shares"
         self.nixosModules."201-wireguard"
         self.nixosModules."homelab-dns"
       ];
@@ -102,6 +101,7 @@
       [
         self.nixosModules.oldblac-vm
         self.nixosModules."203-media"
+        self.nixosModules."203-shares"
       ];
   };
 
