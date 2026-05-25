@@ -164,7 +164,7 @@
             enable = true;
             stateDir = "/var/lib/nixflix";
             mediaDir = "/mnt/Shares/nixflix";
-            mediausers = [ "nixflix" ];
+            #mediausers = [ "nixflix" ];
             downloadsDir = "/mnt/Shares/nixflix/downloads";
 
             sonarr = {
