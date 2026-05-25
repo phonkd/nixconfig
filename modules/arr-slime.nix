@@ -201,8 +201,8 @@
                     apiKey._secret = "/run/secrets/nzbgeek-api-key";
                   }
                   {
-                    name = "SceneNZBs";
-                    implementationName = "Generic Newznab";
+                    name = "Generic Newznab";
+                    #implementationName = "Generic Newznab;
 
                     baseUrl = "https://scenenzbs.com/";
                     apiKey = "/run/secrets/sceneznbs-api-key";
