@@ -153,11 +153,18 @@
           sops.secrets."seerr-api-key" = { };
           sops.secrets."jellyfin-api-key" = { };
           sops.secrets."jellyfin-admin-password" = { };
+          systemd.tmpfiles.rules = [
+            "d /mnt/Shares/nixflix/downloads/usenet 0755 root root -"
+          ];
 
           nixflix = {
+            # globals = {
+            #   libraryOwner.group = "nixflix";
+            # };
             enable = true;
             stateDir = "/var/lib/nixflix";
             mediaDir = "/mnt/Shares/nixflix";
+            mediausers = [ "nixflix" ];
             downloadsDir = "/mnt/Shares/nixflix/downloads";
 
             sonarr = {
