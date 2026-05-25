@@ -131,6 +131,12 @@
         # The actual *arr/jellyfin/sabnzbd services live on the
         # media-server host (203-media).
         (lib.mkIf (noughtyLib.hostHasTag "media-server") {
+          # Open every port to the reverse-proxy host (201) only. nftables is
+          # the active backend (gigaplayer-server tag), so use extraInputRules.
+          networking.firewall.extraInputRules = ''
+            ip saddr 192.168.3.201 accept
+          '';
+
           sops.secrets."sonarr-api-key" = { };
           sops.secrets."sonarr-password" = { };
           sops.secrets."radarr-api-key" = { };
