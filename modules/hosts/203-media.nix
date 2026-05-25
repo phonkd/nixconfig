@@ -14,7 +14,7 @@
     }:
     lib.mkIf (config.noughty.host.name == "203-media") {
       label.labels = [ "vm" ];
-      networking.useDHCP = lib.mkDefault true;
+      networking.useDHCP = lib.mkDefault false;
       networking.interfaces = {
         ens18.ipv4.addresses = [
           # {
@@ -33,6 +33,22 @@
           }
         ];
       };
+
+      # Default route via ens18; a second table makes replies to traffic
+      # arriving on ens19 go back out ens19 (so both addresses stay reachable
+      # from remote subnets, not just their own /24).
+      networking.defaultGateway = {
+        address = "192.168.1.1";
+        interface = "ens18";
+      };
+      networking.iproute2.enable = true;
+      networking.localCommands = ''
+        ip route flush table 203 2>/dev/null || true
+        ip route add default via 192.168.3.1 dev ens19 table 203
+        ip rule del from 192.168.3.203 lookup 203 2>/dev/null || true
+        ip rule add from 192.168.3.203 lookup 203
+      '';
+
       networking.firewall.allowedTCPPorts = [
         22
       ];
