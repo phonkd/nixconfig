@@ -145,6 +145,7 @@
           sops.secrets."prowlarr-password" = { };
           sops.secrets."nzblife-api-key" = { };
           sops.secrets."nzbgeek-api-key" = { };
+          sops.secrets."scenenzbs-api-key" = { };
           sops.secrets."sabnzbd-api-key" = { };
           sops.secrets."sabnzbd-nzb-key" = { };
           sops.secrets."sabnzbduser" = { };
