@@ -14,13 +14,13 @@
     }:
     lib.mkIf (noughtyLib.hostHasTag "gigaplayer-client") {
       systemd.user.services.pipewire-network-sink = {
-        description = "Load PipeWire Network Sink for 203-spot";
+        description = "Load PipeWire Network Sink for 203-media";
         after = [ "pipewire-pulse.service" ];
         bindsTo = [ "pipewire-pulse.service" ];
         wants = [ "pipewire-pulse.service" ];
         wantedBy = [ "default.target" ];
         script = ''
-          ${pkgs.pulseaudio}/bin/pactl load-module module-tunnel-sink server=tcp:192.168.3.203:4713 sink_name=spot-203
+          ${pkgs.pulseaudio}/bin/pactl load-module module-tunnel-sink server=tcp:192.168.3.201:4713 sink_name=spot-201
         '';
         serviceConfig = {
           Restart = "on-failure";
@@ -280,21 +280,6 @@
         group = "uxplay";
       };
       users.groups.uxplay = { };
-
-      ## bluetooth receiver
-      #
-      hardware.bluetooth = {
-        enable = true;
-        powerOnBoot = true;
-        settings = {
-          General = {
-            # Explicitly enable A2DP Sink (receiver) and Source (transmitter) roles
-            Enable = "Source,Sink,Media,Socket";
-            # Experimental enables battery percentage reporting and other features
-            Experimental = false;
-          };
-        };
-      };
     };
 
 }

@@ -20,7 +20,10 @@
     platform = "x86_64-linux";
     formFactor = "desktop";
     desktop = "hyprland";
-    tags = [ "gaming" "gigaplayer-client" ];
+    tags = [
+      "gaming"
+      "gigaplayer-client"
+    ];
     username = "phonkd";
 
     gpu = {
@@ -82,7 +85,7 @@
       ];
   };
 
-  "203-spot" = {
+  "203-media" = {
     kind = "server";
     platform = "x86_64-linux";
     formFactor = null;
@@ -90,6 +93,7 @@
     tags = [
       "gigaplayer-server"
       "vm"
+      "media-server"
     ];
     username = "phonkd";
 
@@ -97,7 +101,7 @@
       { self, inputs }:
       [
         self.nixosModules.oldblac-vm
-        self.nixosModules."203-spot"
+        self.nixosModules."203-media"
       ];
   };
 

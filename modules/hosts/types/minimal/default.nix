@@ -55,6 +55,10 @@
         };
         matchBlocks."*" = {
           addKeysToAgent = "yes";
+          # ghostty's xterm-ghostty terminfo isn't on most servers; force a
+          # widely-known TERM. SetEnv TERM is special-cased by ssh and always
+          # applied to the pty, regardless of the server's AcceptEnv.
+          extraOptions.SetEnv = "TERM=xterm-256color";
         };
       };
       services.ssh-agent = {
