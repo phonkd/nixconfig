@@ -154,7 +154,7 @@
           sops.secrets."jellyfin-api-key" = { };
           sops.secrets."jellyfin-admin-password" = { };
           systemd.tmpfiles.rules = [
-            "d /mnt/Shares/nixflix/downloads/usenet 0755 root root -"
+            "d /mnt/solo-sata/nixflix/downloads/usenet 0755 root root -"
           ];
 
           nixflix = {
@@ -163,9 +163,9 @@
             # };
             enable = true;
             stateDir = "/var/lib/nixflix";
-            mediaDir = "/mnt/Shares/nixflix";
+            mediaDir = "/mnt/solo-sata/nixflix";
             #mediausers = [ "nixflix" ];
-            downloadsDir = "/mnt/Shares/nixflix/downloads";
+            downloadsDir = "/mnt/solo-sata/nixflix/downloads";
 
             sonarr = {
               enable = true;
@@ -249,7 +249,7 @@
               apiKey._secret = "/run/secrets/seerr-api-key";
               sonarr.main = {
                 apiKey._secret = "/run/secrets/sonarr-api-key";
-                activeDirectory = "/mnt/Shares/nixflix/tv";
+                activeDirectory = "/mnt/solo-sata/nixflix/tv";
                 isDefault = true;
                 syncEnabled = true;
               };

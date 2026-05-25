@@ -89,6 +89,7 @@
     lib.mkIf (config.noughty.host.name == "203-media") {
       systemd.tmpfiles.rules = [
         "d /mnt/Shares 0755 root root -"
+        "d /mnt/solo-sata 0755 root root -"
         "d /mnt/Shares/Public 2775 smbpublic smbpublic -"
         "d /mnt/Shares/SemiPublic 2770 phonkd phonkd -"
         "d /mnt/Shares/this-is-my-own-private-property-and-you-are-not-welcome-here 0750 phonkd phonkd -"
@@ -176,6 +177,16 @@
       };
       fileSystems."/mnt/Shares" = {
         device = "/dev/disk/by-id/virtio-shares";
+        fsType = "ext4";
+        autoFormat = true;
+        autoResize = true;
+        options = [
+          "users"
+          "nofail"
+        ];
+      };
+      fileSystems."/mnt/solo-sata" = {
+        device = "/dev/disk/by-id/virtio-solo-sata";
         fsType = "ext4";
         autoFormat = true;
         autoResize = true;
