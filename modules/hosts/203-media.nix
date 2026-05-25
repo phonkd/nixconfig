@@ -14,7 +14,7 @@
     }:
     lib.mkIf (config.noughty.host.name == "203-media") {
       label.labels = [ "vm" ];
-      networking.useDHCP = lib.mkDefault false;
+      networking.useDHCP = lib.mkForce false;
       networking.interfaces = {
         ens18.ipv4.addresses = [
           # {
