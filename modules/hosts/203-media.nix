@@ -50,7 +50,7 @@
       nix.settings.require-sigs = false;
 
       fileSystems."/mnt/Shares" = {
-        device = "/dev/disk/by-id/virtio-vm-203-disk-1";
+        device = "/dev/vdb";
         fsType = "ext4";
         autoFormat = true;
         autoResize = true;
