@@ -265,6 +265,7 @@
               encoding = {
                 enableHardwareEncoding = true;
                 hardwareAccelerationType = "nvenc";
+                enableTonemapping = true;
               };
             };
           };
