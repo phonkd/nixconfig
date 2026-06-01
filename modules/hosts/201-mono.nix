@@ -38,6 +38,7 @@
         443
         22
       ];
+      boot.loader.systemd-boot.configurationLimit = 10;
     };
   flake.nixosModules."201-wireguard" =
     {
