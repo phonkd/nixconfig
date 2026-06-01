@@ -183,6 +183,10 @@
           sops.secrets."jellyfin-admin-password" = { };
           systemd.tmpfiles.rules = [
             "d /mnt/solo-sata/nixflix/downloads/usenet 0755 root root -"
+            "d /mnt/solo-sata/nixflix/music 0775 slskd media -"
+            "d /mnt/solo-sata/nixflix/downloads/slskd 0755 slskd slskd -"
+            "d /mnt/solo-sata/nixflix/downloads/slskd/complete 0755 slskd slskd -"
+            "d /mnt/solo-sata/nixflix/downloads/slskd/incomplete 0755 slskd slskd -"
           ];
 
           nixflix = {
@@ -371,13 +375,6 @@
               };
             };
           };
-
-          systemd.tmpfiles.rules = lib.mkAfter [
-            "d /mnt/solo-sata/nixflix/music 0775 slskd media -"
-            "d /mnt/solo-sata/nixflix/downloads/slskd 0755 slskd slskd -"
-            "d /mnt/solo-sata/nixflix/downloads/slskd/complete 0755 slskd slskd -"
-            "d /mnt/solo-sata/nixflix/downloads/slskd/incomplete 0755 slskd slskd -"
-          ];
 
           # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires
           # on seerr-radarr.service even when radarr is disabled, blocking
