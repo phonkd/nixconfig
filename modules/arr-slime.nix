@@ -343,11 +343,11 @@
               global = {
                 upload = {
                   slots = 10;
-                  speed_limit = 0;
+                  speed_limit = 2147483647;
                 };
                 download = {
                   slots = 10;
-                  speed_limit = 0;
+                  speed_limit = 2147483647;
                 };
               };
               filters.search.request = [ ];
