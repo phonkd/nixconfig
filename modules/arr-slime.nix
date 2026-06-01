@@ -354,19 +354,19 @@
               retention = {
                 transfers = {
                   upload = {
-                    succeeded = 0;
-                    errored = 0;
-                    cancelled = 0;
+                    succeeded = 2147483647;
+                    errored = 2147483647;
+                    cancelled = 2147483647;
                   };
                   download = {
-                    succeeded = 0;
-                    errored = 0;
-                    cancelled = 0;
+                    succeeded = 2147483647;
+                    errored = 2147483647;
+                    cancelled = 2147483647;
                   };
                 };
                 files = {
-                  complete = 0;
-                  incomplete = 0;
+                  complete = 2147483647;
+                  incomplete = 2147483647;
                 };
               };
               directories = {
