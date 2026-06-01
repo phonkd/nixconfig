@@ -89,6 +89,28 @@
                 ipfilter = true;
               };
             };
+            lidarr = {
+              ip = "192.168.3.203";
+              port = 8686;
+              dashboard.enable = true;
+              traefik = {
+                enable = true;
+                domain = "lidarr.int.w.phonkd.net";
+                auth = false;
+                ipfilter = true;
+              };
+            };
+            slskd = {
+              ip = "192.168.3.203";
+              port = 5030;
+              dashboard.enable = true;
+              traefik = {
+                enable = true;
+                domain = "slskd.int.w.phonkd.net";
+                auth = false;
+                ipfilter = true;
+              };
+            };
           };
 
           # Homepage runs on the reverse-proxy host, so its SABnzbd widget
@@ -141,6 +163,12 @@
           sops.secrets."sonarr-password" = { };
           sops.secrets."radarr-api-key" = { };
           sops.secrets."radarr-password" = { };
+          sops.secrets."lidarr-api-key" = { };
+          sops.secrets."lidarr-password" = { };
+          sops.secrets."slskd-slsk-username" = { };
+          sops.secrets."slskd-slsk-password" = { };
+          sops.secrets."slskd-web-username" = { };
+          sops.secrets."slskd-web-password" = { };
           sops.secrets."prowlarr-api-key" = { };
           sops.secrets."prowlarr-password" = { };
           sops.secrets."nzblife-api-key" = { };
@@ -185,6 +213,17 @@
                 hostConfig = {
                   username = "phonkd";
                   password._secret = "/run/secrets/radarr-password";
+                  authenticationRequired = "disabledForLocalAddresses";
+                };
+              };
+            };
+            lidarr = {
+              enable = true;
+              config = {
+                apiKey._secret = "/run/secrets/lidarr-api-key";
+                hostConfig = {
+                  username = "phonkd";
+                  password._secret = "/run/secrets/lidarr-password";
                   authenticationRequired = "disabledForLocalAddresses";
                 };
               };
@@ -269,6 +308,76 @@
               };
             };
           };
+
+          sops.templates."slskd.env" = {
+            content = ''
+              SLSKD_SLSK_USERNAME=${config.sops.placeholder."slskd-slsk-username"}
+              SLSKD_SLSK_PASSWORD=${config.sops.placeholder."slskd-slsk-password"}
+              SLSKD_USERNAME=${config.sops.placeholder."slskd-web-username"}
+              SLSKD_PASSWORD=${config.sops.placeholder."slskd-web-password"}
+            '';
+            owner = "slskd";
+          };
+
+          services.slskd = {
+            enable = true;
+            openFirewall = true;
+            domain = null;
+            environmentFile = config.sops.templates."slskd.env".path;
+            settings = {
+              flags.force_share_scan = false;
+              shares = {
+                directories = [ "/mnt/solo-sata/nixflix/music" ];
+                filters = [
+                  "\\.ini$"
+                  "Thumbs.db$"
+                  "\\.DS_Store$"
+                ];
+              };
+              rooms = [ ];
+              soulseek.description = "slskd";
+              global = {
+                upload = {
+                  slots = 10;
+                  speed_limit = 0;
+                };
+                download = {
+                  slots = 10;
+                  speed_limit = 0;
+                };
+              };
+              filters.search.request = [ ];
+              retention = {
+                transfers = {
+                  upload = {
+                    succeeded = 0;
+                    errored = 0;
+                    cancelled = 0;
+                  };
+                  download = {
+                    succeeded = 0;
+                    errored = 0;
+                    cancelled = 0;
+                  };
+                };
+                files = {
+                  complete = 0;
+                  incomplete = 0;
+                };
+              };
+              directories = {
+                downloads = "/mnt/solo-sata/nixflix/downloads/slskd/complete";
+                incomplete = "/mnt/solo-sata/nixflix/downloads/slskd/incomplete";
+              };
+            };
+          };
+
+          systemd.tmpfiles.rules = lib.mkAfter [
+            "d /mnt/solo-sata/nixflix/music 0775 slskd media -"
+            "d /mnt/solo-sata/nixflix/downloads/slskd 0755 slskd slskd -"
+            "d /mnt/solo-sata/nixflix/downloads/slskd/complete 0755 slskd slskd -"
+            "d /mnt/solo-sata/nixflix/downloads/slskd/incomplete 0755 slskd slskd -"
+          ];
 
           # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires
           # on seerr-radarr.service even when radarr is disabled, blocking
