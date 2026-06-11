@@ -384,6 +384,59 @@
             requires = lib.mkForce [ "sonarr-config.service" ];
           };
 
+          # Upstream nixflix bug: sabnzbd-categories pipes the response of
+          # `mode=get_config` straight into jq, but SAB 5.x's reply doesn't
+          # parse — script dies with `jq: parse error: Invalid numeric`.
+          # Skip the get_config/diff step entirely and just push each desired
+          # category through `set_config`, which is idempotent.
+          systemd.services.sabnzbd-categories.script = lib.mkForce ''
+            set -euo pipefail
+
+            BASE_URL="http://${config.nixflix.usenetClients.sabnzbd.connectionAddress}:${toString config.nixflix.usenetClients.sabnzbd.settings.misc.port}${config.nixflix.usenetClients.sabnzbd.settings.misc.url_base}"
+            API_KEY=$(cat /run/secrets/sabnzbd-api-key)
+
+            # curl -K reads URL from stdin so the api_key never lands in argv
+            # (visible in `ps`).
+            api_call() {
+              local mode="$1"; shift
+              local url="$BASE_URL/api?mode=$mode&output=json&apikey=$API_KEY"
+              for param in "$@"; do url="$url&$param"; done
+              curl -sSf -K - <<EOF
+            url = $url
+            EOF
+            }
+
+            echo "Waiting for SABnzbd API..."
+            for i in $(seq 1 30); do
+              if api_call version >/dev/null 2>&1; then
+                echo "SABnzbd API is ready"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "Timeout waiting for SABnzbd API"
+                exit 1
+              fi
+              sleep 2
+            done
+
+            CATEGORIES_JSON='${builtins.toJSON config.nixflix.usenetClients.sabnzbd.settings.categories}'
+            echo "$CATEGORIES_JSON" | ${pkgs.jq}/bin/jq -c '.[]' | while IFS= read -r category; do
+              name=$(echo "$category" | ${pkgs.jq}/bin/jq -r '.name')
+              params=$(echo "$category" | ${pkgs.jq}/bin/jq -r '
+                to_entries
+                | map("\(.key)=\(.value | tostring | @uri)")
+                | join("&")
+              ')
+              if api_call set_config "section=categories" "$params" >/dev/null; then
+                echo "Configured category: $name"
+              else
+                echo "Warning: Failed to configure category: $name"
+              fi
+            done
+
+            echo "SABnzbd categories configured successfully"
+          '';
+
           # NVIDIA RTX 3060 Ti (Ampere, GA104) passed through to the VM ->
           # Jellyfin NVENC/NVDEC. Was Intel iGPU (i915 + VAAPI/iHD) before.
           services.xserver.videoDrivers = [ "nvidia" ];
