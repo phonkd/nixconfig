@@ -93,6 +93,11 @@
         "d /mnt/Shares/Public 2775 smbpublic smbpublic -"
         "d /mnt/Shares/SemiPublic 2770 phonkd phonkd -"
         "d /mnt/Shares/this-is-my-own-private-property-and-you-are-not-welcome-here 0750 phonkd phonkd -"
+        # The private share's ACL is group::--- so being in the `phonkd` group
+        # doesn't help — mirror the existing `user:smbpublic:r-x` pattern and
+        # name jellyfin explicitly. A+ recurses over existing content; the
+        # `d:` default entry handles anything Samba writes later.
+        "A+ /mnt/Shares/this-is-my-own-private-property-and-you-are-not-welcome-here - - - - u:jellyfin:rX,d:u:jellyfin:rX"
       ];
 
       users.users.smbpublic = {
