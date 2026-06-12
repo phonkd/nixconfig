@@ -110,7 +110,7 @@
           traefik = {
             enable = true;
             auth = false;
-            domain = "memos.int.w.phonkd.net";
+            domain = "notes.int.w.phonkd.net";
             ipfilter = true;
           };
         };
