@@ -132,6 +132,7 @@
     extraModules =
       { self, inputs }:
       [
+        inputs.simple-nixos-mailserver.nixosModule
         self.nixosModules."ext-mail"
       ];
   };
