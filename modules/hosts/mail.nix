@@ -64,8 +64,9 @@
           fsType = "ext4";
         };
         fileSystems."/efi" = {
-          device = "systemd-1";
-          fsType = "autofs";
+          device = "/dev/disk/by-uuid/564D-E28E";
+          fsType = "vfat";
+          options = [ "fmask=0077" "dmask=0077" ];
         };
         swapDevices = [ ];
         networking.useDHCP = lib.mkDefault true;
