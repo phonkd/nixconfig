@@ -50,6 +50,8 @@ let
     server-globalconfig
     server-sops # long-form: imports sops-nix unconditionally
 
+    mailserver
+
     # Reverse-proxy stack (gated on hostHasTag "reverse-proxy").
     homelab-traefik
     homelab-dashboard
