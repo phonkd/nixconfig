@@ -5,7 +5,7 @@
       config,
       pkgs,
       lib,
-      modulespath,
+      modulesPath,
       ...
     }:
     lib.mkIf (config.noughty.host.name == "ext-mail") {
