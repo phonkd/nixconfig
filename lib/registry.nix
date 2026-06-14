@@ -118,7 +118,7 @@
         self.darwinModules.macm4
       ];
   };
-  "201-mono" = {
+  "ext-mail" = {
     kind = "server";
     platform = "x86_64-linux";
     formFactor = null;
