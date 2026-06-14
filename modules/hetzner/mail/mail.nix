@@ -6,7 +6,7 @@
       pkgs,
       lib,
       noughtyLib,
-      mailserver
+      mailserver,
       ...
     }:
     lib.mkIf (noughtyLib.hostHasTag "mailserver") {
