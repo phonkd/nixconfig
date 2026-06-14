@@ -44,5 +44,8 @@
         "192.168.3.201"
         "192.168.3.1"
       ];
+      users.users.phonkd = {
+        extraGroups = [ "wheel" ];
+      };
     };
 }

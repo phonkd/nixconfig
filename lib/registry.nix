@@ -118,4 +118,22 @@
         self.darwinModules.macm4
       ];
   };
+  "201-mono" = {
+    kind = "server";
+    platform = "x86_64-linux";
+    formFactor = null;
+    desktop = null;
+    tags = [
+      "vm"
+      "mailserver"
+    ];
+    username = "phonkd";
+
+    extraModules =
+      { self, inputs }:
+      [
+        self.nixosModules.oldblac-vm
+        self.nixosModules."ext-mail"
+      ];
+  };
 }

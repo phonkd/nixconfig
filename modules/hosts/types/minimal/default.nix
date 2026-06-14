@@ -86,7 +86,7 @@
     users.users.phonkd = {
       isNormalUser = true;
       description = "phonkd";
-      extraGroups = [ "wheel" ];
+      #extraGroups = [ "wheel" ];
       group = "phonkd";
       shell = pkgs.zsh;
     };
