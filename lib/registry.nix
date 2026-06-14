@@ -132,7 +132,6 @@
     extraModules =
       { self, inputs }:
       [
-        self.nixosModules.oldblac-vm
         self.nixosModules."ext-mail"
       ];
   };
