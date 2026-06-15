@@ -133,6 +133,7 @@
       { self, inputs }:
       [
         self.nixosModules."ext-mail"
+        self.nixosModules."hetzner-vm"
       ];
   };
 }
