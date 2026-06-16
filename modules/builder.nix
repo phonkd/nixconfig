@@ -67,6 +67,7 @@ let
     homelab-aislop
     homelab-garage
     homelab-notes
+    observability-server
   ];
 
   # Darwin-side: cross-host feature modules.

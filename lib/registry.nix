@@ -136,4 +136,22 @@
         self.nixosModules."hetzner-vm"
       ];
   };
+  "observability" = {
+    kind = "server";
+    platform = "x86_64-linux";
+    formFactor = null;
+    desktop = null;
+    tags = [
+      "vm"
+      "observability-server"
+    ];
+    username = "phonkd";
+
+    extraModules =
+      { self, inputs }:
+      [
+        self.nixosModules."observability"
+        self.nixosModules."hetzner-vm"
+      ];
+  };
 }
