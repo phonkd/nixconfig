@@ -10,9 +10,9 @@
     }:
     {
       config = lib.mkIf (noughtyLib.hostHasTag "observability-server") {
-        services.cortex-metrics = {
-          enable = true;
-        };
+        # services.cortex-metrics = {
+        #   enable = true;
+        # };
       };
     };
 }
