@@ -29,9 +29,9 @@
               dashboard.enable = true;
               traefik = {
                 enable = true;
-                domain = "jellyfin.int.w.phonkd.net";
+                domain = "jellyfin.w.phonkd.net";
                 auth = false;
-                ipfilter = true;
+                ipfilter = false;
               };
             };
             sonarr = {

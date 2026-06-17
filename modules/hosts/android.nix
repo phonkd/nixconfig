@@ -46,7 +46,6 @@
           environment.packages = with pkgs; [
             openssh
             gawk
-            claude-code
           ];
           nix.extraOptions = ''
             experimental-features = nix-command flakes

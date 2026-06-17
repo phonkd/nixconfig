@@ -234,16 +234,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1781242433,
-        "narHash": "sha256-bchLZZ3sRn740zyvD2icZSnNoTaanN0nw7l6fjVXO+E=",
+        "lastModified": 1781190061,
+        "narHash": "sha256-QRMpLbsmlciMGv4yx75FUoIl54K02JbIX1tgdPHPw1s=",
         "owner": "nix-darwin",
         "repo": "nix-darwin",
-        "rev": "aabb2037edfc0f210723b72cd5f528aab5dd3f0b",
+        "rev": "f2b3fdb347f91dfd344ad196666a0b0fe8aad05c",
         "type": "github"
       },
       "original": {
         "owner": "nix-darwin",
-        "ref": "master",
+        "ref": "nix-darwin-26.05",
         "repo": "nix-darwin",
         "type": "github"
       }
@@ -388,6 +388,22 @@
         "owner": "NixOS",
         "repo": "nixpkgs",
         "rev": "49ee0e94463abada1de470c9c07bfc12b36dcf40",
+        "type": "github"
+      }
+    },
+    "nixpkgs-fork": {
+      "locked": {
+        "lastModified": 1781554518,
+        "narHash": "sha256-ttWWxEcTEiVWQBYx9o4OfL7rOIaxHXEgxz7Og+HR6Hs=",
+        "owner": "phonkd",
+        "repo": "nixpkgs",
+        "rev": "d3f8d3bfe544c355adcf18008bf25d6280d9e80a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "phonkd",
+        "ref": "master",
+        "repo": "nixpkgs",
         "type": "github"
       }
     },
@@ -539,6 +555,7 @@
         "nix-on-droid": "nix-on-droid",
         "nixflix": "nixflix",
         "nixpkgs": "nixpkgs",
+        "nixpkgs-fork": "nixpkgs-fork",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixpkgs-unstable-droid": "nixpkgs-unstable-droid",
         "noctalia": "noctalia",

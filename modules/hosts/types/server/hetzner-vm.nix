@@ -6,13 +6,14 @@
       pkgs,
       lib,
       modulesPath,
+      noughtyLib,
       ...
     }:
     {
       imports = [
         (modulesPath + "/profiles/qemu-guest.nix")
       ];
-      config = (lib.mkIf (noughtyLib.hostHasTag "hetzner-vm") {
+      config = (lib.mkIf (noughtyLib.hostHasTag "hetzner-vm")) {
         services.openssh = {
           enable = true;
           ports = [ 5432 ];

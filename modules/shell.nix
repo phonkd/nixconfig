@@ -14,6 +14,9 @@
         inputs.kubectl-aliases.homeManagerModules.default
         inputs.try-rs.homeModules.default
       ];
+      home.sessionPath = [
+        "$HOME/.local/bin"
+      ];
       programs.try-rs = {
         enable = true;
       };

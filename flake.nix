@@ -10,7 +10,7 @@
     wrapper-modules.url = "github:BirdeeHub/nix-wrapper-modules";
     wrapper-modules.inputs.nixpkgs.follows = "nixpkgs";
     nix-darwin = {
-      url = "github:nix-darwin/nix-darwin/master";
+      url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     home-manager = {
