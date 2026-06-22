@@ -65,7 +65,13 @@
         };
         domains = lib.mkOption {
           type = lib.types.listOf lib.types.str;
-          default = [ ".w.phonkd.net" ];
+          default = [
+            ".w.phonkd.net"
+            # Spotify: route through wg (homelab) instead of direct.
+            ".spotify.com"
+            ".scdn.co"
+            ".spotifycdn.com"
+          ];
         };
         ipRanges = lib.mkOption {
           type = lib.types.listOf lib.types.str;
