@@ -30,6 +30,13 @@
       };
     };
   # Self-gates on the "gigaplayer-server" host tag.
+  #
+  # "beatnikl" -- a Snapcast multiroom server (the byrdsandbytes/beatnik-pi
+  # stack, rebuilt declaratively). snapserver receives AirPlay and Spotify
+  # and broadcasts the PCM to snapclients on the network; it does NOT play
+  # audio locally. snapserver spawns shairport-sync / librespot itself in
+  # pipe mode (each writes PCM to snapserver's stdin), so no local sink,
+  # PipeWire, or sound card is involved -- this host is purely the server.
   flake.nixosModules.gigaplayer-server =
     {
       pkgs,
@@ -37,249 +44,67 @@
       noughtyLib,
       ...
     }:
-    lib.mkIf (noughtyLib.hostHasTag "gigaplayer-server") {
-      # 1. Audio Setup (PipeWire System-Wide)
-      security.rtkit.enable = true;
-      services.pipewire = {
-        enable = lib.mkForce true;
-        alsa.enable = true;
-        alsa.support32Bit = true;
-        pulse.enable = true;
-        systemWide = true;
-        raopOpenFirewall = true;
-        extraConfig.pipewire-pulse."99-network" = {
-          "pulse.cmd" = [
-            {
-              cmd = "load-module";
-              args = "module-native-protocol-tcp port=4713 listen=0.0.0.0 auth-anonymous=1";
-            }
-          ];
-        };
-
-      };
-      systemd.services.pipewire-pulse.wantedBy = [ "multi-user.target" ];
-
-      # Restore ALSA mixer state on boot. Without this, headless system-wide
-      # PipeWire leaves the HDA codec output amps at 0 and the analog jacks
-      # are silent even though network sinks deliver audio correctly.
-      environment.systemPackages = [ pkgs.alsa-utils ];
-      systemd.services.alsa-restore = {
-        description = "Restore ALSA mixer state";
-        wantedBy = [ "sound.target" ];
-        before = [ "sound.target" ];
-        after = [ "local-fs.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          RemainAfterExit = true;
-          ExecStart = "-${pkgs.alsa-utils}/bin/alsactl restore";
-          ExecStop = "${pkgs.alsa-utils}/bin/alsactl store";
-        };
-      };
-
-      services.spotifyd = {
-        enable = true;
-        settings = {
-          global = {
-            device_name = "nixos-headless";
-            backend = "pulseaudio";
-            use_mpris = false;
-            bitrate = 320;
-            cache_path = "/var/cache/spotifyd";
-            volume_controller = "softvol";
-            zeroconf_port = 57621;
-            max_cache_size = 5000000000; # like 5gb for max cache size so disk doesnt fill up
+    lib.mkIf (noughtyLib.hostHasTag "gigaplayer-server") (
+      let
+        # Advertised name on AirPlay / Spotify Connect discovery.
+        deviceName = "beatnikl";
+        # Pinned so the Spotify Connect handshake port is firewall-knowable
+        # (librespot's libmdns otherwise picks a random one).
+        spotifyZeroconfPort = 5040;
+      in
+      {
+        # Snapcast server. snapserver spawns the AirPlay / Spotify sources and
+        # streams their audio to snapclients (port 1704). Control + web UI
+        # (snapweb) live on 1705 / 1780.
+        services.snapserver = {
+          enable = true;
+          openFirewall = true; # opens 1704 (audio), 1705 (control), 1780 (http)
+          settings = {
+            stream.source = [
+              # AirPlay 1 -- snapserver runs shairport-sync with the stdout
+              # backend; appears as "${deviceName}" on AirPlay discovery.
+              "airplay://${pkgs.shairport-sync}/bin/shairport-sync?name=Airplay&devicename=${deviceName}&port=5000"
+              # Spotify Connect -- snapserver runs librespot in zeroconf
+              # discovery mode (no credentials needed); built with-libmdns.
+              "librespot://${lib.getExe pkgs.librespot}?name=Spotify&devicename=${deviceName}&bitrate=320&volume=100&params=--zeroconf-port=${toString spotifyZeroconfPort}"
+            ];
+            http.enabled = true; # snapweb + JSON-RPC over HTTP on :1780
+            tcp-control.enabled = true; # JSON-RPC over TCP on :1705
           };
         };
-      };
 
-      # 4. Networking & Firewall
-      networking = {
-        nftables.enable = true;
-        firewall = {
-          enable = true;
+        # mDNS: lets AirPlay senders, Spotify, and snapclients discover the
+        # server. mkDefault so it coexists with hosts that already enable
+        # avahi (e.g. 203-shares on 203-media).
+        services.avahi = {
+          enable = lib.mkDefault true;
+          publish = {
+            enable = lib.mkDefault true;
+            userServices = lib.mkDefault true;
+          };
+        };
+
+        # Web UI: snapserver serves the built-in snapweb UI on :1780
+        # (services.snapserver.settings.http) -- no separate container needed.
+
+        # snapserver.openFirewall covers 1704/1705/1780. Open the rest of the
+        # Snapcast/AirPlay/Spotify surface.
+        networking.firewall = {
           allowedTCPPorts = [
-            57621 # Spotify Connect
-            4713 # PulseAudio Network
-            12345
-            7000 # AirPlay
-            7100 # AirPlay
-            7011 # AirPlay
-            #8085 # noVNC Web Interface
+            5000 # shairport-sync RTSP (AirPlay)
+            spotifyZeroconfPort # librespot Spotify Connect handshake
           ];
           allowedUDPPorts = [
-            5353 # mDNS (Avahi)
-            6000
-            6001
-            7011
+            5353 # mDNS (Avahi + librespot libmdns)
           ];
-          extraInputRules = ''
-            # Allow noVNC (8085) only from the Traefik VM
-            ip saddr 192.168.3.201 tcp dport 8085 accept
-          '';
-        };
-      };
-
-      # 5. User Permissions
-      users.users.spotifyd = {
-        extraGroups = [
-          "audio"
-          "pipewire"
-        ];
-        isSystemUser = true;
-        group = "spotifyd";
-      };
-      users.groups.spotifyd = { };
-
-      # 3. EasyEffects Web GUI (X11 + VNC + noVNC)
-      # Broadway failed due to Qt dependencies in EasyEffects.
-      # We switch to a robust Xvfb -> x11vnc -> noVNC stack.
-
-      users.users.easyeffects = {
-        isSystemUser = true;
-        group = "easyeffects";
-        extraGroups = [
-          "audio"
-          "pipewire"
-        ];
-        home = "/var/lib/easyeffects";
-        createHome = true;
-      };
-      users.groups.easyeffects = { };
-
-      systemd.services.headless-gui = {
-        description = "EasyEffects Headless Session (noVNC)";
-        wantedBy = [ "multi-user.target" ];
-        after = [
-          "network.target"
-          "pipewire.service"
-        ];
-        requires = [ "pipewire.service" ];
-
-        environment = {
-          "DISPLAY" = ":5";
-          "PIPEWIRE_RUNTIME_DIR" = "/run/pipewire";
-          "PULSE_SERVER" = "unix:/run/pulse/native";
-          "PULSE_RUNTIME_PATH" = "/run/pulse";
-          "XDG_RUNTIME_DIR" = "/run/easyeffects";
-          "XDG_CONFIG_HOME" = "/var/lib/easyeffects/.config";
-          "XDG_CACHE_HOME" = "/var/lib/easyeffects/.cache";
-          "XDG_DATA_HOME" = "/var/lib/easyeffects/.local/share";
-          "GDK_BACKEND" = "x11";
-          "QT_QPA_PLATFORM" = "xcb";
-          "LIBGL_ALWAYS_SOFTWARE" = "1";
-          "QT_XCB_GL_INTEGRATION" = "none";
-          "QT_QUICK_BACKEND" = "software";
-          "QMLSCENE_DEVICE" = "softwarecontext";
-        };
-
-        path = with pkgs; [
-          bash
-          procps
-          xorg.xorgserver
-          xorg.xauth
-          x11vnc
-          python3Packages.websockify
-          dbus
-          easyeffects
-          openbox
-          bluez
-          bluez-tools
-        ];
-
-        script = ''
-          # Use a dbus session for the entire stack
-          exec ${pkgs.dbus}/bin/dbus-run-session -- bash -c '
-            cleanup() {
-              echo "Cleaning up child processes..."
-              kill $XVFB_PID $OPENBOX_PID $X11VNC_PID $WEBSOCKIFY_PID 2>/dev/null || true
-              wait
-            }
-            trap cleanup EXIT
-
-            # 1. Start Xvfb
-            Xvfb :5 -screen 0 1920x1080x24 &
-            XVFB_PID=$!
-            sleep 2
-
-            # 2. Start openbox window manager
-            openbox &
-            OPENBOX_PID=$!
-            sleep 1
-
-            # 3. Start VNC Server
-            x11vnc -display :5 -forever -shared -nopw -q &
-            X11VNC_PID=$!
-            sleep 1
-
-            # 4. Start WebSockify
-            ${pkgs.python3Packages.websockify}/bin/websockify --web ${pkgs.novnc}/share/webapps/novnc 8085 localhost:5900 &
-            WEBSOCKIFY_PID=$!
-            sleep 1
-
-            # 5. Start EasyEffects (blocking foreground process)
-            easyeffects
-          '
-        '';
-
-        serviceConfig = {
-          User = "easyeffects";
-          Group = "easyeffects";
-          Restart = "always";
-          RestartSec = "5s";
-          RuntimeDirectory = "easyeffects";
-          RuntimeDirectoryMode = "0700";
-          KillMode = "control-group";
-          TimeoutStopSec = "10s";
-          # preStart needs root to kill orphaned Xvfb and clean /tmp
-          ExecStartPre = [
-            "+${pkgs.bash}/bin/bash -c '${pkgs.procps}/bin/pkill -9 -x Xvfb || true; sleep 1; rm -f /tmp/.X5-lock /tmp/.X11-unix/X5 /tmp/easyeffects.lock; mkdir -p /var/lib/easyeffects/.config /var/lib/easyeffects/.cache /var/lib/easyeffects/.local/share; chown -R easyeffects:easyeffects /var/lib/easyeffects'"
+          allowedUDPPortRanges = [
+            {
+              from = 6000;
+              to = 6009;
+            } # shairport-sync timing / control / audio
           ];
         };
-      };
-      ## AirPlay receiver (uxplay)
-      services.avahi = {
-        enable = true;
-        nssmdns4 = true;
-        publish = {
-          enable = true;
-          userServices = true;
-        };
-      };
-
-      systemd.services.uxplay = {
-        description = "UxPlay AirPlay Receiver";
-        wantedBy = [ "multi-user.target" ];
-        after = [
-          "network.target"
-          "pipewire.service"
-          "avahi-daemon.service"
-        ];
-        requires = [
-          "pipewire.service"
-          "avahi-daemon.service"
-        ];
-
-        environment = {
-          "PIPEWIRE_RUNTIME_DIR" = "/run/pipewire";
-        };
-
-        serviceConfig = {
-          ExecStart = "${pkgs.uxplay}/bin/uxplay -n nixos-headless -vs 0 -as pulsesink -p";
-          User = "uxplay";
-          Group = "uxplay";
-          Restart = "always";
-          SupplementaryGroups = [
-            "audio"
-            "pipewire"
-          ];
-        };
-      };
-
-      users.users.uxplay = {
-        isSystemUser = true;
-        group = "uxplay";
-      };
-      users.groups.uxplay = { };
-    };
+      }
+    );
 
 }
