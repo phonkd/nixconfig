@@ -36,6 +36,10 @@
 
       # ── Dashboard service + auth + firewall (runs on 204-agent) ──────────
       (lib.mkIf (config.noughty.host.name == "204-agent") {
+        # Write host into config.yaml so hermes reads it from there (the
+        # --host CLI flag alone isn't honoured; config.yaml wins).
+        services.hermes-agent.settings.dashboard.host = "0.0.0.0";
+
         # Bind to 0.0.0.0 so Traefik on 201 can reach it; the firewall rule
         # below restricts access to 201-mono only at the network level.
         systemd.services.hermes-dashboard = {
