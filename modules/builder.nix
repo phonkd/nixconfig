@@ -67,6 +67,7 @@ let
     homelab-aislop
     homelab-garage
     homelab-notes
+    homelab-hermes
     observability-server
   ];
 
