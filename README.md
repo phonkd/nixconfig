@@ -1,20 +1,67 @@
 # nixconfig
 
-## slime
-┌───────────────────────────────────────┬────────┬────────┬─────────┐
-│                                       │  blac  │  g14   │   mac   │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ is.nixosDesktop                       │ true   │ true   │ false   │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ is.darwinDesktop                      │ false  │ false  │ true    │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ is.workstation (any OS)               │ —      │ —      │ true    │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ HM fastfetch.enable                   │ true   │ true   │ true    │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ networking.hostName / homebrew.enable │ blac   │ g14    │ true    │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ nvidia LIBVA_DRIVER_NAME              │ nvidia │ nvidia │ n/a     │
-├───────────────────────────────────────┼────────┼────────┼─────────┤
-│ Hyprland HM (NixOS-only)              │ —      │ —      │ false ✓ │
-└───────────────────────────────────────┴────────┴────────┴─────────┘
+A [flake-parts](https://flake.parts) NixOS / nix-darwin / home-manager config built
+around a **dendritic** module tree: features wire themselves up, and the homelab
+dashboard builds itself from the modules that are active.
+
+## Dendritic structure
+
+`flake.nix` imports the whole module tree with one line:
+
+```nix
+imports = [ (import-tree ./modules) ];
+```
+
+[`import-tree`](https://github.com/vic/import-tree) recursively pulls in **every
+`.nix` file under `modules/`** as a flake-parts module — there is no central list to
+edit. Dropping a new file into `modules/` is the only step needed to add a feature.
+Each file contributes named outputs (`flake.nixosModules.<name>`,
+`flake.darwinModules.<name>`, `flake.homeModules.<name>`) that compose freely.
+
+Hosts live in `lib/registry.nix`, the single source of truth: one stanza per machine
+(`kind`, `platform`, `desktop`, `tags`, `gpu`, …). `modules/builder.nix` reads the
+registry and routes each host by platform suffix (`*-linux` → `nixosConfigurations`,
+`*-darwin` → `darwinConfigurations`).
+
+## Self-activating modules
+
+Modules are **not** hand-wired into each host. Instead they gate themselves on host
+facts exposed by the `noughty` module (`lib/noughty/`):
+
+- predicates like `noughty.host.is.nixosDesktop` / `is.darwinDesktop` / `is.server`
+- freeform tags via `noughtyLib.hostHasTag "<tag>"`
+
+```nix
+# modules/homelab/apps/vaultwarden.nix — activates on any "homelab-server" host
+flake.nixosModules.homelab-vaultwarden = { lib, noughtyLib, ... }:
+  lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
+    services.vaultwarden.enable = true;
+    # ...
+  };
+```
+
+Tag a host in the registry and every module guarding on that tag switches on. No host
+file imports them explicitly.
+
+## Auto-populating dashboard
+
+Homelab apps register themselves in a central typed registry,
+`phonkds.modules.<app>` (declared in `modules/phonkds-options.nix`). A *producer*
+module just describes itself:
+
+```nix
+phonkds.modules.vaultwarden = {
+  ip = "127.0.0.1";
+  port = 8000;
+  dashboard.enable = true;
+  traefik = { enable = true; domain = "vw.w.phonkd.net"; };
+};
+```
+
+The *consumer* — `modules/homelab/dashboard.nix`, gated on the `reverse-proxy` tag —
+reads that registry, filters for apps that are dashboard- and Traefik-enabled with a
+domain, and generates the [homepage-dashboard](https://gethomepage.dev) service list
+automatically. The same registry feeds Traefik routing.
+
+The net effect: enabling an app with `dashboard.enable = true` makes it appear on the
+dashboard (and get proxied) with **no edits to the dashboard module**.
