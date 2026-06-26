@@ -47,6 +47,10 @@
       url = "gitlab:simple-nixos-mailserver/nixos-mailserver/nixos-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Hermes Agent (Nous Research). Intentionally NOT following our nixpkgs:
+    # the package is built with uv2nix against the upstream-pinned
+    # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
+    hermes-agent.url = "github:NousResearch/hermes-agent";
   };
 
   outputs =
