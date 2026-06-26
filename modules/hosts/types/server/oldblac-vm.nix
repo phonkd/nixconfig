@@ -10,6 +10,10 @@
     {
       imports = [
         (modulesPath + "/profiles/qemu-guest.nix")
+        # Every oldblac VM is a build client that offloads x86_64-linux to
+        # 205-builder. 205-builder mkForce-disables this and runs the server
+        # role instead (see modules/hosts/205-builder.nix).
+        self.nixosModules.builder-client
       ];
       fileSystems."/" = {
         device = "/dev/disk/by-uuid/f222513b-ded1-49fa-b591-20ce86a2fe7f";
