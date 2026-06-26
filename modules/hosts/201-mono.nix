@@ -39,6 +39,8 @@
         22
       ];
       boot.loader.systemd-boot.configurationLimit = 10;
+      # (Distributed-build client wiring comes from builder-client, imported
+      # via oldblac-vm -- see modules/hosts/types/server/builder.nix.)
     };
   flake.nixosModules."201-wireguard" =
     {

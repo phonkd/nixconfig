@@ -124,6 +124,24 @@
       ];
   };
 
+  "205-builder" = {
+    kind = "server";
+    platform = "x86_64-linux";
+    formFactor = null;
+    desktop = null;
+    tags = [
+      "vm"
+    ];
+    username = "phonkd";
+
+    extraModules =
+      { self, inputs }:
+      [
+        self.nixosModules.oldblac-vm
+        self.nixosModules."205-builder"
+      ];
+  };
+
   "Eliss-MacBook-Pro" = {
     kind = "computer";
     platform = "aarch64-darwin";
