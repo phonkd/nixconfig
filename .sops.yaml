@@ -3,5 +3,4 @@ creation_rules:
     encrypted_regex: "^(private_key|public_key)$"
     age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"
   - path_regex: modules/homelab/global-secrets
-    encrypted_regex: "^(private_key|public_key)$"
     age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"

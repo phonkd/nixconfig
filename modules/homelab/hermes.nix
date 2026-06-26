@@ -7,6 +7,9 @@
   #
   # 204-agent section: runs the dashboard process + restricts port 9119 in
   #   the firewall to traffic from 201-mono (192.168.3.201) only.
+  #   Auth: username in settings; bcrypt password hash read from
+  #   sops secret "hermes-dashboard-pw-hash" and injected into config.yaml
+  #   at activation time (keeps plaintext password out of the nix store).
   flake.nixosModules.homelab-hermes =
     {
       config,
@@ -31,8 +34,32 @@
         };
       })
 
-      # ── Dashboard service + firewall (runs on 204-agent) ──────────────────
+      # ── Dashboard service + auth + firewall (runs on 204-agent) ──────────
       (lib.mkIf (config.noughty.host.name == "204-agent") {
+        # Username lives in config.yaml (not sensitive).
+        services.hermes-agent.settings.dashboard.basic_auth.username = "phonkd";
+
+        # Password hash from sops — decrypted at activation, injected into
+        # config.yaml by the activation script below (never hits the nix store).
+        sops.secrets."hermes-dashboard-pw-hash" = {
+          owner = config.services.hermes-agent.user;
+        };
+
+        # Runs after sops decryption and after the hermes-agent-setup script
+        # that writes config.yaml. Uses jq to upsert the password_hash field.
+        system.activationScripts."hermes-dashboard-auth" =
+          lib.stringAfter [ "hermes-agent-setup" "setupSecrets" ] ''
+            _cfg="${config.services.hermes-agent.stateDir}/.hermes/config.yaml"
+            _hash_file="${config.sops.secrets."hermes-dashboard-pw-hash".path}"
+            if [ -f "$_hash_file" ] && [ -f "$_cfg" ]; then
+              _hash="$(cat "$_hash_file")"
+              ${pkgs.jq}/bin/jq --arg h "$_hash" \
+                '.dashboard.basic_auth.password_hash = $h' \
+                "$_cfg" > "$_cfg.tmp" && mv "$_cfg.tmp" "$_cfg"
+              chown ${config.services.hermes-agent.user}:${config.services.hermes-agent.group} "$_cfg"
+            fi
+          '';
+
         # Bind to 0.0.0.0 so Traefik on 201 can reach it; the firewall rule
         # below restricts access to 201-mono only at the network level.
         systemd.services.hermes-dashboard = {
