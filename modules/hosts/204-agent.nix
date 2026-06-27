@@ -40,10 +40,9 @@
 
       services.hermes-agent = {
         enable = true;
-
-        # Install the hermes CLI system-wide and export HERMES_HOME so an
-        # interactive shell shares state (sessions/cron/auth) with the gateway.
         addToSystemPackages = true;
+
+        settings.dashboard.host = "0.0.0.0";
 
         # No build-time secret. After the first rebuild, log in on the VM:
         #     hermes portal login      # OAuth into Nous, sets provider + model
