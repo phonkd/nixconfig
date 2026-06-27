@@ -58,7 +58,8 @@
           };
         };
 
-        # nftables (extraInputRules) — allow 9119 from 201-mono only.
+        networking.nftables.enable = true;
+        # Allow hermes dashboard port from 201-mono only.
         networking.firewall.extraInputRules = ''
           ip saddr 192.168.3.201 tcp dport 9119 accept
         '';
