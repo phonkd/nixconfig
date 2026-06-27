@@ -42,8 +42,6 @@
         enable = true;
         addToSystemPackages = true;
 
-        settings.dashboard.host = "0.0.0.0";
-
         # No build-time secret. After the first rebuild, log in on the VM:
         #     hermes portal login      # OAuth into Nous, sets provider + model
         #     hermes portal info       # verify what's wired up

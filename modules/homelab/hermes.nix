@@ -27,7 +27,7 @@
           dashboard.enable = true;
           traefik = {
             enable = true;
-            domain = "hermes.w.phonkd.net";
+            domain = "int.w.phonkd.net";
             auth = false;
             ipfilter = true;
           };
