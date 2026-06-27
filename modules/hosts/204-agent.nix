@@ -41,6 +41,7 @@
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
+        settings.model = "anthropic/claude-sonnet-4-6";
 
         # No build-time secret. After the first rebuild, log in on the VM:
         #     hermes portal login      # OAuth into Nous, sets provider + model
