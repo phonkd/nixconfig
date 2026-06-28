@@ -107,4 +107,29 @@
       }
     );
 
+  # Registers the Snapcast web UI (snapweb on 203-media:1780) in the
+  # phonkds.modules registry so the reverse-proxy picks it up for both
+  # Traefik routing and the homepage dashboard.
+  flake.nixosModules.gigaplayer-server-proxy =
+    {
+      lib,
+      noughtyLib,
+      ...
+    }:
+    lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
+      phonkds.modules.snapcast = {
+        ip = "192.168.3.203";
+        port = 1780;
+        dashboard = {
+          enable = true;
+          icon = "snapcast";
+        };
+        traefik = {
+          enable = true;
+          domain = "snapcast.w.phonkd.net";
+          ipfilter = true;
+        };
+      };
+    };
+
 }
