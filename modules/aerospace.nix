@@ -64,7 +64,7 @@
             alt-shift-i = "move-node-to-workspace X";
             alt-shift-o = "move-node-to-workspace C";
             alt-f = "fullscreen";
-            alt-v = "exec-and-forget ${pkgs.kitty}/bin/kitty";
+            alt-v = "exec-and-forget ${pkgs.kitty}/bin/kitty --directory ~";
             alt-space = "layout floating tiling";
             alt-tab = "workspace-back-and-forth";
             alt-shift-period = "mode service";
