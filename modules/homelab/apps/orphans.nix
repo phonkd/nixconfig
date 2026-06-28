@@ -59,8 +59,8 @@
             extraMiddlewares = [ "pve-headers" ];
           };
         };
-        zyxel = {
-          ip = "192.168.1.2";
+        unifi = {
+          ip = "192.168.1.1";
           port = 443;
           dashboard = {
             enable = true;
@@ -72,6 +72,17 @@
             scheme = "https";
             transport = "insecureTransport";
             ipfilter = true;
+          };
+        };
+        grafana = {
+          ip = "10.9.0.1";
+          port = 3000;
+          dashboard.enable = true;
+          traefik = {
+            enable = true;
+            domain = "grafana.phonkd.net";
+            auth = false;
+            ipfilter = false;
           };
         };
       };

@@ -33,6 +33,7 @@
           "192.168.3.200/32"
           "192.168.1.150/32"
           "192.168.3.203"
+          "10.9.0.0/24"
         ];
         networking.hostName = "g14";
         networking.nameservers = [
