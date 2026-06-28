@@ -43,7 +43,14 @@
           ];
         };
         security.sudo.wheelNeedsPassword = false;
-        virtualisation.docker.enable = true;
+        virtualisation.docker = {
+          enable = true;
+          # Use 10.100.x.0/24 pools so Docker doesn't collide with the WireGuard
+          # routes that claim all of 172.16.0.0/12 and 192.168.0.0/16.
+          daemon.settings.default-address-pools = [
+            { base = "10.100.0.0/16"; size = 24; }
+          ];
+        };
         system.stateVersion = lib.mkForce "26.05";
 
         users.users."phonkd".openssh.authorizedKeys.keys = [
