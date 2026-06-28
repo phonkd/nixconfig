@@ -31,23 +31,17 @@
         22
       ];
 
-      # Let the interactive user share HERMES_HOME with the gateway service.
-      # The state dir (/var/lib/hermes) is 2770 hermes:hermes and
-      # addToSystemPackages exports HERMES_HOME system-wide, so phonkd needs to
-      # be in the `hermes` group to run `hermes portal login` (writes OAuth
-      # creds into the shared HERMES_HOME). Alternatively: sudo -u hermes hermes ...
       users.users.phonkd.extraGroups = [ "hermes" ];
 
-      sops.secrets."hermes-anthr-token" = {
+      sops.secrets."hermes-openrouter-key" = {
         owner = "hermes";
       };
 
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
-        settings.model = "anthropic/claude-sonnet-4-6";
-        extraDependencyGroups = [ "anthropic" ];
-        environmentFiles = [ config.sops.secrets."hermes-anthr-token".path ];
+        settings.model = "openrouter/anthropic/claude-sonnet-4-6";
+        environmentFiles = [ config.sops.secrets."hermes-openrouter-key".path ];
       };
     };
 }
