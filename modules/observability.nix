@@ -248,6 +248,13 @@
       ...
     }:
     lib.mkIf (noughtyLib.hostHasTag "observability-sender") {
+      # Enable cgroup CPU/memory accounting so node_exporter's systemd collector
+      # and the process exporter can read accurate per-service resource usage.
+      systemd.extraConfig = ''
+        DefaultCPUAccounting=yes
+        DefaultMemoryAccounting=yes
+      '';
+
       services.alloy.enable = true;
       # systemd.services.alloy.serviceConfig = {
       #     # Alloy normally runs as an unprivileged user; force root instead.
@@ -270,11 +277,29 @@
             mimirendpoint = "http://10.9.0.1:9009/api/v1/push";
           in
           ''
-            prometheus.exporter.unix "gagu" { }
+            prometheus.exporter.unix "gagu" {
+              enable_collectors = ["systemd"]
+            }
 
             // Configure a prometheus.scrape component to collect unix metrics.
             prometheus.scrape "gagu" {
               targets    = prometheus.exporter.unix.gagu.targets
+              forward_to = [prometheus.remote_write.nixvms.receiver]
+            }
+
+            // Per-service CPU/memory: groups processes by systemd cgroup slice.
+            // Produces namedprocess_namegroup_cpu_seconds_total{groupname="<service>"}.
+            prometheus.exporter.process "services" {
+              track_children = true
+              track_threads  = false
+              matcher {
+                name   = "{{.Groups.service}}"
+                cgroup = ["/system\\.slice/(?P<service>.+)\\.service"]
+              }
+            }
+
+            prometheus.scrape "services" {
+              targets    = prometheus.exporter.process.services.targets
               forward_to = [prometheus.remote_write.nixvms.receiver]
             }
 
