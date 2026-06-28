@@ -269,6 +269,20 @@
         enable = true;
       };
 
+      # Process exporter for per-service CPU/memory metrics.
+      # Runs as root so it can read /proc for all processes.
+      services.prometheus.exporters.process = {
+        enable = true;
+        port = 9256;
+        user = "root";
+        settings.process_names = [
+          {
+            name = "{{.ExeBase}}";
+            cmdline = [ ".+" ];
+          }
+        ];
+      };
+
       environment.etc."alloy/config.alloy" = {
         text =
           let
@@ -287,19 +301,11 @@
               forward_to = [prometheus.remote_write.nixvms.receiver]
             }
 
-            // Per-process CPU/memory grouped by executable base name.
+            // Scrape the NixOS-native process exporter (runs as root, port 9256).
             // Produces namedprocess_namegroup_cpu_seconds_total{groupname="<exe>"}.
-            prometheus.exporter.process "services" {
-              track_children = true
-              track_threads  = false
-              matcher {
-                name    = "{{.ExeBase}}"
-                cmdline = [".+"]
-              }
-            }
-
-            prometheus.scrape "services" {
-              targets    = prometheus.exporter.process.services.targets
+            prometheus.scrape "process" {
+              targets    = [{"__address__" = "127.0.0.1:9256"}]
+              job_name   = "integrations/process"
               forward_to = [prometheus.remote_write.nixvms.receiver]
             }
 
