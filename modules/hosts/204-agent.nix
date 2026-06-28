@@ -46,6 +46,7 @@
         enable = true;
         addToSystemPackages = true;
         settings.model = "anthropic/claude-sonnet-4-6";
+        extraDependencyGroups = [ "anthropic" ];
         environmentFiles = [ config.sops.secrets."hermes-anthr-token".path ];
       };
     };
