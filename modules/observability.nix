@@ -287,14 +287,14 @@
               forward_to = [prometheus.remote_write.nixvms.receiver]
             }
 
-            // Per-service CPU/memory: groups processes by systemd cgroup slice.
-            // Produces namedprocess_namegroup_cpu_seconds_total{groupname="<service>"}.
+            // Per-process CPU/memory grouped by executable name.
+            // Produces namedprocess_namegroup_cpu_seconds_total{groupname="<exe>"}.
             prometheus.exporter.process "services" {
               track_children = true
               track_threads  = false
               matcher {
-                name   = "{{.Groups.service}}"
-                cgroup = ["/system\\.slice/(?P<service>.+)\\.service"]
+                name = "{{.Comm}}"
+                comm = [".+"]
               }
             }
 
