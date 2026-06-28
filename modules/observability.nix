@@ -287,14 +287,14 @@
               forward_to = [prometheus.remote_write.nixvms.receiver]
             }
 
-            // Per-process CPU/memory grouped by executable name.
+            // Per-process CPU/memory grouped by executable base name.
             // Produces namedprocess_namegroup_cpu_seconds_total{groupname="<exe>"}.
             prometheus.exporter.process "services" {
               track_children = true
               track_threads  = false
               matcher {
-                name = "{{.Comm}}"
-                comm = [".+"]
+                name    = "{{.ExeBase}}"
+                cmdline = [".+"]
               }
             }
 
