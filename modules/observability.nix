@@ -311,8 +311,7 @@
           in
           ''
             mkdir -p /var/lib/mimir/ruler/anonymous
-            chown -R mimir:mimir /var/lib/mimir/ruler
-            install -m 0644 -o mimir -g mimir ${rulesFile} /var/lib/mimir/ruler/anonymous/homelab.yaml
+            install -m 0644 ${rulesFile} /var/lib/mimir/ruler/anonymous/homelab.yaml
           '';
         deps = [ ];
       };
