@@ -63,11 +63,11 @@
         };
         boot.loader.efi.efiSysMountPoint = "/efi";
         fileSystems."/" = {
-          device = "/dev/disk/by-uuid/4c720436-405e-43af-abed-be474257acd9";
+          device = "/dev/disk/by-uuid/5781b336-4eff-4fed-8f60-20c827635786";
           fsType = "ext4";
         };
         fileSystems."/efi" = {
-          device = "/dev/disk/by-uuid/564D-E28E";
+          device = "/dev/disk/by-uuid/E416-7905";
           fsType = "vfat";
           options = [ "fmask=0077" "dmask=0077" ];
         };
