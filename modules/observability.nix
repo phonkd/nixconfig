@@ -134,8 +134,8 @@
           store_gateway.sharding_ring.replication_factor = 1;
 
           ruler_storage = {
-            backend = "filesystem";
-            filesystem.dir = "/var/lib/mimir/ruler";
+            backend = "local";
+            local.directory = "/var/lib/mimir/ruler";
           };
         };
       };
@@ -310,8 +310,8 @@
             '';
           in
           ''
-            mkdir -p /var/lib/mimir/ruler/rules/anonymous
-            install -m 0644 ${rulesFile} /var/lib/mimir/ruler/rules/anonymous/homelab.yaml
+            mkdir -p /var/lib/mimir/ruler/anonymous
+            install -m 0644 ${rulesFile} /var/lib/mimir/ruler/anonymous/homelab.yaml
           '';
         deps = [ ];
       };
