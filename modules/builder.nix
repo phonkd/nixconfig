@@ -44,6 +44,7 @@ let
     # Misc feature modules.
     gigaplayer-client # gated on hostHasTag "gigaplayer-client"
     gigaplayer-server # gated on hostHasTag "gigaplayer-server"
+    gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
 
     # Server baseline (gated on host.is.server).
