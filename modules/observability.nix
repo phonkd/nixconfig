@@ -310,8 +310,8 @@
             '';
           in
           ''
-            mkdir -p /var/lib/mimir/ruler/anonymous
-            install -m 0644 ${rulesFile} /var/lib/mimir/ruler/anonymous/homelab.yaml
+            mkdir -p /var/lib/mimir/ruler/rules/anonymous
+            install -m 0644 ${rulesFile} /var/lib/mimir/ruler/rules/anonymous/homelab.yaml
           '';
         deps = [ ];
       };
