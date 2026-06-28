@@ -32,6 +32,18 @@
       grafanaPort = 3000;
     in
     lib.mkIf (noughtyLib.hostHasTag "observability-server") {
+      # Override the hetzner-vm default UUIDs — the observability disk has
+      # different UUIDs (changed when a private network interface was attached).
+      fileSystems."/" = lib.mkForce {
+        device = "/dev/disk/by-uuid/5781b336-4eff-4fed-8f60-20c827635786";
+        fsType = "ext4";
+      };
+      fileSystems."/efi" = lib.mkForce {
+        device = "/dev/disk/by-uuid/E416-7905";
+        fsType = "vfat";
+        options = [ "fmask=0077" "dmask=0077" ];
+      };
+
       # ── Loki ────────────────────────────────────────────────────────────────
       # Single-binary, filesystem-backed. State lives under /var/lib/loki.
       services.loki = {
