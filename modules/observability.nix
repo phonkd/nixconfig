@@ -250,10 +250,10 @@
     lib.mkIf (noughtyLib.hostHasTag "observability-sender") {
       # Enable cgroup CPU/memory accounting so node_exporter's systemd collector
       # and the process exporter can read accurate per-service resource usage.
-      systemd.extraConfig = ''
-        DefaultCPUAccounting=yes
-        DefaultMemoryAccounting=yes
-      '';
+      systemd.settings.Manager = {
+        DefaultCPUAccounting = true;
+        DefaultMemoryAccounting = true;
+      };
 
       services.alloy.enable = true;
       # systemd.services.alloy.serviceConfig = {
