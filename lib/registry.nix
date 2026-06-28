@@ -70,6 +70,7 @@
     tags = [
       "reverse-proxy"
       "homelab-server"
+      "observability-sender"
       "vm"
     ];
     username = "phonkd";
@@ -93,6 +94,7 @@
       "gigaplayer-server"
       "vm"
       "media-server"
+      "observability-sender"
     ];
     username = "phonkd";
 
@@ -112,6 +114,7 @@
     desktop = null;
     tags = [
       "vm"
+      "observability-sender"
     ];
     username = "phonkd";
 
@@ -131,6 +134,7 @@
     desktop = null;
     tags = [
       "vm"
+      "observability-sender"
     ];
     username = "phonkd";
 
