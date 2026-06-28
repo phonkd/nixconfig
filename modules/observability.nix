@@ -179,6 +179,131 @@
         lokiHttpPort
         mimirHttpPort
       ];
+
+      # ── Mimir alerting rules ─────────────────────────────────────────────────
+      # Written to Mimir's ruler filesystem storage on every activation.
+      # Mimir polls this directory every minute and picks up changes automatically.
+      # Tenant is "anonymous" (single-tenant mode, multitenancy_enabled = false).
+      system.activationScripts.mimirAlertRules = {
+        text =
+          let
+            rulesFile = pkgs.writeText "homelab.yaml" ''
+              groups:
+                - name: instance
+                  interval: 1m
+                  rules:
+                    - alert: InstanceDown
+                      expr: up{job="integrations/unix"} == 0
+                      for: 5m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "{{ $labels.instance }} is unreachable"
+                        description: "{{ $labels.instance }} has not been scraped for 5 minutes."
+
+                - name: cpu
+                  interval: 1m
+                  rules:
+                    - alert: HighCPU
+                      expr: >
+                        100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle",job="integrations/unix"}[5m])) * 100) > 90
+                      for: 10m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High CPU on {{ $labels.instance }}"
+                        description: 'CPU above 90% for 10 min (current: {{ $value | printf "%.1f" }}%).'
+                    - alert: HighLoadAverage
+                      expr: >
+                        node_load1{job="integrations/unix"}
+                        / count without(cpu, mode) (node_cpu_seconds_total{mode="idle",job="integrations/unix"}) > 3
+                      for: 10m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High load on {{ $labels.instance }}"
+                        description: '1m load is {{ $value | printf "%.2f" }}x the CPU count.'
+
+                - name: memory
+                  interval: 1m
+                  rules:
+                    - alert: HighMemory
+                      expr: >
+                        (1 - node_memory_MemAvailable_bytes{job="integrations/unix"}
+                             / node_memory_MemTotal_bytes{job="integrations/unix"}) * 100 > 90
+                      for: 10m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "High memory on {{ $labels.instance }}"
+                        description: 'Memory usage is {{ $value | printf "%.1f" }}%.'
+                    - alert: CriticalMemory
+                      expr: >
+                        (1 - node_memory_MemAvailable_bytes{job="integrations/unix"}
+                             / node_memory_MemTotal_bytes{job="integrations/unix"}) * 100 > 97
+                      for: 5m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "Critical memory on {{ $labels.instance }}"
+                        description: 'Memory is {{ $value | printf "%.1f" }}% — OOM imminent.'
+
+                - name: disk
+                  interval: 1m
+                  rules:
+                    - alert: DiskSpaceWarning
+                      expr: >
+                        (1 - node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}
+                             / node_filesystem_size_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}) * 100 > 80
+                      for: 5m
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "Disk {{ $labels.mountpoint }} filling on {{ $labels.instance }}"
+                        description: '{{ $labels.mountpoint }} is {{ $value | printf "%.1f" }}% full.'
+                    - alert: DiskSpaceCritical
+                      expr: >
+                        (1 - node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}
+                             / node_filesystem_size_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}) * 100 > 95
+                      for: 5m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "Disk {{ $labels.mountpoint }} nearly full on {{ $labels.instance }}"
+                        description: '{{ $labels.mountpoint }} is {{ $value | printf "%.1f" }}% full.'
+                    - alert: DiskWillFillIn24h
+                      expr: >
+                        predict_linear(
+                          node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}[6h],
+                          86400
+                        ) < 0
+                      for: 1h
+                      labels:
+                        severity: warning
+                      annotations:
+                        summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} will fill in 24h"
+                        description: "Based on last 6h growth, {{ $labels.mountpoint }} will run out within 24 hours."
+
+                - name: systemd
+                  interval: 1m
+                  rules:
+                    - alert: SystemdServiceFailed
+                      expr: node_systemd_unit_state{job="integrations/unix",state="failed",type="service"} == 1
+                      for: 2m
+                      labels:
+                        severity: critical
+                      annotations:
+                        summary: "Service {{ $labels.name }} failed on {{ $labels.instance }}"
+                        description: "systemd unit {{ $labels.name }} is in failed state on {{ $labels.instance }}."
+            '';
+          in
+          ''
+            mkdir -p /var/lib/mimir/ruler/anonymous
+            chown -R mimir:mimir /var/lib/mimir/ruler
+            install -m 0644 -o mimir -g mimir ${rulesFile} /var/lib/mimir/ruler/anonymous/homelab.yaml
+          '';
+        deps = [ ];
+      };
     };
 
   # ───────────────────────────────────────────────────────────────────────────
