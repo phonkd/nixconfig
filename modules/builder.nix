@@ -68,7 +68,12 @@ let
     homelab-garage
     homelab-notes
     homelab-hermes
+
+    # Observability stack (server + VPN gated on "observability-server",
+    # sender gated on "observability-sender").
     observability-server
+    observability-vpn
+    observability-sender
   ];
 
   # Darwin-side: cross-host feature modules.
