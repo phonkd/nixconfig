@@ -52,7 +52,15 @@
           serviceConfig = {
             User = config.services.hermes-agent.user;
             Group = config.services.hermes-agent.group;
-            ExecStart = "${config.services.hermes-agent.package}/bin/hermes dashboard --host 0.0.0.0 --port 9119 --no-open";
+            ExecStart =
+              let
+                svc = config.services.hermes-agent;
+                pkg = if svc.extraDependencyGroups == [] && svc.extraPythonPackages == []
+                  then svc.package
+                  else svc.package.override {
+                    inherit (svc) extraDependencyGroups extraPythonPackages;
+                  };
+              in "${pkg}/bin/hermes dashboard --host 0.0.0.0 --port 9119 --no-open";
             Restart = "on-failure";
             RestartSec = 5;
           };
