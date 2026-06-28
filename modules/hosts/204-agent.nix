@@ -38,22 +38,15 @@
       # creds into the shared HERMES_HOME). Alternatively: sudo -u hermes hermes ...
       users.users.phonkd.extraGroups = [ "hermes" ];
 
+      sops.secrets."hermes-anthr-token" = {
+        owner = "hermes";
+      };
+
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
         settings.model = "anthropic/claude-sonnet-4-6";
-
-        # No build-time secret. After the first rebuild, log in on the VM:
-        #     hermes portal login      # OAuth into Nous, sets provider + model
-        #     hermes portal info       # verify what's wired up
-        #
-        # Prefer API keys instead? Add a `hermes/env` entry (e.g.
-        # ANTHROPIC_API_KEY=...) to modules/homelab/global-secrets/secret.yaml,
-        # then uncomment:
-        #     sops.secrets."hermes/env" = { };
-        #     services.hermes-agent.environmentFiles =
-        #       [ config.sops.secrets."hermes/env".path ];
-        #     services.hermes-agent.settings.model = "anthropic/claude-sonnet-4";
+        environmentFiles = [ config.sops.secrets."hermes-anthr-token".path ];
       };
     };
 }
