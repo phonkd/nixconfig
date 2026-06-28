@@ -266,7 +266,7 @@
         text =
           let
             hostname = config.networking.hostName;
-            lokiendpoint = "http://10.9.0.1:3100/insert/loki/api/v1/push";
+            lokiendpoint = "http://10.9.0.1:3100/api/v1/push";
             mimirendpoint = "http://10.9.0.1:9009/api/v1/push";
           in
           ''
