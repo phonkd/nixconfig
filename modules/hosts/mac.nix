@@ -38,6 +38,37 @@
 
       system.stateVersion = 6;
       nix.settings.experimental-features = "nix-command flakes";
+
+      # --- Offload x86_64-linux builds to the 205-builder VM -------------
+      # The Mac can't build Linux natively, so point it at 205-builder for
+      # x86_64-linux derivations (NixOS configs, ISOs, amd64 OCI images...).
+      # The nix-daemon SSHes as root, so place the nixremote PRIVATE key at
+      # /var/root/.ssh/nixremote_ed25519 (chmod 600, owned root) and seed the
+      # builder's host key once:
+      #   sudo -H ssh -i /var/root/.ssh/nixremote_ed25519 nixremote@192.168.3.205 true
+      # (sops-nix is a NixOS module, so the key is delivered manually here.)
+      nix.distributedBuilds = true;
+      nix.settings.builders-use-substitutes = true;
+      nix.settings.trusted-users = [
+        "root"
+        "phonkd"
+      ];
+      nix.buildMachines = [
+        {
+          hostName = "192.168.3.205";
+          sshUser = "nixremote";
+          sshKey = "/var/root/.ssh/nixremote_ed25519";
+          system = "x86_64-linux";
+          maxJobs = 8;
+          speedFactor = 2;
+          supportedFeatures = [
+            "nixos-test"
+            "benchmark"
+            "big-parallel"
+            "kvm"
+          ];
+        }
+      ];
       security.pam.services.sudo_local = {
         enable = true;
         touchIdAuth = true;
