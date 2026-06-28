@@ -36,6 +36,7 @@
           }
         ];
         security.sudo.wheelNeedsPassword = false;
+        networking.networkmanager.dhcp = "internal";
         networking.firewall.allowedTCPPorts = [ 22 ];
 
         # Server, not client: neutralize the builder-client wiring inherited

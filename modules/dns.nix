@@ -21,6 +21,7 @@
           ".int.phonkd.net" = "192.168.3.201";
           ".w.int.phonkd.net" = "192.168.3.201";
           ".w.phonkd.net" = "192.168.3.201";
+          "grafana.phonkd.net" = "192.168.3.201";
         };
       };
     };

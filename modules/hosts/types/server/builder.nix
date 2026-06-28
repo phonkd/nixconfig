@@ -39,9 +39,8 @@
           ];
         }
       ];
-      # Capture after first boot with: ssh-keyscan -t ed25519 192.168.3.205
       programs.ssh.knownHosts."192.168.3.205".publicKey =
-        "ssh-ed25519 AAAA...REPLACE_ME..."; # >>> replace after first boot <<<
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPRovQTSmDh+ooke5LdQK75qZeKvZCbcekwiaWK+WKeB";
     };
 
   flake.nixosModules.builder-server =
