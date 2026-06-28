@@ -17,7 +17,6 @@
         dates = "weekly";
         options = "--delete-older-than 30d";
       };
-      environment.systemPackages = [ pkgs.ghostty.terminfo ];
       services.openssh = {
         enable = true;
         settings.PasswordAuthentication = false;

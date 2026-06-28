@@ -63,7 +63,7 @@
         #extraConfig = builtins.readFile ../dotconfig/hypr/hyprland.conf;
         extraConfig = ''
           -- Programs
-          local terminal    = "ghostty"
+          local terminal    = "kitty"
           local fileManager = "thunar"
           local menu        = "noctalia-shell ipc call launcher toggle"
           local mainMod     = "SUPER"

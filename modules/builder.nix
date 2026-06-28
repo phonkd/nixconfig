@@ -74,6 +74,7 @@ let
   # Darwin-side: cross-host feature modules.
   alwaysImportDarwin = with self.darwinModules; [
     gui-darwin # gated on host.is.darwinDesktop
+    aerospace # gated on host.is.darwinDesktop
   ];
 
   # Always-on Home Manager wiring. Safe on hosts with no HM users
