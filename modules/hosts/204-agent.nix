@@ -40,7 +40,7 @@
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
-        settings.model = "openrouter/anthropic/claude-sonnet-4-6";
+        settings.model = "openrouter/deepseek/deepseek-v4-flash";
         environmentFiles = [ config.sops.secrets."hermes-openrouter-key".path ];
       };
     };
