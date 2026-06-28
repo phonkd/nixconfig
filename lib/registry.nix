@@ -180,6 +180,7 @@
     desktop = null;
     tags = [
       "vm"
+      "hetzner-vm"
       "observability-server"
     ];
     username = "phonkd";
