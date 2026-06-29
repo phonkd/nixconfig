@@ -35,16 +35,19 @@
 
       sops.secrets."hermes-openrouter-key" = { owner = "hermes"; };
       sops.secrets."hermes-discord" = { owner = "hermes"; };
+      sops.secrets."hermes-github" = { owner = "hermes"; };
 
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
+        extraPackages = [ pkgs.gh ];
         settings.model = "deepseek/deepseek-v4-flash";
         settings.discord.require_mention = false;
         environmentFiles = [
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
+          config.sops.secrets."hermes-github".path
         ];
       };
     };
