@@ -41,6 +41,7 @@
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
         settings.model = "deepseek/deepseek-v4-flash";
+        settings.discord.require_mention = false;
         environmentFiles = [
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
