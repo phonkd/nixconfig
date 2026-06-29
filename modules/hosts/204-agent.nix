@@ -44,6 +44,7 @@
         extraPackages = [ pkgs.gh ];
         settings.model = "deepseek/deepseek-v4-flash";
         settings.discord.require_mention = false;
+        settings.approvals.mode = "auto";
         environmentFiles = [
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
