@@ -33,15 +33,18 @@
 
       users.users.phonkd.extraGroups = [ "hermes" ];
 
-      sops.secrets."hermes-openrouter-key" = {
-        owner = "hermes";
-      };
+      sops.secrets."hermes-openrouter-key" = { owner = "hermes"; };
+      sops.secrets."hermes-discord" = { owner = "hermes"; };
 
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
+        extraDependencyGroups = [ "messaging" ];
         settings.model = "deepseek/deepseek-v4-flash";
-        environmentFiles = [ config.sops.secrets."hermes-openrouter-key".path ];
+        environmentFiles = [
+          config.sops.secrets."hermes-openrouter-key".path
+          config.sops.secrets."hermes-discord".path
+        ];
       };
     };
 }
