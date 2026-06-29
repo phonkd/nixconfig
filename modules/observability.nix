@@ -392,7 +392,7 @@
       };
 
       services.alloy.enable = true;
-      users.users.alloy.extraGroups = [ "systemd-journal" ];
+      users.groups.systemd-journal.members = [ "alloy" ];
       services.prometheus.exporters.node = {
         # enabledCollectors = [
         #   "node"
