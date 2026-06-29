@@ -35,6 +35,10 @@
 
       sops.secrets."hermes-openrouter-key" = { owner = "hermes"; };
       sops.secrets."hermes-discord" = { owner = "hermes"; };
+      # Also feeds the Copilot model provider below: this is a fine-grained PAT
+      # exported as GITHUB_TOKEN, which Hermes' Copilot resolver picks up
+      # (COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN). The "Copilot Requests"
+      # permission must be enabled on it; classic ghp_* PATs are rejected.
       sops.secrets."hermes-github" = { owner = "hermes"; };
 
       services.hermes-agent = {
@@ -42,9 +46,27 @@
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
         extraPackages = [ pkgs.gh ];
-        settings.model = "deepseek/deepseek-v4-flash";
+        # Main model: GPT-5.4 via the GitHub Copilot subscription. provider
+        # "copilot" makes Hermes exchange the existing GITHUB_TOKEN (the
+        # hermes-github fine-grained PAT, now with Copilot Requests) for a
+        # short-lived Copilot token and hit api.githubcopilot.com. (Previously
+        # deepseek/deepseek-v4-flash on OpenRouter — the hermes-openrouter-key
+        # secret is kept for an easy revert.)
+        settings.model = {
+          default = "gpt-5.4";
+          provider = "copilot";
+          base_url = "https://api.githubcopilot.com";
+        };
         settings.discord.require_mention = false;
         settings.approvals.mode = "auto";
+        # Enable the native Spotify toolset for Discord (default-off). Hermes
+        # ships spotify_playback/devices/queue/search/playlists/albums/library
+        # tools built-in (no MCP, no extra dependency group). Replaces the
+        # default discord preset list, so hermes-discord is re-listed alongside
+        # spotify. Auth is a one-time `hermes auth spotify` PKCE flow run on the
+        # host; it captures the Spotify app client ID and persists the refresh
+        # token in the state dir (~/.hermes), after which Hermes auto-refreshes.
+        settings.platform_toolsets.discord = [ "hermes-discord" "spotify" ];
         environmentFiles = [
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
