@@ -7,9 +7,11 @@
   # ───────────────────────────────────────────────────────────────────────────
   # Central observability stack (Hetzner VM, tag "observability-server")
   #
-  #   Loki    — log aggregation        (HTTP 3100)
-  #   Mimir   — long-term metrics      (HTTP 9009, Prometheus-compatible)
-  #   Grafana — dashboards / explore   (HTTP 3000)
+  #   Loki      — log aggregation      (HTTP 3100)
+  #   Mimir     — long-term metrics    (HTTP 9009, Prometheus-compatible)
+  #   Tempo     — distributed traces   (HTTP 3200, OTLP 4317/4318)
+  #   Pyroscope — continuous profiling (HTTP 4040)
+  #   Grafana   — dashboards / explore (HTTP 3000)
   #
   # Reachability: services bind on all interfaces but the firewall only opens
   # their ports on the WireGuard interface (see observability-vpn below). Home
@@ -29,6 +31,14 @@
       lokiGrpcPort = 9096;
       mimirHttpPort = 9009;
       mimirGrpcPort = 9095;
+      # Tempo (traces) and Pyroscope (profiles) share the host, so each needs a
+      # distinct gRPC port — Mimir already owns 9095, Loki 9096.
+      tempoHttpPort = 3200;
+      tempoGrpcPort = 9097;
+      tempoOtlpGrpcPort = 4317; # standard OTLP/gRPC ingest
+      tempoOtlpHttpPort = 4318; # standard OTLP/HTTP ingest
+      pyroscopePort = 4040;
+      pyroscopeGrpcPort = 9098;
       grafanaPort = 3000;
     in
     lib.mkIf (noughtyLib.hostHasTag "observability-server") {
@@ -140,6 +150,51 @@
         };
       };
 
+      # ── Tempo ───────────────────────────────────────────────────────────────
+      # Single-binary tracing backend with local block storage under /var/lib/tempo.
+      # Accepts traces over OTLP (gRPC 4317 / HTTP 4318); Grafana queries on 3200.
+      services.tempo = {
+        enable = true;
+        settings = {
+          # Tempo phones home usage stats by default — disable like the rest.
+          usage_report.reporting_enabled = false;
+
+          server = {
+            http_listen_port = tempoHttpPort;
+            grpc_listen_port = tempoGrpcPort;
+            log_level = "warn";
+          };
+
+          distributor.receivers.otlp.protocols = {
+            grpc.endpoint = "0.0.0.0:${toString tempoOtlpGrpcPort}";
+            http.endpoint = "0.0.0.0:${toString tempoOtlpHttpPort}";
+          };
+
+          ingester.max_block_duration = "5m";
+
+          # Keep traces for 7 days; bump once disk usage is understood.
+          compactor.compaction.block_retention = "168h";
+
+          storage.trace = {
+            backend = "local";
+            wal.path = "/var/lib/tempo/wal";
+            local.path = "/var/lib/tempo/blocks";
+          };
+        };
+      };
+
+      # ── Pyroscope ───────────────────────────────────────────────────────────
+      # Continuous-profiling backend, local storage under /var/lib/pyroscope.
+      # Binds all interfaces (firewall restricts to wg-obs); Grafana queries on 4040.
+      services.pyroscope = {
+        enable = true;
+        settings.server = {
+          http_listen_address = "0.0.0.0";
+          http_listen_port = pyroscopePort;
+          grpc_listen_port = pyroscopeGrpcPort;
+        };
+      };
+
       # ── Grafana ─────────────────────────────────────────────────────────────
       # Datasources provisioned declaratively. Reached over the VPN on :3000.
       services.grafana = {
@@ -174,6 +229,18 @@
               access = "proxy";
               url = "http://127.0.0.1:${toString lokiHttpPort}";
             }
+            {
+              name = "Tempo";
+              type = "tempo";
+              access = "proxy";
+              url = "http://127.0.0.1:${toString tempoHttpPort}";
+            }
+            {
+              name = "Pyroscope";
+              type = "grafana-pyroscope-datasource";
+              access = "proxy";
+              url = "http://127.0.0.1:${toString pyroscopePort}";
+            }
           ];
         };
       };
@@ -190,6 +257,10 @@
         grafanaPort
         lokiHttpPort
         mimirHttpPort
+        tempoHttpPort # query + Tempo's own API
+        tempoOtlpGrpcPort # OTLP trace ingest (gRPC)
+        tempoOtlpHttpPort # OTLP trace ingest (HTTP)
+        pyroscopePort # profile ingest + query
       ];
 
       # ── Mimir alerting rules ─────────────────────────────────────────────────
