@@ -392,11 +392,7 @@
       };
 
       services.alloy.enable = true;
-      # systemd.services.alloy.serviceConfig = {
-      #     # Alloy normally runs as an unprivileged user; force root instead.
-      #   User  = lib.mkForce "root";
-      #   Group = lib.mkForce "root";  # optional, but usually pair with User
-      # };
+      users.users.alloy.extraGroups = [ "systemd-journal" ];
       services.prometheus.exporters.node = {
         # enabledCollectors = [
         #   "node"
