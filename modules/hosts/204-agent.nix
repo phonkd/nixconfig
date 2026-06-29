@@ -45,11 +45,33 @@
         settings.model = "deepseek/deepseek-v4-flash";
         settings.discord.require_mention = false;
         settings.approvals.mode = "auto";
+        # Give Hermes semantic search over the personal-data archive.
+        # Registered tool name: mcp_slop_trove_search_personal_data.
+        settings.mcp_servers.slop_trove = {
+          url = "http://127.0.0.1:9120/mcp";
+          tools.include = [ "search_personal_data" ];
+        };
         environmentFiles = [
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
           config.sops.secrets."hermes-github".path
         ];
+      };
+
+      # Personal-data embedding + semantic search (the "thing"); Hermes queries
+      # it via the MCP entry above. Postgres + pgvector are created locally.
+      services.slop-trove = {
+        enable = true;
+        database.createLocally = true;
+        # blac's RTX 5080 runs Ollama. TODO: set to blac's reserved static IP.
+        embedding.endpoint = "http://192.168.3.206:11434";
+        embedding.model = "bge-m3";
+        embedding.dim = 1024;
+        mcp.port = 9120;
+        sources.discord = {
+          enable = true;
+          path = "/var/lib/slop-trove/exports/discord";
+        };
       };
     };
 }

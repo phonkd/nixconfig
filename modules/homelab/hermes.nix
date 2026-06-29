@@ -66,6 +66,28 @@
           };
         };
 
+        # ── Apple TV control (atvremote / pyatv) ──────────────────────────────
+        # Lets Hermes drive the living-room Apple TV ("Wohnzimmer").
+        # atvremote runs headless and can't multicast-scan across subnets, so the
+        # agent addresses the device by IP (-s "$ATV_IP") and passes the Companion
+        # credentials directly (--companion-credentials "$ATV_COMPANION_CREDENTIALS").
+        # The credentials grant control of the device, so they come from sops as an
+        # env-file (ATV_COMPANION_CREDENTIALS=...) and never hit the nix store.
+        # Typical call:
+        #   atvremote --storage none -s "$ATV_IP" \
+        #     --companion-credentials "$ATV_COMPANION_CREDENTIALS" launch_app=com.spotify.client
+        services.hermes-agent.extraPackages = [ pkgs.python313Packages.pyatv ];
+        systemd.services.hermes-agent.environment = {
+          ATV_ID = "42E23540-E5EA-4C05-A5EC-FB0E1F23F820";
+          ATV_IP = "192.168.1.135";
+        };
+        sops.secrets."hermes-pyatv" = {
+          owner = config.services.hermes-agent.user;
+        };
+        services.hermes-agent.environmentFiles = [
+          config.sops.secrets."hermes-pyatv".path
+        ];
+
         networking.nftables.enable = true;
         # Allow hermes dashboard port from 201-mono only.
         networking.firewall.extraInputRules = ''

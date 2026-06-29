@@ -51,6 +51,11 @@
     # the package is built with uv2nix against the upstream-pinned
     # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
     hermes-agent.url = "github:NousResearch/hermes-agent";
+    # slop-trove: personal-data embedding/search platform (own repo, "the thing").
+    slop-trove = {
+      url = "github:phonkd/slop-trove";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
