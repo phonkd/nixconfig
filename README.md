@@ -1,67 +1,41 @@
 # nixconfig
 
-A [flake-parts](https://flake.parts) NixOS / nix-darwin / home-manager config built
-around a **dendritic** module tree: features wire themselves up, and the homelab
-dashboard builds itself from the modules that are active.
+NixOS / nix-darwin / home-manager config.
 
-## Dendritic structure
+## How it works
 
-`flake.nix` imports the whole module tree with one line:
+flake.nix pulls in everything under modules/ automatically via import-tree.
+Drop a new .nix file in there and it's picked up - no central list to edit.
 
-```nix
-imports = [ (import-tree ./modules) ];
+Hosts are defined in lib/registry.nix - one stanza per machine with its platform,
+desktop env, tags, gpu, etc. modules/builder.nix reads the registry and routes
+each host to the right config type (nixos, darwin, home-manager).
+
+Modules gate themselves on host facts exposed by the noughty module
+(lib/noughty/). Enable a module on a host by setting a tag or attribute in the
+registry - no manual wiring.
+
+## Quick start
+
+```bash
+# Build for a host
+nixos-rebuild switch --flake .#hostname
+# Darwin
+darwin-rebuild switch --flake .#hostname
 ```
 
-[`import-tree`](https://github.com/vic/import-tree) recursively pulls in **every
-`.nix` file under `modules/`** as a flake-parts module — there is no central list to
-edit. Dropping a new file into `modules/` is the only step needed to add a feature.
-Each file contributes named outputs (`flake.nixosModules.<name>`,
-`flake.darwinModules.<name>`, `flake.homeModules.<name>`) that compose freely.
+## Secrets
 
-Hosts live in `lib/registry.nix`, the single source of truth: one stanza per machine
-(`kind`, `platform`, `desktop`, `tags`, `gpu`, …). `modules/builder.nix` reads the
-registry and routes each host by platform suffix (`*-linux` → `nixosConfigurations`,
-`*-darwin` → `darwinConfigurations`).
+Managed with sops-nix. Decryption keys are expected at the standard paths.
 
-## Self-activating modules
+## Structure
 
-Modules are **not** hand-wired into each host. Instead they gate themselves on host
-facts exposed by the `noughty` module (`lib/noughty/`):
-
-- predicates like `noughty.host.is.nixosDesktop` / `is.darwinDesktop` / `is.server`
-- freeform tags via `noughtyLib.hostHasTag "<tag>"`
-
-```nix
-# modules/homelab/apps/vaultwarden.nix — activates on any "homelab-server" host
-flake.nixosModules.homelab-vaultwarden = { lib, noughtyLib, ... }:
-  lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
-    services.vaultwarden.enable = true;
-    # ...
-  };
 ```
-
-Tag a host in the registry and every module guarding on that tag switches on. No host
-file imports them explicitly.
-
-## Auto-populating dashboard
-
-Homelab apps register themselves in a central typed registry,
-`phonkds.modules.<app>` (declared in `modules/phonkds-options.nix`). A *producer*
-module just describes itself:
-
-```nix
-phonkds.modules.vaultwarden = {
-  ip = "127.0.0.1";
-  port = 8000;
-  dashboard.enable = true;
-  traefik = { enable = true; domain = "vw.w.phonkd.net"; };
-};
+flake.nix          # entry point, inputs
+lib/
+  registry.nix     # host definitions (single source of truth)
+  noughty/         # host fact module for self-gating
+modules/           # feature modules (auto-imported)
+  builder.nix      #registry → config routing
+dotconfig/         # per-user dotfiles
 ```
-
-The *consumer* — `modules/homelab/dashboard.nix`, gated on the `reverse-proxy` tag —
-reads that registry, filters for apps that are dashboard- and Traefik-enabled with a
-domain, and generates the [homepage-dashboard](https://gethomepage.dev) service list
-automatically. The same registry feeds Traefik routing.
-
-The net effect: enabling an app with `dashboard.enable = true` makes it appear on the
-dashboard (and get proxied) with **no edits to the dashboard module**.
