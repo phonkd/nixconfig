@@ -23,10 +23,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nixpkgs-unstable-droid.url = "github:nixos/nixpkgs/88d3861";
-    noctalia = {
-      url = "github:noctalia-dev/noctalia-shell";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     nix-index-database = {
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";

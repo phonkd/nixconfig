@@ -122,10 +122,6 @@
 
       services.flatpak.enable = true;
       xdg.portal.enable = true;
-      # GNOME hosts get their portals from the desktopManager.gnome module.
-      xdg.portal.extraPortals = lib.optional (
-        config.noughty.host.desktop == "hyprland"
-      ) pkgs.xdg-desktop-portal-hyprland;
       services.pulseaudio.enable = false;
       security.rtkit.enable = true;
       services.pipewire = {
@@ -154,24 +150,6 @@
       environment.systemPackages = with pkgs; [
         sbctl
         slskd
-      ];
-      services.displayManager.sessionPackages = lib.optionals (config.noughty.host.desktop == "hyprland") [
-        (pkgs.runCommand "hyprland-session"
-          {
-            passthru.providedSessions = [ "hyprland" ];
-          }
-          ''
-                  mkdir -p $out/share/wayland-sessions
-                  cat <<EOF > $out/share/wayland-sessions/hyprland.desktop
-            [Desktop Entry]
-            Name=Hyprland
-            Comment=An intelligent dynamic tiling Wayland compositor
-            Exec=Hyprland
-            Type=Application
-            DesktopNames=Hyprland
-            EOF
-          ''
-        )
       ];
     };
   # Self-gating module: imports stay unconditional, but its config block

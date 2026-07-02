@@ -82,7 +82,7 @@ in
         # Platform-specific desktop predicates. Use these to gate modules
         # that depend on NixOS- or Darwin-specific option namespaces.
         # A Mac is is.workstation but not is.nixosDesktop, so it won't
-        # accidentally activate NixOS-only modules like Hyprland-via-NixOS.
+        # accidentally activate NixOS-only desktop modules.
         nixosDesktop = lib.mkOption {
           type = lib.types.bool;
           default = config.noughty.host.desktop != null && config.noughty.host.os == "linux";
