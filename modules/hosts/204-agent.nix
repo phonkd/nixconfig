@@ -85,8 +85,11 @@
       services.slop-trove = {
         enable = true;
         database.createLocally = true;
-        # blac's RTX 5080 runs Ollama. TODO: set to blac's reserved static IP.
-        embedding.endpoint = "http://192.168.3.206:11434";
+        # blac's RTX 5080 runs Ollama. blac's static IP is set imperatively in
+        # GNOME/NetworkManager on the box (not declared in blac.nix). blac sits
+        # on the 1.x segment (switch can't tag the 3.x VLAN), so this crosses
+        # subnets — needs inter-VLAN routing to allow 3.204 → 1.206:11434.
+        embedding.endpoint = "http://192.168.1.206:11434";
         embedding.model = "bge-m3";
         embedding.dim = 1024;
         mcp.port = 9120;
