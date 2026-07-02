@@ -709,6 +709,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixpkgs-unstable-droid": "nixpkgs-unstable-droid",
         "simple-nixos-mailserver": "simple-nixos-mailserver",
+        "slop-trove": "slop-trove",
         "sops-nix": "sops-nix",
         "try-rs": "try-rs",
         "wrapper-modules": "wrapper-modules"
@@ -770,6 +771,26 @@
         "ref": "nixos-26.05",
         "repo": "nixos-mailserver",
         "type": "gitlab"
+      }
+    },
+    "slop-trove": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1783027247,
+        "narHash": "sha256-QWaoAUIKP5hsgPdT159g+CRIpufPmnDt/9zaXqe2GoM=",
+        "owner": "phonkd",
+        "repo": "slop-trove",
+        "rev": "da00c842e0d656ff0bbb02cff0f09259046a498e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "phonkd",
+        "repo": "slop-trove",
+        "type": "github"
       }
     },
     "sops-nix": {
