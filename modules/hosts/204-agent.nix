@@ -61,7 +61,7 @@
         # GITHUB_TOKEN PAT, which outranks the OAuth token and 400s. To retry:
         # delete the credential_pool.copilot entries from auth.json, set
         # provider copilot / model gpt-5.4 here again, restart hermes-agent.
-        settings.model = "openrouter/deepseek/deepseek-v4-flash";
+        settings.model = "deepseek/deepseek-v4-flash";
         settings.discord.require_mention = false;
         settings.approvals.mode = "auto";
         # Enable the native Spotify toolset for Discord (default-off). Hermes
