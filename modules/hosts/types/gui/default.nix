@@ -31,7 +31,6 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.gaming
-        self.homeModules.desktop-environment
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
       ];
@@ -55,7 +54,7 @@
 
   # Darwin-side GUI: gated on host.is.darwinDesktop. Wires Home Manager
   # with the cross-platform `gui` HM module (not gui-nixos, which carries
-  # Hyprland + Linux-only bits).
+  # Linux-only bits).
   flake.darwinModules.gui-darwin =
     {
       config,

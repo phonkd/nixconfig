@@ -6,7 +6,7 @@
 #   kind        : "computer" | "server" | "vm" | "container"  (default "computer")
 #   platform    : nixpkgs system string (default "x86_64-linux")
 #   formFactor  : "desktop" | "laptop" | "handheld" | "tablet" | "phone" | null
-#   desktop     : string or null (e.g. "hyprland", "aqua"); null = headless
+#   desktop     : string or null (e.g. "gnome", "aqua"); null = headless
 #   tags        : freeform host tags (e.g. "gigaplayer-client")
 #   username    : primary user (default "phonkd")
 #   userTags    : freeform user tags
@@ -19,7 +19,7 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "desktop";
-    desktop = "hyprland";
+    desktop = "gnome";
     tags = [
       "gaming"
       "gigaplayer-client"
@@ -46,7 +46,7 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "laptop";
-    desktop = "hyprland";
+    desktop = "gnome";
     tags = [ "gigaplayer-client" ];
     username = "phonkd";
 

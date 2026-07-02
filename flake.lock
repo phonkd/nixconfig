@@ -584,26 +584,6 @@
         "type": "gitlab"
       }
     },
-    "noctalia": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1781452661,
-        "narHash": "sha256-VBtqQxofacGSdWLEf2UtPpkw682QwVlHikInWN6QM7U=",
-        "owner": "noctalia-dev",
-        "repo": "noctalia-shell",
-        "rev": "4c7dd99b0388d394c9c8dfeb99fdceec054f6dcd",
-        "type": "github"
-      },
-      "original": {
-        "owner": "noctalia-dev",
-        "repo": "noctalia-shell",
-        "type": "github"
-      }
-    },
     "npm-lockfile-fix": {
       "inputs": {
         "nixpkgs": [
@@ -728,7 +708,6 @@
         "nixpkgs-fork": "nixpkgs-fork",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixpkgs-unstable-droid": "nixpkgs-unstable-droid",
-        "noctalia": "noctalia",
         "simple-nixos-mailserver": "simple-nixos-mailserver",
         "sops-nix": "sops-nix",
         "try-rs": "try-rs",

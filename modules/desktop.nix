@@ -122,7 +122,6 @@
 
       services.flatpak.enable = true;
       xdg.portal.enable = true;
-      xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-hyprland ];
       services.pulseaudio.enable = false;
       security.rtkit.enable = true;
       services.pipewire = {
@@ -151,24 +150,6 @@
       environment.systemPackages = with pkgs; [
         sbctl
         slskd
-      ];
-      services.displayManager.sessionPackages = [
-        (pkgs.runCommand "hyprland-session"
-          {
-            passthru.providedSessions = [ "hyprland" ];
-          }
-          ''
-                  mkdir -p $out/share/wayland-sessions
-                  cat <<EOF > $out/share/wayland-sessions/hyprland.desktop
-            [Desktop Entry]
-            Name=Hyprland
-            Comment=An intelligent dynamic tiling Wayland compositor
-            Exec=Hyprland
-            Type=Application
-            DesktopNames=Hyprland
-            EOF
-          ''
-        )
       ];
     };
   # Self-gating module: imports stay unconditional, but its config block

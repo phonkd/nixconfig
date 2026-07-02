@@ -39,15 +39,8 @@
 
       services.xserver.enable = true;
 
-      services.greetd = {
-        enable = true;
-        settings = {
-          default_session = {
-            command = "${pkgs.greetd.tuigreet}/bin/tuigreet --time --remember --cmd start-hyprland";
-            user = "greeter";
-          };
-        };
-      };
+      services.displayManager.gdm.enable = true;
+      services.desktopManager.gnome.enable = true;
 
       boot.kernelParams = [
         "pci=noaer"
