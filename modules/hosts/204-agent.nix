@@ -53,18 +53,15 @@
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
         extraPackages = [ pkgs.gh ];
-        # Main model: GPT-5.4 via the GitHub Copilot subscription (individual
-        # plan). provider "copilot" resolves COPILOT_GITHUB_TOKEN (the
-        # hermes-copilot OAuth token); the copilot_internal/v2/token exchange
-        # 404s for this OAuth app, but Hermes falls back to sending the raw
-        # gho_* token as Bearer, which api.githubcopilot.com accepts.
-        # (Previously deepseek/deepseek-v4-flash on OpenRouter — the
-        # hermes-openrouter-key secret is kept for an easy revert.)
-        settings.model = {
-          default = "gpt-5.4";
-          provider = "copilot";
-          base_url = "https://api.githubcopilot.com";
-        };
+        # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
+        # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
+        # hermes-copilot OAuth token gets live gpt-5.4 completions from
+        # api.githubcopilot.com — but Hermes' credential pool in
+        # ~/.hermes/auth.json kept a stale priority-0 entry seeded from the
+        # GITHUB_TOKEN PAT, which outranks the OAuth token and 400s. To retry:
+        # delete the credential_pool.copilot entries from auth.json, set
+        # provider copilot / model gpt-5.4 here again, restart hermes-agent.
+        settings.model = "openrouter/deepseek/deepseek-v4-flash";
         settings.discord.require_mention = false;
         settings.approvals.mode = "auto";
         # Enable the native Spotify toolset for Discord (default-off). Hermes
