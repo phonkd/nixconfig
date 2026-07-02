@@ -68,7 +68,17 @@
       };
       services.ollama = {
         enable = true;
+        # Use the RTX 5080 (CUDA) rather than CPU.
+        acceleration = "cuda";
+        # Listen on the LAN so 204-agent (slop-trove) can reach it.
+        host = "0.0.0.0";
+        port = 11434;
+        # Pull the embedding model on startup (slop-trove uses bge-m3, 1024-dim).
+        loadModels = [ "bge-m3" ];
       };
+      # Ollama has no auth; only open it on the trusted LAN. Tighten to 204
+      # only if blac ever gets nftables (see services.hermes for the pattern).
+      networking.firewall.allowedTCPPorts = [ 11434 ];
 
       environment.etc."libinput/local-overrides.quirks".text = ''
         [Company Mouse Debounce Override]

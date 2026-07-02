@@ -30,7 +30,7 @@
       vendors = [ "nvidia" ];
       compute = {
         vendor = "nvidia";
-        vram = 24;
+        vram = 16;
       };
     };
 
@@ -124,6 +124,7 @@
         self.nixosModules.oldblac-vm
         self.nixosModules."204-agent"
         inputs.hermes-agent.nixosModules.default
+        inputs.slop-trove.nixosModules.default
       ];
   };
 
