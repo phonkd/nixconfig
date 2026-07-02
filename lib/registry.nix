@@ -19,7 +19,7 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "desktop";
-    desktop = "hyprland";
+    desktop = "gnome";
     tags = [
       "gaming"
       "gigaplayer-client"

@@ -122,7 +122,10 @@
 
       services.flatpak.enable = true;
       xdg.portal.enable = true;
-      xdg.portal.extraPortals = [ pkgs.xdg-desktop-portal-hyprland ];
+      # GNOME hosts get their portals from the desktopManager.gnome module.
+      xdg.portal.extraPortals = lib.optional (
+        config.noughty.host.desktop == "hyprland"
+      ) pkgs.xdg-desktop-portal-hyprland;
       services.pulseaudio.enable = false;
       security.rtkit.enable = true;
       services.pipewire = {
@@ -152,7 +155,7 @@
         sbctl
         slskd
       ];
-      services.displayManager.sessionPackages = [
+      services.displayManager.sessionPackages = lib.optionals (config.noughty.host.desktop == "hyprland") [
         (pkgs.runCommand "hyprland-session"
           {
             passthru.providedSessions = [ "hyprland" ];

@@ -31,7 +31,6 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.gaming
-        self.homeModules.desktop-environment
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
       ];
@@ -50,12 +49,15 @@
     lib.mkIf config.noughty.host.is.nixosDesktop {
       home-manager.users.phonkd.imports = [
         self.homeModules.gui-nixos
-      ];
+      ]
+      # Hyprland + Noctalia HM config only for hosts still on that desktop;
+      # GNOME hosts (blac) get their DE from the NixOS module instead.
+      ++ lib.optional (config.noughty.host.desktop == "hyprland") self.homeModules.desktop-environment;
     };
 
   # Darwin-side GUI: gated on host.is.darwinDesktop. Wires Home Manager
   # with the cross-platform `gui` HM module (not gui-nixos, which carries
-  # Hyprland + Linux-only bits).
+  # Linux-only bits).
   flake.darwinModules.gui-darwin =
     {
       config,
