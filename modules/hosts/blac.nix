@@ -68,8 +68,9 @@
       };
       services.ollama = {
         enable = true;
-        # Use the RTX 5080 (CUDA) rather than CPU.
-        acceleration = "cuda";
+        # Use the RTX 5080 (CUDA) rather than CPU. (services.ollama.acceleration
+        # is defunct; the accelerated variant is picked via the package now.)
+        package = pkgs.ollama-cuda;
         # Listen on the LAN so 204-agent (slop-trove) can reach it.
         host = "0.0.0.0";
         port = 11434;
