@@ -35,23 +35,31 @@
 
       sops.secrets."hermes-openrouter-key" = { owner = "hermes"; };
       sops.secrets."hermes-discord" = { owner = "hermes"; };
-      # Also feeds the Copilot model provider below: this is a fine-grained PAT
-      # exported as GITHUB_TOKEN, which Hermes' Copilot resolver picks up
-      # (COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN). The "Copilot Requests"
-      # permission must be enabled on it; classic ghp_* PATs are rejected.
+      # GITHUB_TOKEN (fine-grained PAT) — for the gh CLI only. The Copilot API
+      # rejects PATs of any kind ("Personal Access Tokens are not supported"),
+      # regardless of the Copilot Requests permission.
       sops.secrets."hermes-github" = { owner = "hermes"; };
+      # COPILOT_GITHUB_TOKEN (gho_* OAuth token) — feeds the Copilot model
+      # provider. Hermes resolves COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN,
+      # so this outranks the PAT above. Minted via the GitHub device-code flow
+      # with the Copilot CLI client ID (Ov23li8tweQw6odWQebz); doesn't expire
+      # unless revoked or unused for ~a year. To re-mint: POST
+      # github.com/login/device/code with that client_id, approve, poll
+      # login/oauth/access_token, then update this secret.
+      sops.secrets."hermes-copilot" = { owner = "hermes"; };
 
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
         extraPackages = [ pkgs.gh ];
-        # Main model: GPT-5.4 via the GitHub Copilot subscription. provider
-        # "copilot" makes Hermes exchange the existing GITHUB_TOKEN (the
-        # hermes-github fine-grained PAT, now with Copilot Requests) for a
-        # short-lived Copilot token and hit api.githubcopilot.com. (Previously
-        # deepseek/deepseek-v4-flash on OpenRouter — the hermes-openrouter-key
-        # secret is kept for an easy revert.)
+        # Main model: GPT-5.4 via the GitHub Copilot subscription (individual
+        # plan). provider "copilot" resolves COPILOT_GITHUB_TOKEN (the
+        # hermes-copilot OAuth token); the copilot_internal/v2/token exchange
+        # 404s for this OAuth app, but Hermes falls back to sending the raw
+        # gho_* token as Bearer, which api.githubcopilot.com accepts.
+        # (Previously deepseek/deepseek-v4-flash on OpenRouter — the
+        # hermes-openrouter-key secret is kept for an easy revert.)
         settings.model = {
           default = "gpt-5.4";
           provider = "copilot";
@@ -77,6 +85,7 @@
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
           config.sops.secrets."hermes-github".path
+          config.sops.secrets."hermes-copilot".path
         ];
       };
 
