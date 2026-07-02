@@ -24,7 +24,11 @@
         programs.steam.enable = true;
         hardware.bluetooth.enable = true;
         system.stateVersion = "26.05";
-        users.users.phonkd.extraGroups = [ "dialout" ];
+        # "wheel" must be declared (see blac.nix) or sudo is lost on rebuild.
+        users.users.phonkd.extraGroups = [
+          "dialout"
+          "wheel"
+        ];
         networking.networkmanager.enable = true;
         home-manager.users.phonkd.proxy.ipRanges = [
           "192.168.1.47/32"
