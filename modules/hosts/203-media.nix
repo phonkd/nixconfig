@@ -61,7 +61,20 @@
 
       networking.firewall.allowedTCPPorts = [
         22
+        11434 # ollama — 204-agent (slop-trove) reaches this over ens19/192.168.3.0
       ];
+
+      # Embeddings for slop-trove (bge-m3) on the RTX 3060 Ti passed through
+      # for Jellyfin transcoding (see arr-slime.nix) — idle GPU cycles, and
+      # unlike blac this host is always on. Same 192.168.3.0/24 as 204-agent
+      # (via ens19), so no inter-VLAN routing needed.
+      services.ollama = {
+        enable = true;
+        package = pkgs.ollama-cuda;
+        host = "0.0.0.0";
+        port = 11434;
+        loadModels = [ "bge-m3" ];
+      };
       swapDevices = [
         {
           device = "/var/lib/swapfile";

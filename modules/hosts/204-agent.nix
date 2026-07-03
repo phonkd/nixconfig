@@ -91,11 +91,12 @@
       services.slop-trove = {
         enable = true;
         database.createLocally = true;
-        # blac's RTX 5080 runs Ollama. blac's static IP is set imperatively in
-        # GNOME/NetworkManager on the box (not declared in blac.nix). blac sits
-        # on the 1.x segment (switch can't tag the 3.x VLAN), so this crosses
-        # subnets — needs inter-VLAN routing to allow 3.204 → 1.206:11434.
-        embedding.endpoint = "http://192.168.1.206:11434";
+        # 203-media's RTX 3060 Ti runs Ollama (passed through for Jellyfin
+        # transcoding, see arr-slime.nix) — always on, unlike blac's 5080.
+        # Same 192.168.3.0/24 as this host (203-media's ens19), no VLAN
+        # crossing needed. blac also still runs ollama-cuda/bge-m3 if this
+        # ever needs to move back (192.168.1.206:11434, cross-subnet).
+        embedding.endpoint = "http://192.168.3.203:11434";
         embedding.model = "bge-m3";
         embedding.dim = 1024;
         mcp.port = 9120;
