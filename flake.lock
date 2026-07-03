@@ -780,11 +780,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1783032222,
-        "narHash": "sha256-SdyQYeCgLhgCGqBkCkKDFhEkuxxDBXiTY+oFZweKv4Q=",
+        "lastModified": 1783074669,
+        "narHash": "sha256-jrLuO5qF/cn1W849mFvnTN4TfOA7OtD3KHunr7oBS9o=",
         "owner": "phonkd",
         "repo": "slop-trove",
-        "rev": "0fe52308ab1be76957782ecf261d91301ff51dea",
+        "rev": "2e21a7203870c06c5a17151c743c8169c2ffff8f",
         "type": "github"
       },
       "original": {

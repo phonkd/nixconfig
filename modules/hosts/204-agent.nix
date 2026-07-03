@@ -104,6 +104,10 @@
           enable = true;
           path = "/var/lib/slop-trove/exports/discord";
         };
+        sources.claude = {
+          enable = true;
+          path = "/var/lib/slop-trove/exports/claude";
+        };
       };
     };
 }
