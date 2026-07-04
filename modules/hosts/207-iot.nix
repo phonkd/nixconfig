@@ -9,6 +9,16 @@
 # template. If you build a fresh disk instead, run `blkid` on the VM and
 # override fileSystems."/".device / fileSystems."/boot".device here.
 #
+# Single-homed on 192.168.1.0/24 (the main LAN), not the 192.168.3.0/24
+# management subnet the other 20X VMs use -- the Apple TV and Yamaha
+# receivers live there, and mDNS/AirPlay discovery (apple_tv, yamaha_musiccast)
+# doesn't cross subnets. oldblac-vm.nix hardcodes the gateway/nameservers for
+# 192.168.3.0/24, so both are mkForce'd below to their 192.168.1.x
+# equivalents (same trick 203-media uses for its own gateway override). One
+# NIC only -- unlike 203-media this host doesn't dual-home onto .3.0/24, so
+# it won't resolve *.int.phonkd.net/*.w.phonkd.net (served from
+# 192.168.3.201); reach other homelab services by IP instead.
+#
 # services.home-assistant.config is left unset (null) so HA's own onboarding
 # wizard collects name/location/units/time zone on first browser visit --
 # same as any fresh HA install. extraComponents just puts the Python deps
@@ -34,10 +44,15 @@
       networking.hostName = "207-iot";
       networking.interfaces.ens18.ipv4.addresses = [
         {
-          address = "192.168.3.207";
+          address = "192.168.1.207";
           prefixLength = 24;
         }
       ];
+      # oldblac-vm.nix sets these for 192.168.3.0/24; override for this
+      # subnet's router (which also does local DNS, mirroring how
+      # 192.168.3.1 doubles as a nameserver for that VLAN).
+      networking.defaultGateway = lib.mkForce "192.168.1.1";
+      networking.nameservers = lib.mkForce [ "192.168.1.1" ];
       security.sudo.wheelNeedsPassword = false;
       networking.firewall.allowedTCPPorts = [
         22
