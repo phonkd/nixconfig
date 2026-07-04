@@ -69,6 +69,17 @@
           "wake_on_lan"
           "jellyfin"
           "spotify"
+          # default_config's onboarding auto-creates config entries for these
+          # (met: default weather; google_translate: default TTS;
+          # radio_browser: default internet-radio) but nixpkgs only bundles a
+          # component's extra PyPI deps if it's listed here explicitly --
+          # otherwise they fail at startup with ModuleNotFoundError.
+          "met"
+          "google_translate"
+          "radio_browser"
+          # myStrom plug at 192.168.1.19 (see modules/shell.nix), auto-discovered
+          # via DHCP/zeroconf now that HA is on the same LAN.
+          "mystrom"
         ];
       };
     };
