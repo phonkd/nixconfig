@@ -48,7 +48,7 @@
             enable = true;
             icon = "sh-proxmox";
           };
-          ip = "192.168.1.47";
+          ip = "192.168.3.47";
           port = 8006;
           traefik = {
             enable = true;
@@ -65,13 +65,6 @@
           dashboard = {
             enable = true;
             icon = "router";
-          };
-          traefik = {
-            enable = true;
-            domain = "1.int.phonkd.net";
-            scheme = "https";
-            transport = "insecureTransport";
-            ipfilter = true;
           };
         };
         grafana = {
