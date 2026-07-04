@@ -144,6 +144,20 @@
             backend = "filesystem";
             filesystem.dir = "/var/lib/mimir/ruler-storage";
           };
+
+          # Tell the ruler where to send firing alerts — Mimir's own bundled
+          # Alertmanager (included in target=all), reached on the same port.
+          ruler.alertmanager_url = "http://127.0.0.1:${toString mimirHttpPort}/alertmanager";
+
+          # Storage for the Alertmanager's tenant config (contact points,
+          # notification policies, e.g. a Discord webhook receiver). Configured
+          # entirely through Grafana's Alerting UI once pointed at the
+          # "Mimir Alertmanager" datasource below — no receiver config or
+          # secrets need to live in this repo.
+          alertmanager_storage = {
+            backend = "filesystem";
+            filesystem.dir = "/var/lib/mimir/alertmanager-storage";
+          };
         };
       };
 
@@ -174,6 +188,13 @@
               # Mimir serves the Prometheus query API under /prometheus.
               url = "http://127.0.0.1:${toString mimirHttpPort}/prometheus";
               isDefault = true;
+            }
+            {
+              name = "Mimir Alertmanager";
+              type = "alertmanager";
+              access = "proxy";
+              url = "http://127.0.0.1:${toString mimirHttpPort}/alertmanager";
+              jsonData.implementation = "mimir";
             }
             {
               name = "Loki";
