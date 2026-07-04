@@ -100,6 +100,11 @@
                     default = null;
                     description = "Custom link for the dashboard. Defaults to 'https://<traefik.domain>'.";
                   };
+                  widget = lib.mkOption {
+                    type = t.nullOr (t.attrsOf t.anything);
+                    default = null;
+                    description = "Homepage live-stats widget config, passed through verbatim to services.homepage-dashboard (type, url, key, fields, ...).";
+                  };
                 };
               };
             }

@@ -27,6 +27,12 @@
               ip = "192.168.3.203";
               port = 8096;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "jellyfin";
+                url = "http://192.168.3.203:8096";
+                key = "{{HOMEPAGE_VAR_JELLYFIN_KEY}}";
+                enableBlocks = true;
+              };
               traefik = {
                 enable = true;
                 domain = "jellyfin.w.phonkd.net";
@@ -38,6 +44,11 @@
               ip = "192.168.3.203";
               port = 8989;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "sonarr";
+                url = "http://192.168.3.203:8989";
+                key = "{{HOMEPAGE_VAR_SONARR_KEY}}";
+              };
               traefik = {
                 enable = true;
                 domain = "sonarr.int.w.phonkd.net";
@@ -49,6 +60,11 @@
               ip = "192.168.3.203";
               port = 9696;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "prowlarr";
+                url = "http://192.168.3.203:9696";
+                key = "{{HOMEPAGE_VAR_PROWLARR_KEY}}";
+              };
               traefik = {
                 enable = true;
                 domain = "prowlarr.int.w.phonkd.net";
@@ -60,6 +76,16 @@
               ip = "192.168.3.203";
               port = 8080;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "sabnzbd";
+                url = "http://192.168.3.203:8080";
+                key = "{{HOMEPAGE_VAR_SABNZBD_KEY}}";
+                fields = [
+                  "rate"
+                  "queue"
+                  "timeleft"
+                ];
+              };
               traefik = {
                 enable = true;
                 domain = "sabnzbd.int.w.phonkd.net";
@@ -71,6 +97,11 @@
               ip = "192.168.3.203";
               port = 5055;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "jellyseerr";
+                url = "http://192.168.3.203:5055";
+                key = "{{HOMEPAGE_VAR_SEERR_KEY}}";
+              };
               traefik = {
                 enable = true;
                 domain = "seerr.int.w.phonkd.net";
@@ -82,6 +113,11 @@
               ip = "192.168.3.203";
               port = 7878;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "radarr";
+                url = "http://192.168.3.203:7878";
+                key = "{{HOMEPAGE_VAR_RADARR_KEY}}";
+              };
               traefik = {
                 enable = true;
                 domain = "radarr.int.w.phonkd.net";
@@ -93,6 +129,11 @@
               ip = "192.168.3.203";
               port = 8686;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "lidarr";
+                url = "http://192.168.3.203:8686";
+                key = "{{HOMEPAGE_VAR_LIDARR_KEY}}";
+              };
               traefik = {
                 enable = true;
                 domain = "lidarr.int.w.phonkd.net";
@@ -104,6 +145,11 @@
               ip = "192.168.3.203";
               port = 5030;
               dashboard.enable = true;
+              dashboard.widget = {
+                type = "slskd";
+                url = "http://192.168.3.203:5030";
+                key = "{{HOMEPAGE_VAR_SLSKD_KEY}}";
+              };
               traefik = {
                 enable = true;
                 domain = "slskd.int.w.phonkd.net";
@@ -113,39 +159,31 @@
             };
           };
 
-          # Homepage runs on the reverse-proxy host, so its SABnzbd widget
-          # (and the api-key it needs) belong here, not on the media-server.
+          # Homepage runs on the reverse-proxy host, so the widget api-keys
+          # belong here, not on the media-server. All keys live in the shared
+          # global secrets file, so they decrypt on both hosts.
           sops.secrets."sabnzbd-api-key" = { };
+          sops.secrets."sonarr-api-key" = { };
+          sops.secrets."radarr-api-key" = { };
+          sops.secrets."lidarr-api-key" = { };
+          sops.secrets."prowlarr-api-key" = { };
+          sops.secrets."seerr-api-key" = { };
+          sops.secrets."jellyfin-api-key" = { };
+          sops.secrets."slskd-api-key" = { };
 
           sops.templates."homepage.env".content = ''
             HOMEPAGE_VAR_SABNZBD_KEY=${config.sops.placeholder."sabnzbd-api-key"}
+            HOMEPAGE_VAR_SONARR_KEY=${config.sops.placeholder."sonarr-api-key"}
+            HOMEPAGE_VAR_RADARR_KEY=${config.sops.placeholder."radarr-api-key"}
+            HOMEPAGE_VAR_LIDARR_KEY=${config.sops.placeholder."lidarr-api-key"}
+            HOMEPAGE_VAR_PROWLARR_KEY=${config.sops.placeholder."prowlarr-api-key"}
+            HOMEPAGE_VAR_SEERR_KEY=${config.sops.placeholder."seerr-api-key"}
+            HOMEPAGE_VAR_JELLYFIN_KEY=${config.sops.placeholder."jellyfin-api-key"}
+            HOMEPAGE_VAR_SLSKD_KEY=${config.sops.placeholder."slskd-api-key"}
           '';
 
           services.homepage-dashboard = {
             environmentFile = config.sops.templates."homepage.env".path;
-            services = [
-              {
-                "Downloaders" = [
-                  {
-                    "SABnzbd" = {
-                      icon = "sabnzbd.png";
-                      href = "https://sabnzbd.int.w.phonkd.net";
-                      description = "sabnzbd.int.w.phonkd.net";
-                      widget = {
-                        type = "sabnzbd";
-                        url = "http://192.168.3.203:8080";
-                        key = "{{HOMEPAGE_VAR_SABNZBD_KEY}}";
-                        fields = [
-                          "rate"
-                          "queue"
-                          "timeleft"
-                        ];
-                      };
-                    };
-                  }
-                ];
-              }
-            ];
           };
         })
 
@@ -170,6 +208,7 @@
           sops.secrets."slskd-slsk-password" = { };
           sops.secrets."slskd-web-username" = { };
           sops.secrets."slskd-web-password" = { };
+          sops.secrets."slskd-api-key" = { };
           sops.secrets."prowlarr-api-key" = { };
           sops.secrets."prowlarr-password" = { };
           sops.secrets."nzblife-api-key" = { };
@@ -320,6 +359,7 @@
               SLSKD_SLSK_PASSWORD=${config.sops.placeholder."slskd-slsk-password"}
               SLSKD_USERNAME=${config.sops.placeholder."slskd-web-username"}
               SLSKD_PASSWORD=${config.sops.placeholder."slskd-web-password"}
+              SLSKD_API_KEY=role=ReadOnly;cidr=192.168.3.201/32;${config.sops.placeholder."slskd-api-key"}
             '';
             owner = "slskd";
           };

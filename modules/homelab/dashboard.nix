@@ -24,7 +24,11 @@
           icon = if app.dashboard.icon != null then app.dashboard.icon else "${name}.png";
           href = if app.dashboard.link != null then app.dashboard.link else "https://${app.traefik.domain}";
           description = if app.traefik.domain != null then app.traefik.domain else "";
-        };
+          # Green/red status dot; goes through traefik so it reflects what a
+          # browser would actually get.
+          siteMonitor = "https://${app.traefik.domain}";
+        }
+        // lib.optionalAttrs (app.dashboard.widget != null) { widget = app.dashboard.widget; };
       }) enabledApps;
 
     in
@@ -39,25 +43,34 @@
             saturate = "30";
             brightness = "30";
             opacity = "80";
-            maxGroupColumns = "2";
-            fullWidth = "true";
           };
           cardblur = "md";
           headerStyle = "boxedWidgets";
+          # These are top-level settings, not background options.
+          fullWidth = true;
+          statusStyle = "dot";
+          useEqualHeights = true;
+          # Render the single big group as a grid instead of one endless column.
+          layout = {
+            "Reverse proxied" = {
+              style = "row";
+              columns = 4;
+            };
+          };
         };
         widgets = [
+          {
+            search = {
+              provider = "duckduckgo";
+              target = "_blank";
+            };
+          }
           {
             resources = {
               label = "System";
               cpu = true;
               memory = true;
               disk = "/";
-            };
-          }
-          {
-            resources = {
-              label = "Shares";
-              disk = "/mnt/Shares";
             };
           }
           {
@@ -70,6 +83,15 @@
             resources = {
               label = "Syncthing";
               disk = "/mnt/syncthing";
+            };
+          }
+          {
+            datetime = {
+              text_size = "xl";
+              format = {
+                dateStyle = "long";
+                timeStyle = "short";
+              };
             };
           }
         ];

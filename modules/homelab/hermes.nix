@@ -25,6 +25,7 @@
           ip = "192.168.3.204";
           port = 9119;
           dashboard.enable = true;
+          dashboard.icon = "mdi-robot";
           traefik = {
             enable = true;
             domain = "hermes-dashboard.int.w.phonkd.net";

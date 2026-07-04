@@ -10,6 +10,7 @@
         ip = "127.0.0.1";
         port = 11111;
         dashboard.enable = true;
+        dashboard.icon = "sh-open-webui";
         traefik = {
           enable = true;
           domain = "openwebui.int.w.phonkd.net";
