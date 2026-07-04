@@ -440,6 +440,26 @@
 
       services.alloy.enable = true;
       systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "systemd-journal" ];
+
+      # Keep Alloy shipping telemetry even when the host is CPU/IO saturated —
+      # that's exactly the incident you want visibility into. These cgroup-v2
+      # resource-control knobs on Alloy's own systemd slice merge with the
+      # SupplementaryGroups setting above:
+      #   Nice           — raise its scheduler priority above normal processes.
+      #   CPUWeight      — give it the dominant CPU share within system.slice
+      #                    when the CPU is contended (default 100, max 10000).
+      #   IOWeight       — likewise for disk, so WAL flushes aren't starved.
+      #   OOMScoreAdjust — don't let Alloy be the first thing the OOM killer
+      #                    reaps under the memory pressure that often accompanies
+      #                    a CPU spike.
+      # Alloy buffers to a WAL on both remote_write and loki.write, so anything
+      # it can't send immediately is replayed once it gets scheduled again.
+      systemd.services.alloy.serviceConfig = {
+        Nice = -10;
+        CPUWeight = 10000;
+        IOWeight = 10000;
+        OOMScoreAdjust = -500;
+      };
       services.prometheus.exporters.node = {
         # enabledCollectors = [
         #   "node"
