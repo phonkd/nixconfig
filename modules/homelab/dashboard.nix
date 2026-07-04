@@ -19,7 +19,7 @@
 
       # Convert the filtered apps into the homepage-dashboard service format
       # Structure: [ { "AppName" = { icon = "..."; href = "..."; ... }; } ]
-      serviceList = lib.mapAttrsToList (name: app: {
+      mkServiceList = lib.mapAttrsToList (name: app: {
         "${name}" = {
           icon = if app.dashboard.icon != null then app.dashboard.icon else "${name}.png";
           href = if app.dashboard.link != null then app.dashboard.link else "https://${app.traefik.domain}";
@@ -29,7 +29,11 @@
           siteMonitor = "https://${app.traefik.domain}";
         }
         // lib.optionalAttrs (app.dashboard.widget != null) { widget = app.dashboard.widget; };
-      }) enabledApps;
+      });
+
+      # Two columns: live-stats cards left, plain links right.
+      widgetApps = lib.filterAttrs (_: app: app.dashboard.widget != null) enabledApps;
+      plainApps = lib.filterAttrs (_: app: app.dashboard.widget == null) enabledApps;
 
     in
     lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
@@ -49,14 +53,6 @@
           # These are top-level settings, not background options.
           fullWidth = true;
           statusStyle = "dot";
-          useEqualHeights = true;
-          # Render the single big group as a grid instead of one endless column.
-          layout = {
-            "Reverse proxied" = {
-              style = "row";
-              columns = 4;
-            };
-          };
         };
         widgets = [
           {
@@ -97,7 +93,10 @@
         ];
         services = [
           {
-            "Reverse proxied" = serviceList;
+            "Monitored" = mkServiceList widgetApps;
+          }
+          {
+            "Reverse proxied" = mkServiceList plainApps;
           }
         ];
         allowedHosts = config.phonkds.modules.homepage.traefik.domain;
