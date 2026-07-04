@@ -100,7 +100,10 @@
         configuration = {
           multitenancy_enabled = false;
           usage_stats.enabled = false;
-          target = "all";
+          # "all" deliberately excludes the alertmanager and overrides-exporter
+          # components — Mimir won't start the Alertmanager (or expose it on
+          # the admin page) unless it's opted into the target list explicitly.
+          target = "all,alertmanager";
 
           server = {
             http_listen_port = mimirHttpPort;
