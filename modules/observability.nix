@@ -9,8 +9,6 @@
   #
   #   Loki      — log aggregation      (HTTP 3100)
   #   Mimir     — long-term metrics    (HTTP 9009, Prometheus-compatible)
-  #   Tempo     — distributed traces   (HTTP 3200, OTLP 4317/4318)
-  #   Pyroscope — continuous profiling (HTTP 4040)
   #   Grafana   — dashboards / explore (HTTP 3000)
   #
   # Reachability: services bind on all interfaces but the firewall only opens
@@ -31,14 +29,6 @@
       lokiGrpcPort = 9096;
       mimirHttpPort = 9009;
       mimirGrpcPort = 9095;
-      # Tempo (traces) and Pyroscope (profiles) share the host, so each needs a
-      # distinct gRPC port — Mimir already owns 9095, Loki 9096.
-      tempoHttpPort = 3200;
-      tempoGrpcPort = 9097;
-      tempoOtlpGrpcPort = 4317; # standard OTLP/gRPC ingest
-      tempoOtlpHttpPort = 4318; # standard OTLP/HTTP ingest
-      pyroscopePort = 4040;
-      pyroscopeGrpcPort = 9098;
       grafanaPort = 3000;
     in
     lib.mkIf (noughtyLib.hostHasTag "observability-server") {
@@ -154,51 +144,20 @@
             backend = "filesystem";
             filesystem.dir = "/var/lib/mimir/ruler-storage";
           };
-        };
-      };
 
-      # ── Tempo ───────────────────────────────────────────────────────────────
-      # Single-binary tracing backend with local block storage under /var/lib/tempo.
-      # Accepts traces over OTLP (gRPC 4317 / HTTP 4318); Grafana queries on 3200.
-      services.tempo = {
-        enable = true;
-        settings = {
-          # Tempo phones home usage stats by default — disable like the rest.
-          usage_report.reporting_enabled = false;
+          # Tell the ruler where to send firing alerts — Mimir's own bundled
+          # Alertmanager (included in target=all), reached on the same port.
+          ruler.alertmanager_url = "http://127.0.0.1:${toString mimirHttpPort}/alertmanager";
 
-          server = {
-            http_listen_port = tempoHttpPort;
-            grpc_listen_port = tempoGrpcPort;
-            log_level = "warn";
+          # Storage for the Alertmanager's tenant config (contact points,
+          # notification policies, e.g. a Discord webhook receiver). Configured
+          # entirely through Grafana's Alerting UI once pointed at the
+          # "Mimir Alertmanager" datasource below — no receiver config or
+          # secrets need to live in this repo.
+          alertmanager_storage = {
+            backend = "filesystem";
+            filesystem.dir = "/var/lib/mimir/alertmanager-storage";
           };
-
-          distributor.receivers.otlp.protocols = {
-            grpc.endpoint = "0.0.0.0:${toString tempoOtlpGrpcPort}";
-            http.endpoint = "0.0.0.0:${toString tempoOtlpHttpPort}";
-          };
-
-          ingester.max_block_duration = "5m";
-
-          # Keep traces for 7 days; bump once disk usage is understood.
-          compactor.compaction.block_retention = "168h";
-
-          storage.trace = {
-            backend = "local";
-            wal.path = "/var/lib/tempo/wal";
-            local.path = "/var/lib/tempo/blocks";
-          };
-        };
-      };
-
-      # ── Pyroscope ───────────────────────────────────────────────────────────
-      # Continuous-profiling backend, local storage under /var/lib/pyroscope.
-      # Binds all interfaces (firewall restricts to wg-obs); Grafana queries on 4040.
-      services.pyroscope = {
-        enable = true;
-        settings.server = {
-          http_listen_address = "0.0.0.0";
-          http_listen_port = pyroscopePort;
-          grpc_listen_port = pyroscopeGrpcPort;
         };
       };
 
@@ -231,22 +190,17 @@
               isDefault = true;
             }
             {
+              name = "Mimir Alertmanager";
+              type = "alertmanager";
+              access = "proxy";
+              url = "http://127.0.0.1:${toString mimirHttpPort}/alertmanager";
+              jsonData.implementation = "mimir";
+            }
+            {
               name = "Loki";
               type = "loki";
               access = "proxy";
               url = "http://127.0.0.1:${toString lokiHttpPort}";
-            }
-            {
-              name = "Tempo";
-              type = "tempo";
-              access = "proxy";
-              url = "http://127.0.0.1:${toString tempoHttpPort}";
-            }
-            {
-              name = "Pyroscope";
-              type = "grafana-pyroscope-datasource";
-              access = "proxy";
-              url = "http://127.0.0.1:${toString pyroscopePort}";
             }
           ];
         };
@@ -264,10 +218,6 @@
         grafanaPort
         lokiHttpPort
         mimirHttpPort
-        tempoHttpPort # query + Tempo's own API
-        tempoOtlpGrpcPort # OTLP trace ingest (gRPC)
-        tempoOtlpHttpPort # OTLP trace ingest (HTTP)
-        pyroscopePort # profile ingest + query
       ];
 
       # ── Mimir alerting rules ─────────────────────────────────────────────────
