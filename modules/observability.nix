@@ -143,9 +143,16 @@
 
           store_gateway.sharding_ring.replication_factor = 1;
 
+          # "filesystem" (not "local") so Mimir's own DynamicUser owns the whole
+          # tree it writes into. The ruler config API (used by mimirtool, and by
+          # the mimir-rules-sync service below) needs to create/update rule-group
+          # objects at runtime; "local" only supports reading rule files placed
+          # by an external process and 500s on API writes because the directory
+          # ends up root-owned (created by an activation script) while Mimir
+          # runs as a dynamic, non-root service user that can't write into it.
           ruler_storage = {
-            backend = "local";
-            local.directory = "/var/lib/mimir/ruler";
+            backend = "filesystem";
+            filesystem.dir = "/var/lib/mimir/ruler-storage";
           };
         };
       };
@@ -264,128 +271,147 @@
       ];
 
       # ── Mimir alerting rules ─────────────────────────────────────────────────
-      # Written to Mimir's ruler filesystem storage on every activation.
-      # Mimir polls this directory every minute and picks up changes automatically.
+      # Pushed into Mimir's ruler via its config API (mimirtool, bundled with
+      # the mimir package) rather than dropped as a raw file — the "filesystem"
+      # ruler_storage backend above doesn't scan a directory the way the old
+      # "local" backend did, and API-driven writes are also what lets other
+      # tools (e.g. Hermes) create/update rules at runtime the same way.
       # Tenant is "anonymous" (single-tenant mode, multitenancy_enabled = false).
-      system.activationScripts.mimirAlertRules = {
-        text =
-          let
-            rulesFile = pkgs.writeText "homelab.yaml" ''
-              groups:
-                - name: instance
-                  interval: 1m
-                  rules:
-                    - alert: InstanceDown
-                      expr: up{job="integrations/unix"} == 0
-                      for: 5m
-                      labels:
-                        severity: critical
-                      annotations:
-                        summary: "{{ $labels.instance }} is unreachable"
-                        description: "{{ $labels.instance }} has not been scraped for 5 minutes."
+      systemd.services.mimir-rules-sync =
+        let
+          rulesFile = pkgs.writeText "homelab.yaml" ''
+            groups:
+              - name: instance
+                interval: 1m
+                rules:
+                  - alert: InstanceDown
+                    expr: up{job="integrations/unix"} == 0
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "{{ $labels.instance }} is unreachable"
+                      description: "{{ $labels.instance }} has not been scraped for 5 minutes."
 
-                - name: cpu
-                  interval: 1m
-                  rules:
-                    - alert: HighCPU
-                      expr: >
-                        100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle",job="integrations/unix"}[5m])) * 100) > 90
-                      for: 10m
-                      labels:
-                        severity: warning
-                      annotations:
-                        summary: "High CPU on {{ $labels.instance }}"
-                        description: 'CPU above 90% for 10 min (current: {{ $value | printf "%.1f" }}%).'
-                    - alert: HighLoadAverage
-                      expr: >
-                        node_load1{job="integrations/unix"}
-                        / count without(cpu, mode) (node_cpu_seconds_total{mode="idle",job="integrations/unix"}) > 3
-                      for: 10m
-                      labels:
-                        severity: warning
-                      annotations:
-                        summary: "High load on {{ $labels.instance }}"
-                        description: '1m load is {{ $value | printf "%.2f" }}x the CPU count.'
+              - name: cpu
+                interval: 1m
+                rules:
+                  - alert: HighCPU
+                    expr: >
+                      100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle",job="integrations/unix"}[5m])) * 100) > 90
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "High CPU on {{ $labels.instance }}"
+                      description: 'CPU above 90% for 10 min (current: {{ $value | printf "%.1f" }}%).'
+                  - alert: HighLoadAverage
+                    expr: >
+                      node_load1{job="integrations/unix"}
+                      / count without(cpu, mode) (node_cpu_seconds_total{mode="idle",job="integrations/unix"}) > 3
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "High load on {{ $labels.instance }}"
+                      description: '1m load is {{ $value | printf "%.2f" }}x the CPU count.'
 
-                - name: memory
-                  interval: 1m
-                  rules:
-                    - alert: HighMemory
-                      expr: >
-                        (1 - node_memory_MemAvailable_bytes{job="integrations/unix"}
-                             / node_memory_MemTotal_bytes{job="integrations/unix"}) * 100 > 90
-                      for: 10m
-                      labels:
-                        severity: warning
-                      annotations:
-                        summary: "High memory on {{ $labels.instance }}"
-                        description: 'Memory usage is {{ $value | printf "%.1f" }}%.'
-                    - alert: CriticalMemory
-                      expr: >
-                        (1 - node_memory_MemAvailable_bytes{job="integrations/unix"}
-                             / node_memory_MemTotal_bytes{job="integrations/unix"}) * 100 > 97
-                      for: 5m
-                      labels:
-                        severity: critical
-                      annotations:
-                        summary: "Critical memory on {{ $labels.instance }}"
-                        description: 'Memory is {{ $value | printf "%.1f" }}% — OOM imminent.'
+              - name: memory
+                interval: 1m
+                rules:
+                  - alert: HighMemory
+                    expr: >
+                      (1 - node_memory_MemAvailable_bytes{job="integrations/unix"}
+                           / node_memory_MemTotal_bytes{job="integrations/unix"}) * 100 > 90
+                    for: 10m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "High memory on {{ $labels.instance }}"
+                      description: 'Memory usage is {{ $value | printf "%.1f" }}%.'
+                  - alert: CriticalMemory
+                    expr: >
+                      (1 - node_memory_MemAvailable_bytes{job="integrations/unix"}
+                           / node_memory_MemTotal_bytes{job="integrations/unix"}) * 100 > 97
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "Critical memory on {{ $labels.instance }}"
+                      description: 'Memory is {{ $value | printf "%.1f" }}% — OOM imminent.'
 
-                - name: disk
-                  interval: 1m
-                  rules:
-                    - alert: DiskSpaceWarning
-                      expr: >
-                        (1 - node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}
-                             / node_filesystem_size_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}) * 100 > 80
-                      for: 5m
-                      labels:
-                        severity: warning
-                      annotations:
-                        summary: "Disk {{ $labels.mountpoint }} filling on {{ $labels.instance }}"
-                        description: '{{ $labels.mountpoint }} is {{ $value | printf "%.1f" }}% full.'
-                    - alert: DiskSpaceCritical
-                      expr: >
-                        (1 - node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}
-                             / node_filesystem_size_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}) * 100 > 95
-                      for: 5m
-                      labels:
-                        severity: critical
-                      annotations:
-                        summary: "Disk {{ $labels.mountpoint }} nearly full on {{ $labels.instance }}"
-                        description: '{{ $labels.mountpoint }} is {{ $value | printf "%.1f" }}% full.'
-                    - alert: DiskWillFillIn24h
-                      expr: >
-                        predict_linear(
-                          node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}[6h],
-                          86400
-                        ) < 0
-                      for: 1h
-                      labels:
-                        severity: warning
-                      annotations:
-                        summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} will fill in 24h"
-                        description: "Based on last 6h growth, {{ $labels.mountpoint }} will run out within 24 hours."
+              - name: disk
+                interval: 1m
+                rules:
+                  - alert: DiskSpaceWarning
+                    expr: >
+                      (1 - node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}
+                           / node_filesystem_size_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}) * 100 > 80
+                    for: 5m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "Disk {{ $labels.mountpoint }} filling on {{ $labels.instance }}"
+                      description: '{{ $labels.mountpoint }} is {{ $value | printf "%.1f" }}% full.'
+                  - alert: DiskSpaceCritical
+                    expr: >
+                      (1 - node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}
+                           / node_filesystem_size_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}) * 100 > 95
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "Disk {{ $labels.mountpoint }} nearly full on {{ $labels.instance }}"
+                      description: '{{ $labels.mountpoint }} is {{ $value | printf "%.1f" }}% full.'
+                  - alert: DiskWillFillIn24h
+                    expr: >
+                      predict_linear(
+                        node_filesystem_avail_bytes{job="integrations/unix",fstype!~"tmpfs|devtmpfs|overlay|squashfs|fuse.*"}[6h],
+                        86400
+                      ) < 0
+                    for: 1h
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} will fill in 24h"
+                      description: "Based on last 6h growth, {{ $labels.mountpoint }} will run out within 24 hours."
 
-                - name: systemd
-                  interval: 1m
-                  rules:
-                    - alert: SystemdServiceFailed
-                      expr: node_systemd_unit_state{job="integrations/unix",state="failed",type="service"} == 1
-                      for: 2m
-                      labels:
-                        severity: critical
-                      annotations:
-                        summary: "Service {{ $labels.name }} failed on {{ $labels.instance }}"
-                        description: "systemd unit {{ $labels.name }} is in failed state on {{ $labels.instance }}."
-            '';
-          in
-          ''
-            mkdir -p /var/lib/mimir/ruler/anonymous
-            install -m 0644 ${rulesFile} /var/lib/mimir/ruler/anonymous/homelab.yaml
+              - name: systemd
+                interval: 1m
+                rules:
+                  - alert: SystemdServiceFailed
+                    expr: node_systemd_unit_state{job="integrations/unix",state="failed",type="service"} == 1
+                    for: 2m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "Service {{ $labels.name }} failed on {{ $labels.instance }}"
+                      description: "systemd unit {{ $labels.name }} is in failed state on {{ $labels.instance }}."
+        '';
+        in
+        {
+          description = "Push homelab alert rules into Mimir's ruler via the API";
+          after = [ "mimir.service" ];
+          wants = [ "mimir.service" ];
+          wantedBy = [ "multi-user.target" ];
+          serviceConfig = {
+            Type = "oneshot";
+            RemainAfterExit = true;
+          };
+          # Mimir takes a few seconds to become ready after (re)starting, so
+          # retry rather than racing it once and failing the unit.
+          script = ''
+            for i in $(seq 1 30); do
+              if ${config.services.mimir.package}/bin/mimirtool rules sync ${rulesFile} \
+                --address=http://127.0.0.1:${toString mimirHttpPort} --id=anonymous; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "mimir-rules-sync: gave up after 30 attempts" >&2
+            exit 1
           '';
-        deps = [ ];
-      };
+        };
     };
 
   # ───────────────────────────────────────────────────────────────────────────
