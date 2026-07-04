@@ -86,6 +86,163 @@
         ];
       };
 
+      # Custom Hermes skill: teaches it to create/list/delete Mimir alert
+      # rules via the ruler HTTP API (see modules/observability.nix for the
+      # Mimir side — no auth, filesystem ruler_storage backend, "homelab"
+      # namespace managed declaratively by mimir-rules-sync). Dropped straight
+      # into $HERMES_HOME/skills/, the same directory bundled skills like
+      # "watchers" install themselves into — no code changes to hermes-agent
+      # itself, just a SKILL.md, per Hermes' own skill-authoring convention.
+      system.activationScripts.hermesMimirAlertingSkill =
+        let
+          skillFile = pkgs.writeText "SKILL.md" ''
+            ---
+            name: mimir-alerting
+            description: "Create, list, and delete Grafana Mimir alert rules via its ruler HTTP API."
+            version: 1.0.0
+            author: phonkd homelab
+            license: Unlicense
+            platforms: [linux, macos]
+            metadata:
+              hermes:
+                tags: [monitoring, alerting, mimir, prometheus, homelab]
+                category: devops
+                requires_toolsets: [terminal]
+                related_skills: []
+            ---
+
+            # Mimir Alerting
+
+            Create and manage Prometheus-style alert rules in the homelab's Grafana
+            Mimir instance via its ruler HTTP API. No authentication, no CLI
+            dependency — plain `curl`.
+
+            ## When to Use
+
+            - User asks to "alert me when X" / "watch X and notify me" for something
+              already exposed as a metric in Mimir (node_exporter host metrics, or
+              anything else scraped into Mimir).
+            - User wants to see, change, or remove an alert rule created this way.
+
+            ## Before you start
+
+            - Address: `http://10.9.0.1:9009` — only reachable over the home
+              site-to-site VPN; this host already has that route (it ships metrics
+              there via Alloy).
+            - Tenant: single-tenant homelab (`multitenancy_enabled: false`), so no
+              `X-Scope-OrgID` header is needed — every request is implicitly tenant
+              `anonymous` regardless of what (if anything) you send.
+            - **Always use the `hermes` namespace for anything you create.** The
+              `homelab` namespace is managed declaratively by nix
+              (`modules/observability.nix`, the `mimir-rules-sync` service) and gets
+              reset from a fixed rule set on every rebuild of the observability
+              server — never write to it, and never run a "sync"-style bulk
+              operation across all namespaces (see Pitfalls).
+
+            ## Quick Reference
+
+            | Operation | Method + Path |
+            |---|---|
+            | List every namespace/group | `GET /prometheus/config/v1/rules` |
+            | Get one namespace (all its groups) | `GET /prometheus/config/v1/rules/hermes` |
+            | Get one group | `GET /prometheus/config/v1/rules/hermes/<group>` |
+            | Create/replace one group | `POST /prometheus/config/v1/rules/hermes` (body = single group, not wrapped in `groups:`) |
+            | Delete one group | `DELETE /prometheus/config/v1/rules/hermes/<group>` |
+            | Delete the whole namespace | `DELETE /prometheus/config/v1/rules/hermes` |
+            | Check if a rule is actually evaluating/firing | `GET /prometheus/api/v1/rules` |
+            | Check Alertmanager received it | `GET /alertmanager/api/v2/alerts` |
+
+            ## Procedure
+
+            1. **Write the rule group as YAML.** The POST body is a *single group
+               object* — `name`, optional `interval`, and `rules` — not the
+               `groups: [...]` wrapper a mimirtool rule file would use:
+
+               ```yaml
+               name: disk-alerts
+               rules:
+                 - alert: SomeDiskFull
+                   expr: node_filesystem_avail_bytes{...} < 1e9
+                   for: 5m
+                   labels:
+                     severity: warning
+                   annotations:
+                     summary: "..."
+                     description: "..."
+               ```
+
+            2. **POST it to the `hermes` namespace:**
+
+               ```bash
+               curl -sS -X POST http://10.9.0.1:9009/prometheus/config/v1/rules/hermes \
+                 -H "Content-Type: application/yaml" \
+                 --data-binary @rule-group.yaml
+               ```
+
+               `{"status":"success",...}` means it's live — Mimir's ruler picks it
+               up within its evaluation interval (default 1m unless you set
+               `interval:`), no restart needed.
+
+            3. **Verify it's actually evaluating** (don't just trust the 200):
+
+               ```bash
+               curl -sS http://10.9.0.1:9009/prometheus/api/v1/rules | grep -A5 <alert-name>
+               ```
+
+               Look for `"health": "ok"` and, once the condition is true,
+               `"state": "firing"`.
+
+            4. **Confirm delivery** if you need to be sure a firing alert actually
+               reached Alertmanager (and from there, Discord):
+
+               ```bash
+               curl -sS http://10.9.0.1:9009/alertmanager/api/v2/alerts
+               ```
+
+            ## Pitfalls
+
+            - **Never run a "sync"-style bulk operation across the whole tenant**
+              (this mainly applies if you ever reach for `mimirtool rules sync`
+              instead of plain curl — there's no such bulk endpoint to hit by
+              accident via curl). It's a mirror operation: it deletes every
+              namespace not present in what you give it, tenant-wide, not just
+              missing groups within one namespace. Verified live once: an unscoped
+              sync wiped an unrelated namespace *and* the real declarative
+              `homelab` rules in one shot. Stick to POST/DELETE on your own
+              `hermes` namespace only.
+            - **Don't touch the `homelab` namespace.** It's reset from nix on every
+              rebuild — anything you put there is temporary at best, and editing it
+              risks fighting the declarative sync.
+            - **A POST replaces the entire group.** If a group already has 3 rules
+              and you POST a version with 1, the other 2 are gone. `GET` the
+              current group first if you're adding to it rather than replacing it.
+            - Check `GET /prometheus/config/v1/rules/homelab` for the house style
+              (thresholds, `for:` durations, `severity: warning` vs `critical`)
+              before adding a new rule, so alerts feel consistent with the existing
+              ones.
+
+            ## Verification
+
+            After creating or changing a rule, always:
+
+            1. `GET /prometheus/api/v1/rules` and confirm the group/rule appears
+               with `"health": "ok"`.
+            2. If it's supposed to be firing right now, confirm `"state": "firing"`
+               and that it shows up in `GET /alertmanager/api/v2/alerts`.
+            3. Tell the user which namespace/group was created, and confirm it's
+               `hermes`, not `homelab`.
+          '';
+        in
+        {
+          text = ''
+            install -D -m 0644 \
+              -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+              ${skillFile} \
+              ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/mimir-alerting/SKILL.md
+          '';
+          deps = [ ];
+        };
+
       # Personal-data embedding + semantic search (the "thing"); Hermes queries
       # it via the MCP entry above. Postgres + pgvector are created locally.
       services.slop-trove = {
