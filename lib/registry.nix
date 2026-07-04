@@ -147,6 +147,25 @@
       ];
   };
 
+  "207-iot" = {
+    kind = "server";
+    platform = "x86_64-linux";
+    formFactor = null;
+    desktop = null;
+    tags = [
+      "vm"
+      "observability-sender"
+    ];
+    username = "phonkd";
+
+    extraModules =
+      { self, inputs }:
+      [
+        self.nixosModules.oldblac-vm
+        self.nixosModules."207-iot"
+      ];
+  };
+
   "Eliss-MacBook-Pro" = {
     kind = "computer";
     platform = "aarch64-darwin";
