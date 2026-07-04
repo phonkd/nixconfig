@@ -196,7 +196,15 @@
               name = "Mimir Alertmanager";
               type = "alertmanager";
               access = "proxy";
-              url = "http://127.0.0.1:${toString mimirHttpPort}/alertmanager";
+              # No "/alertmanager" suffix: Grafana's "mimir" implementation
+              # adds the right prefix itself per-operation — the root address
+              # for tenant config CRUD (GET/POST /api/v1/alerts, Mimir's
+              # Cortex-style config API), vs. "/alertmanager/api/v2/..." for
+              # browsing alerts/silences. Pointing this at .../alertmanager
+              # directly instead routes config requests into the embedded
+              # Alertmanager engine's own (deprecated, v1-removed) API and
+              # breaks the config editor — verified live against the server.
+              url = "http://127.0.0.1:${toString mimirHttpPort}";
               jsonData.implementation = "mimir";
             }
             {
