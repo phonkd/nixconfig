@@ -350,13 +350,28 @@
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
+            RuntimeDirectory = "mimir-rules-sync";
           };
           # Mimir takes a few seconds to become ready after (re)starting, so
           # retry rather than racing it once and failing the unit.
+          #
+          # `rules sync` is a mirror operation: it deletes any namespace not
+          # present in the given files, tenant-wide. rulesFile lives at a
+          # hashed nix store path, so passing it directly would make the
+          # namespace name (mimirtool derives it from the filename) churn
+          # every time the rule content changes, and — worse — a bare `sync`
+          # would wipe out any other namespace in this tenant, including ones
+          # a tool like Hermes creates dynamically via the same API. Copying
+          # to a fixed filename fixes the namespace as "homelab", and
+          # --namespaces=homelab scopes the sync to only that namespace so
+          # everything else is left alone. Verified live against the
+          # observability server: an unscoped sync deleted an unrelated
+          # namespace it had no business touching.
           script = ''
+            install -m 0644 ${rulesFile} /run/mimir-rules-sync/homelab.yaml
             for i in $(seq 1 30); do
-              if ${config.services.mimir.package}/bin/mimirtool rules sync ${rulesFile} \
-                --address=http://127.0.0.1:${toString mimirHttpPort} --id=anonymous; then
+              if ${config.services.mimir.package}/bin/mimirtool rules sync /run/mimir-rules-sync/homelab.yaml \
+                --address=http://127.0.0.1:${toString mimirHttpPort} --id=anonymous --namespaces=homelab; then
                 exit 0
               fi
               sleep 2
