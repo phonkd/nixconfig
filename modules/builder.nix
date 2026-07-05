@@ -65,6 +65,7 @@ let
     homelab-vaultwarden
     homelab-paperless
     homelab-arr-slime
+    homelab-ocis
     homelab-aislop
     homelab-garage
     homelab-notes
