@@ -48,7 +48,7 @@
 
         sops.templates."ocis.env" = {
           content = ''
-            ADMIN_PASSWORD=${config.sops.placeholder."ocis-admin-password"}
+            OCIS_ADMIN_PASSWORD=${config.sops.placeholder."ocis-admin-password"}
           '';
           owner = "ocis";
         };
