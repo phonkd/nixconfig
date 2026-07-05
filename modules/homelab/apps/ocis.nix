@@ -55,10 +55,13 @@
 
         services.ocis = {
           enable = true;
-          address = "0.0.0.0";
-          url = "https://ocis.w.phonkd.net";
+          port = 9200;
           stateDir = "/mnt/solo-sata/ocis";
           environmentFile = config.sops.templates."ocis.env".path;
+          settings = {
+            OCIS_HTTP_ADDR = "0.0.0.0:9200";
+            OCIS_URL = "https://ocis.w.phonkd.net";
+          };
         };
       })
     ];
