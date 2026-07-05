@@ -62,6 +62,11 @@
             # skip cert verification between oCIS's internal services.
             PROXY_TLS = "false";
             OCIS_INSECURE = "true";
+            # oCIS's internal "web" service defaults to 9100, which
+            # node_exporter (observability-sender) already holds on this
+            # host — the only overlap between oCIS's fullstack ports and
+            # what 203 runs. Purely internal, only the proxy talks to it.
+            WEB_HTTP_ADDR = "127.0.0.1:9101";
           };
         };
 
