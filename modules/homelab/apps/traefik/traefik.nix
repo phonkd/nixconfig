@@ -120,7 +120,8 @@
           entryPoints = {
             # Prometheus metrics, localhost-only — scraped by the local
             # Alloy (see alloy/traefik.alloy below), never exposed.
-            metrics.address = "127.0.0.1:8082";
+            # NOT 8082: homepage-dashboard sits there (its nixpkgs default).
+            metrics.address = "127.0.0.1:8083";
             websecure = {
               address = ":443";
               # We keep TLS generic here; router will say which certResolver to use
@@ -200,7 +201,7 @@
       environment.etc."alloy/traefik.alloy" = lib.mkIf (noughtyLib.hostHasTag "observability-sender") {
         text = ''
           prometheus.scrape "traefik" {
-            targets    = [{"__address__" = "127.0.0.1:8082"}]
+            targets    = [{"__address__" = "127.0.0.1:8083"}]
             job_name   = "integrations/traefik"
             forward_to = [prometheus.remote_write.nixvms.receiver]
           }
