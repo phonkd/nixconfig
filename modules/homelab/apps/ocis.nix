@@ -27,12 +27,6 @@
             domain = "ocis.w.phonkd.net";
             auth = false;
             ipfilter = false;
-            # oCIS terminates TLS itself with a self-signed cert on its
-            # main port even with OCIS_INSECURE set (same situation as
-            # oldblac's Proxmox UI in orphans.nix) -- skip verification
-            # rather than fight it.
-            scheme = "https";
-            transport = "insecureTransport";
           };
         };
       })
@@ -46,23 +40,43 @@
 
         sops.secrets."ocis-admin-password" = { };
 
+        # ADMIN_PASSWORD seeds `ocis init` on first boot; IDM_ADMIN_PASSWORD
+        # keeps the runtime idm service in agreement afterwards.
         sops.templates."ocis.env" = {
           content = ''
-            OCIS_ADMIN_PASSWORD=${config.sops.placeholder."ocis-admin-password"}
+            ADMIN_PASSWORD=${config.sops.placeholder."ocis-admin-password"}
+            IDM_ADMIN_PASSWORD=${config.sops.placeholder."ocis-admin-password"}
           '';
           owner = "ocis";
         };
 
         services.ocis = {
           enable = true;
+          address = "0.0.0.0";
           port = 9200;
+          url = "https://ocis.w.phonkd.net";
           stateDir = "/mnt/solo-sata/ocis";
           environmentFile = config.sops.templates."ocis.env".path;
-          settings = {
-            OCIS_HTTP_ADDR = "0.0.0.0:9200";
-            OCIS_URL = "https://ocis.w.phonkd.net";
+          environment = {
+            # TLS terminates at traefik on 201; serve plain HTTP here and
+            # skip cert verification between oCIS's internal services.
+            PROXY_TLS = "false";
+            OCIS_INSECURE = "true";
           };
         };
+
+        # The nixpkgs module doesn't bootstrap oCIS's config (jwt secrets,
+        # service accounts, ...) and `ocis server` refuses to start without
+        # one -- generate it on first boot. EnvironmentFile above is
+        # unit-level, so $ADMIN_PASSWORD is available here too.
+        systemd.services.ocis.preStart = ''
+          if [ ! -f "${config.services.ocis.stateDir}/config/ocis.yaml" ]; then
+            ${lib.getExe config.services.ocis.package} init \
+              --config-path "${config.services.ocis.stateDir}/config" \
+              --admin-password "$ADMIN_PASSWORD" \
+              --insecure true
+          fi
+        '';
       })
     ];
 }

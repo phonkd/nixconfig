@@ -113,7 +113,14 @@
         enable = true;
         environmentFiles = [ "${config.sops.secrets.CF_DNS_API_TOKEN.path}" ];
         staticConfigOptions = {
+          # OTLP log export is still experimental in traefik 3.7 and must be
+          # switched on here before log.otlp / accessLog.otlp are accepted.
+          experimental.otlpLogs = true;
+
           entryPoints = {
+            # Prometheus metrics, localhost-only — scraped by the local
+            # Alloy (see alloy/traefik.alloy below), never exposed.
+            metrics.address = "127.0.0.1:8082";
             websecure = {
               address = ":443";
               # We keep TLS generic here; router will say which certResolver to use
@@ -130,10 +137,29 @@
             };
           };
 
+          metrics.prometheus = {
+            entryPoint = "metrics";
+            addEntryPointsLabels = true;
+            addRoutersLabels = true;
+            addServicesLabels = true;
+          };
+
+          # Application + access logs also go to Loki on the observability
+          # server, straight over OTLP/HTTP (Loki ingests OTLP natively on
+          # /otlp/v1/logs, no collector needed). host.name ends up as
+          # structured metadata; the Loki label is service_name="traefik".
           log = {
             level = "INFO";
             filePath = "${config.services.traefik.dataDir}/traefik.log";
             format = "json";
+            otlp = {
+              resourceAttributes."host.name" = config.networking.hostName;
+              http.endpoint = "http://10.9.0.1:3100/otlp/v1/logs";
+            };
+          };
+          accessLog.otlp = {
+            resourceAttributes."host.name" = config.networking.hostName;
+            http.endpoint = "http://10.9.0.1:3100/otlp/v1/logs";
           };
 
           certificatesResolvers = {
@@ -164,6 +190,21 @@
         # the secret file itself must contain lines like:
         # CF_DNS_API_TOKEN=supersecrettoken
         EnvironmentFile = [ config.sops.secrets.CF_DNS_API_TOKEN.path ];
+      };
+
+      # Ship traefik's Prometheus metrics through the local Alloy into Mimir.
+      # Alloy loads every *.alloy file in /etc/alloy into one shared
+      # namespace, so this forwards straight into the remote_write pipeline
+      # that config.alloy (observability-sender module) defines. Gated on
+      # that tag so the reference can't dangle if the tags ever diverge.
+      environment.etc."alloy/traefik.alloy" = lib.mkIf (noughtyLib.hostHasTag "observability-sender") {
+        text = ''
+          prometheus.scrape "traefik" {
+            targets    = [{"__address__" = "127.0.0.1:8082"}]
+            job_name   = "integrations/traefik"
+            forward_to = [prometheus.remote_write.nixvms.receiver]
+          }
+        '';
       };
     };
 }
