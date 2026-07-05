@@ -58,6 +58,12 @@
         22
         8123 # Home Assistant web UI
       ];
+      # mDNS/Bonjour: apple_tv (pyatv) and yamaha_musiccast discovery -- both
+      # autodiscovery and a manual-IP add go through zeroconf, which needs to
+      # send/receive multicast on 5353. Without this, HA's firewall silently
+      # drops the Apple TV's mDNS announcements and every scan comes back
+      # empty, even when targeting its IP directly.
+      networking.firewall.allowedUDPPorts = [ 5353 ];
 
       services.home-assistant = {
         enable = true;
