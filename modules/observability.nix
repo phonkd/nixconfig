@@ -341,7 +341,7 @@
                 interval: 1m
                 rules:
                   - alert: SystemdServiceFailed
-                    expr: node_systemd_unit_state{job="integrations/unix",state="failed",type="service"} == 1
+                    expr: node_systemd_unit_state{job="integrations/unix",state="failed"} == 1
                     for: 2m
                     labels:
                       severity: critical
