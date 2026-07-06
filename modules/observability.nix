@@ -245,14 +245,25 @@
               - name: instance
                 interval: 1m
                 rules:
+                  # A dead host never produces up == 0: each host scrapes
+                  # itself via Alloy and remote_writes the result, so when the
+                  # host dies the series just stops existing (verified during
+                  # the 2026-07-06 Proxmox outage — all five VMs vanished
+                  # without a single 0 sample). The second clause catches
+                  # that: series had samples within 24h but has none now.
+                  # After 24h of continuous downtime the alert self-resolves
+                  # as the series ages out of the lookback window.
                   - alert: InstanceDown
-                    expr: up{job="integrations/unix"} == 0
+                    expr: >
+                      up{job="integrations/unix"} == 0
+                      or
+                      (max_over_time(up{job="integrations/unix"}[24h]) unless up{job="integrations/unix"})
                     for: 5m
                     labels:
                       severity: critical
                     annotations:
                       summary: "{{ $labels.instance }} is unreachable"
-                      description: "{{ $labels.instance }} has not been scraped for 5 minutes."
+                      description: "{{ $labels.instance }} has stopped reporting metrics (host down, or its exporter/remote_write pipeline is broken)."
 
               - name: cpu
                 interval: 1m
