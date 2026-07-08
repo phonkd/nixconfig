@@ -47,12 +47,23 @@
       # github.com/login/device/code with that client_id, approve, poll
       # login/oauth/access_token, then update this secret.
       sops.secrets."hermes-copilot" = { owner = "hermes"; };
+      # CLAUDE_CODE_OAUTH_TOKEN for the delegated Claude Code CLI (the bundled
+      # autonomous-ai-agents/claude-code skill shells out to `claude`). Uses the
+      # Claude Pro/Max subscription — generate once with `claude setup-token`
+      # on a logged-in machine, no per-token API billing. REQUIRED before deploy:
+      # sops-nix fails activation if this key is missing from secret.yaml.
+      sops.secrets."hermes-claude" = { owner = "hermes"; };
 
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
-        extraPackages = [ pkgs.gh ];
+        # gh: GitHub toolset. claude-code + tmux + jq: the bundled
+        # autonomous-ai-agents/claude-code skill delegates to the `claude` CLI
+        # (print mode + interactive PTY via tmux; jq parses its stream-json).
+        # The skill auto-seeds into ~/.hermes/skills on startup; terminal +
+        # skills toolsets are already in the hermes-discord preset.
+        extraPackages = [ pkgs.gh pkgs.claude-code pkgs.tmux pkgs.jq ];
         # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
@@ -83,6 +94,7 @@
           config.sops.secrets."hermes-discord".path
           config.sops.secrets."hermes-github".path
           config.sops.secrets."hermes-copilot".path
+          config.sops.secrets."hermes-claude".path
         ];
       };
 
