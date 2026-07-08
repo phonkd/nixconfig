@@ -419,12 +419,58 @@
 
           # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires
           # on seerr-radarr.service even when radarr is disabled, blocking
-          # the oneshot from running. Force-drop the bad ref.
+          # the oneshot from running. Force-drop the bad ref, plus add
+          # restart behaviour so transient API failures retry.
           systemd.services.seerr-sonarr = {
-            after = lib.mkForce [ "sonarr-config.service" ];
-            requires = lib.mkForce [ "sonarr-config.service" ];
+            after = lib.mkForce [ "sonarr-config.service" "seerr.service" ];
+            requires = lib.mkForce [ "sonarr-config.service" "seerr.service" ];
+            serviceConfig = {
+              Restart = lib.mkOverride 90 "on-failure";
+              RestartSec = lib.mkOverride 90 "10s";
+            };
           };
 
+          # Nixflix sets Restart=on-failure but doesn't set RestartSec or
+          # StartLimitBurst, so rapid restarts hit the systemd default rate
+          # limit (5 failures / 10s) and the unit is permanently stopped.
+          # Set sane restart throttling for all *arr services + seerr.
+          systemd.services = {
+            sonarr = {
+              serviceConfig = {
+                RestartSec = lib.mkOverride 90 "10s";
+                StartLimitIntervalSec = lib.mkOverride 90 "30s";
+                StartLimitBurst = lib.mkOverride 90 10;
+              };
+            };
+            radarr = {
+              serviceConfig = {
+                RestartSec = lib.mkOverride 90 "10s";
+                StartLimitIntervalSec = lib.mkOverride 90 "30s";
+                StartLimitBurst = lib.mkOverride 90 10;
+              };
+            };
+            lidarr = {
+              serviceConfig = {
+                RestartSec = lib.mkOverride 90 "10s";
+                StartLimitIntervalSec = lib.mkOverride 90 "30s";
+                StartLimitBurst = lib.mkOverride 90 10;
+              };
+            };
+            prowlarr = {
+              serviceConfig = {
+                RestartSec = lib.mkOverride 90 "10s";
+                StartLimitIntervalSec = lib.mkOverride 90 "30s";
+                StartLimitBurst = lib.mkOverride 90 10;
+              };
+            };
+            seerr = {
+              serviceConfig = {
+                RestartSec = lib.mkOverride 90 "10s";
+                StartLimitIntervalSec = lib.mkOverride 90 "30s";
+                StartLimitBurst = lib.mkOverride 90 10;
+              };
+            };
+          };
 
           # NVIDIA RTX 3060 Ti (Ampere, GA104) passed through to the VM ->
           # Jellyfin NVENC/NVDEC. Was Intel iGPU (i915 + VAAPI/iHD) before.
