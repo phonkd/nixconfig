@@ -37,6 +37,15 @@
           }
         ];
       };
+      programs.jujutsu = {
+        enable = true;
+        settings = {
+          user = {
+            email = "phonkd@phonkd.net";
+            name = "Phonkd";
+          };
+        };
+      };
       programs.fastfetch.enable = true;
       programs.ssh = {
         enable = true;
