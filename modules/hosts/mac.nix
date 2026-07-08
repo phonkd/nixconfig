@@ -41,6 +41,16 @@
             "192.168.3.205/32"
             "10.9.0.0/24"
           ];
+          # Finder SMB can't use a SOCKS proxy, so give it a local port
+          # that sing-box forwards to 203's samba over wg:
+          #   Finder > Cmd+K > smb://127.0.0.1:8445
+          proxy.tcpForwards = [
+            {
+              listenPort = 8445;
+              address = "192.168.3.203";
+              port = 445;
+            }
+          ];
         }
       ];
 
