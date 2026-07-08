@@ -75,6 +75,12 @@
             enable = true;
             icon = "home-assistant";
           };
+          traefik = {
+            enable = true;
+            domain = "home.phonkd.net";
+            auth = false;
+            ipfilter = true;
+          };
         };
         grafana = {
           ip = "10.9.0.1";
