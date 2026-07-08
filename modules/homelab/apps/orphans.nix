@@ -67,6 +67,15 @@
             icon = "router";
           };
         };
+        home-assistant = {
+          ip = "192.168.1.115";
+          port = 8123;
+          path = "/home/overview";
+          dashboard = {
+            enable = true;
+            icon = "home-assistant";
+          };
+        };
         grafana = {
           ip = "10.9.0.1";
           port = 3000;
