@@ -124,6 +124,11 @@
             metrics.address = "127.0.0.1:8083";
             websecure = {
               address = ":443";
+              # traefik v3 defaults readTimeout to 60s, which kills any
+              # request body still streaming after a minute — i.e. large
+              # oCIS tus upload chunks. ownCloud's own traefik example
+              # uses 12h for upload workloads.
+              transport.respondingTimeouts.readTimeout = "12h";
               # We keep TLS generic here; router will say which certResolver to use
               http = {
                 tls = { };
