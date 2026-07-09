@@ -124,6 +124,8 @@
         enable = true;
         enableZshIntegration = true;
         enableFishIntegration = false;
+        # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell is unused
+        enableNushellIntegration = false;
       };
       programs.btop = {
         enable = true;

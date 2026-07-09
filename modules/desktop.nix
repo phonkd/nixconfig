@@ -17,7 +17,6 @@
           withVencord = true; # can do this here too
         })
         scrcpy
-        (yt-dlp.override { javascriptSupport = false; })
         nvtopPackages.full
         cool-retro-term
         yubikey-manager
@@ -40,6 +39,7 @@
       home.packages = with pkgs; [
         dracula-theme
         librewolf
+        yt-dlp
         #claude-code
       ];
       qt = {
