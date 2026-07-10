@@ -41,6 +41,18 @@
           kgi = ''
             kubectl get ingress "$@" -o custom-columns="NAME:.metadata.name,HOST:.spec.rules[*].host,PATH:.spec.rules[*].http.paths[*].path,BACKEND:.spec.rules[*].http.paths[*].backend.service.name"
           '';
+          jj = ''
+            if git rev-parse --is-inside-work-tree &>/dev/null; then
+              local email name
+              email=$(git config user.email 2>/dev/null)
+              name=$(git config user.name 2>/dev/null)
+              if [[ -n "$email" && -n "$name" ]]; then
+                command jj --config "user.email=\"$email\"" --config "user.name=\"$name\"" "$@"
+                return
+              fi
+            fi
+            command jj "$@"
+          '';
         };
         enableCompletion = true;
         completionInit = ''
