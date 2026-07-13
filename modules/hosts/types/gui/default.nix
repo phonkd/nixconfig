@@ -66,5 +66,25 @@
       home-manager.users.${config.noughty.user.name}.imports = [
         self.homeModules.gui
       ];
+    homebrew.casks = [
+      "zen"
+      "firefox"
+      "spotify"
+      "claude-code"
+      "zed"
+      "utm"
+      "eqmac"
+      "microsoft-teams"
+      "royal-tsx"
+      "displaylink"
+      "music-decoy"
+      "discord"
+      "grandperspective"
+      "clipbook"
+      "betterdisplay"
+      "shottr"
+    ];
+    homebrew.brews = ["yt-dlp"];
+
     };
 }

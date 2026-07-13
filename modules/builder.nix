@@ -64,6 +64,7 @@ let
     homelab-syncthing
     homelab-vaultwarden
     homelab-paperless
+    homelab-crowdsec
     homelab-arr-slime
     homelab-ocis
     homelab-immich

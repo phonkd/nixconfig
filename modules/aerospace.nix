@@ -68,7 +68,7 @@
             alt-space = "layout floating tiling";
             alt-tab = "workspace-back-and-forth";
             alt-shift-period = "mode service";
-            alt-b = ''exec-and-forget osascript -e "tell application \"System Events\" to key code 100"'';
+            alt-b = "exec-and-forget /usr/bin/open -a /Applications/Zen.app";
           };
           on-window-detected = [
             {

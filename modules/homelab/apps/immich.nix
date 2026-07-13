@@ -43,6 +43,9 @@
 
         services.immich = {
           enable = true;
+          # nixpkgs-26.05/unstable are both still on Immich 2.7.5; pull just
+          # this package from a newer pin to get 3.0.2.
+          package = inputs.nixpkgs-immich.legacyPackages.${pkgs.system}.immich;
           host = "0.0.0.0";
           mediaLocation = "/mnt/solo-sata/immich";
         };
