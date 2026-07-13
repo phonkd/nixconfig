@@ -66,6 +66,7 @@ let
     homelab-paperless
     homelab-arr-slime
     homelab-ocis
+    homelab-immich
     homelab-aislop
     homelab-garage
     homelab-notes
