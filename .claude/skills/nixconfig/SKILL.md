@@ -114,13 +114,13 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
 - Verify NixOS option names against the real module source, not from memory. Locate
   nixpkgs: `nix eval --raw .#nixosConfigurations."203-media".pkgs.path`, then read
   `<path>/nixos/modules/...`.
-- **Default to committing straight to `main`** and pushing — no feature branch, no
-  PR — since most changes here are small homelab tweaks and PR ceremony is pure
-  overhead for a single-user repo. Only branch + open a PR when the user says so, or
-  the change is large/risky enough that a review pass genuinely matters (e.g.
-  something that could break the reverse-proxy host or take down multiple hosts at
-  once). Don't `gh pr create` unprompted even then — the user opens/merges PRs
-  themselves.
+- **Default to committing straight to `main`, but don't push** — no feature branch,
+  no PR — since most changes here are small homelab tweaks and PR ceremony is pure
+  overhead for a single-user repo. Leave the push to the user; they push (and pull
+  on the target) themselves. Only branch + open a PR when the user says so, or the
+  change is large/risky enough that a review pass genuinely matters (e.g. something
+  that could break the reverse-proxy host or take down multiple hosts at once). Don't
+  `gh pr create` unprompted even then — the user opens/merges PRs themselves.
 - GitHub's "Potential fix for pull request finding" autofix commits have invented
   nonexistent options before (`services.ocis.settings`) — if a merged branch breaks,
   diff against your own last commit first.
