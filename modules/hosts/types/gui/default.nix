@@ -79,6 +79,9 @@
       "displaylink"
       "music-decoy"
       "discord"
+      "grandperspective"
+      "clipbook"
+      "betterdisplay"
     ];
     homebrew.brews = ["yt-dlp"];
 
