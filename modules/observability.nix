@@ -478,12 +478,14 @@
       services.alloy.enable = true;
       systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "systemd-journal" ];
       services.prometheus.exporters.node = {
-        # enabledCollectors = [
-        #   "node"
-        #   "postgres"
-        # ];
+        enabledCollectors = [
+          "node"
+          "postgres"
+          "smartctl"
+        ];
         enable = true;
       };
+      services.prometheus.exporters.smartctl.enable = true;
 
       # Process exporter for per-service CPU/memory metrics.
       # Runs as root so it can read /proc for all processes.
