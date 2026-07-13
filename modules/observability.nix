@@ -362,16 +362,24 @@
                     annotations:
                       summary: "ZFS pool {{ $labels.zpool }} is {{ $labels.state }} on {{ $labels.instance }}"
                       description: "Pool {{ $labels.zpool }} on {{ $labels.instance }} left the ONLINE state — check zpool status."
-                  # smartctl_device_smart_status: 1 = overall SMART self-check
-                  # passed, 0 = the drive itself says it is failing.
+                  # Two metric families for the same fact (overall SMART
+                  # health, 1 = passed): smartctl_device_smart_status from the
+                  # standalone exporter on the NixOS VMs, and
+                  # smartmon_device_smart_healthy from the smartmon textfile
+                  # collector on the PVE host (Debian has no smartctl exporter
+                  # package). Label for the drive differs too — device vs disk —
+                  # so the annotations render both; exactly one is non-empty.
                   - alert: SmartUnhealthy
-                    expr: smartctl_device_smart_status{job="integrations/smartctl"} == 0
+                    expr: >
+                      smartctl_device_smart_status == 0
+                      or
+                      smartmon_device_smart_healthy == 0
                     for: 15m
                     labels:
                       severity: critical
                     annotations:
-                      summary: "SMART failure on {{ $labels.device }} ({{ $labels.instance }})"
-                      description: "Drive {{ $labels.device }} on {{ $labels.instance }} reports failed SMART overall health."
+                      summary: "SMART failure on {{ $labels.device }}{{ $labels.disk }} ({{ $labels.instance }})"
+                      description: "Drive {{ $labels.device }}{{ $labels.disk }} on {{ $labels.instance }} reports failed SMART overall health."
 
               - name: systemd
                 interval: 1m
@@ -598,8 +606,12 @@
           '';
       };
 
-      # Scrape the exporters on the Proxmox host (oldblac, not nix-managed —
-      # node_exporter and smartctl_exporter are installed there via apt).
+      # Scrape node_exporter on the Proxmox host (oldblac, not nix-managed).
+      # Debian doesn't package the standalone smartctl exporter, so SMART
+      # comes through node_exporter's textfile collector instead:
+      #   apt install prometheus-node-exporter prometheus-node-exporter-collectors smartmontools
+      # (the collectors package runs smartctl on a systemd timer and emits
+      # smartmon_* metrics on :9100 — no separate exporter or port needed).
       # Gated to 201-mono ONLY: every VM carries observability-sender, and
       # scraping the same target from all of them would ship duplicate series.
       # instance/hostname are pinned in the target so the series are labelled
@@ -617,16 +629,6 @@
               "hostname"    = "oldblac",
             }]
             job_name   = "integrations/unix"
-            forward_to = [prometheus.remote_write.nixvms.receiver]
-          }
-
-          prometheus.scrape "pve_smartctl" {
-            targets = [{
-              "__address__" = "192.168.3.47:9633",
-              "instance"    = "oldblac",
-              "hostname"    = "oldblac",
-            }]
-            job_name   = "integrations/smartctl"
             forward_to = [prometheus.remote_write.nixvms.receiver]
           }
         '';
