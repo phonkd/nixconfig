@@ -68,7 +68,7 @@
             alt-space = "layout floating tiling";
             alt-tab = "workspace-back-and-forth";
             alt-shift-period = "mode service";
-            alt-b = "exec-and-forget open -a Zen";
+            alt-b = "exec-and-forget /usr/bin/open -a /Applications/Zen.app";
           };
           on-window-detected = [
             {
