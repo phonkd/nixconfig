@@ -348,6 +348,31 @@
                       summary: "{{ $labels.mountpoint }} on {{ $labels.instance }} will fill in 24h"
                       description: "Based on last 6h growth, {{ $labels.mountpoint }} will run out within 24 hours."
 
+              - name: storage-health
+                interval: 1m
+                rules:
+                  # node_zfs_zpool_state is one-hot: one series per pool per
+                  # possible state (online/degraded/faulted/...), value 1 for
+                  # the current state. Alert whenever any non-online state is 1.
+                  - alert: ZpoolNotHealthy
+                    expr: node_zfs_zpool_state{job="integrations/unix",state!="online"} == 1
+                    for: 5m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "ZFS pool {{ $labels.zpool }} is {{ $labels.state }} on {{ $labels.instance }}"
+                      description: "Pool {{ $labels.zpool }} on {{ $labels.instance }} left the ONLINE state — check zpool status."
+                  # smartctl_device_smart_status: 1 = overall SMART self-check
+                  # passed, 0 = the drive itself says it is failing.
+                  - alert: SmartUnhealthy
+                    expr: smartctl_device_smart_status{job="integrations/smartctl"} == 0
+                    for: 15m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "SMART failure on {{ $labels.device }} ({{ $labels.instance }})"
+                      description: "Drive {{ $labels.device }} on {{ $labels.instance }} reports failed SMART overall health."
+
               - name: systemd
                 interval: 1m
                 rules:
@@ -571,6 +596,40 @@
               }
             }
           '';
+      };
+
+      # Scrape the exporters on the Proxmox host (oldblac, not nix-managed —
+      # node_exporter and smartctl_exporter are installed there via apt).
+      # Gated to 201-mono ONLY: every VM carries observability-sender, and
+      # scraping the same target from all of them would ship duplicate series.
+      # instance/hostname are pinned in the target so the series are labelled
+      # as oldblac's — remote_write external_labels only fill in labels that
+      # aren't already set, so 201's own labels won't overwrite these.
+      environment.etc."alloy/pve.alloy" = lib.mkIf (config.noughty.host.name == "201-mono") {
+        text = ''
+          // job "integrations/unix" on purpose: oldblac joins the existing
+          // CPU/memory/disk/InstanceDown alert coverage. NB: up==0 will fire
+          // InstanceDown until node_exporter is actually installed on PVE.
+          prometheus.scrape "pve_node" {
+            targets = [{
+              "__address__" = "192.168.3.47:9100",
+              "instance"    = "oldblac",
+              "hostname"    = "oldblac",
+            }]
+            job_name   = "integrations/unix"
+            forward_to = [prometheus.remote_write.nixvms.receiver]
+          }
+
+          prometheus.scrape "pve_smartctl" {
+            targets = [{
+              "__address__" = "192.168.3.47:9633",
+              "instance"    = "oldblac",
+              "hostname"    = "oldblac",
+            }]
+            job_name   = "integrations/smartctl"
+            forward_to = [prometheus.remote_write.nixvms.receiver]
+          }
+        '';
       };
     };
 }
