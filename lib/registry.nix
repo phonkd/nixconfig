@@ -187,6 +187,10 @@
       "vm"
       "hetzner-vm"
       "observability-server"
+      # Monitor the monitoring host itself: the sender module's push
+      # endpoints (10.9.0.1) are this host's own wg-obs address, so the
+      # traffic just loops back locally.
+      "observability-sender"
     ];
     username = "phonkd";
 
