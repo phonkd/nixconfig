@@ -477,14 +477,13 @@
 
       services.alloy.enable = true;
       systemd.services.alloy.serviceConfig.SupplementaryGroups = [ "systemd-journal" ];
-      services.prometheus.exporters.node = {
-        enabledCollectors = [
-          "node"
-          "postgres"
-          "smartctl"
-        ];
-        enable = true;
-      };
+      services.prometheus.exporters.node.enable = true;
+
+      # SMART disk metrics. smartctl is its own exporter (:9633), NOT a
+      # node_exporter collector — passing it via enabledCollectors makes
+      # node_exporter fail on an unknown --collector.smartctl flag. It only
+      # yields data on hosts whose disks actually expose SMART; plain virtio
+      # disks in VMs don't, so expect empty results there.
       services.prometheus.exporters.smartctl.enable = true;
 
       # Process exporter for per-service CPU/memory metrics.
@@ -516,6 +515,15 @@
             // Configure a prometheus.scrape component to collect unix metrics.
             prometheus.scrape "gagu" {
               targets    = prometheus.exporter.unix.gagu.targets
+              forward_to = [prometheus.remote_write.nixvms.receiver]
+            }
+
+            // Scrape the standalone smartctl exporter (port 9633). Without a
+            // scrape job its metrics never reach Mimir — the exporter just
+            // sits there answering /metrics to nobody.
+            prometheus.scrape "smartctl" {
+              targets    = [{"__address__" = "127.0.0.1:9633"}]
+              job_name   = "integrations/smartctl"
               forward_to = [prometheus.remote_write.nixvms.receiver]
             }
 
