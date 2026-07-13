@@ -66,10 +66,9 @@
             alt-f = "fullscreen";
             alt-v = "exec-and-forget ${pkgs.kitty}/bin/kitty --directory /Users/phonkd";
             alt-space = "layout floating tiling";
-            cmd-space = "exec-and-forget open -a Zen";
             alt-tab = "workspace-back-and-forth";
             alt-shift-period = "mode service";
-            alt-b = ''exec-and-forget osascript -e "tell application \"System Events\" to key code 100"'';
+            alt-b = "exec-and-forget open -a Zen";
           };
           on-window-detected = [
             {
