@@ -52,6 +52,14 @@
           enable = true;
           listen_uri = "127.0.0.1:8081";
         };
+        # Runtime-generated credentials, written by the module's setup script
+        # into crowdsec's own state dir (not sops - they don't exist until
+        # first start). lapi: `cscli machine add --auto` for the local agent;
+        # eval FAILS with a null-coerce error if unset while api.server is
+        # enabled. capi: triggers `cscli capi register`, which signs 201 up
+        # for the community blocklists.
+        settings.lapi.credentialsFile = "/var/lib/crowdsec/state/lapi-credentials.yaml";
+        settings.capi.credentialsFile = "/var/lib/crowdsec/state/capi-credentials.yaml";
       };
 
       # Enforcement: drops LAPI-banned IPs in the INPUT chain, ahead of
