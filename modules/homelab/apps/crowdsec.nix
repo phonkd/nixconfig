@@ -33,11 +33,16 @@
             labels.type = "syslog";
           }
           {
-            source = "journalctl";
-            # Traefik's own app log goes to a file (see traefik.nix); only
-            # accessLog defaults to stdout, which is what lands in the
-            # journal and what the crowdsecurity/traefik collection parses.
-            journalctl_filter = [ "_SYSTEMD_UNIT=traefik.service" ];
+            # Traefik logs come from Loki rather than the local journal:
+            # traefik already ships app+access logs to Loki via OTLP (see
+            # traefik.nix), and 201 reaches Loki over wg-obs as an
+            # observability-sender. crowdsec tails the query below via
+            # Loki's websocket API. labels.type feeds the s00-raw
+            # non-syslog parser, which sets program="traefik" — the hub
+            # traefik parser's filter matches on that.
+            source = "loki";
+            url = "http://10.9.0.1:3100";
+            query = ''{service_name="traefik"}'';
             labels.type = "traefik";
           }
         ];
@@ -48,5 +53,12 @@
           listen_uri = "127.0.0.1:8081";
         };
       };
+
+      # Enforcement: drops LAPI-banned IPs in the INPUT chain, ahead of
+      # traefik. Everything else is derived by the nixpkgs module: api_url
+      # follows listen_uri above, registration happens automatically against
+      # the local crowdsec (cscli bouncers add), and mode resolves to
+      # "iptables" because 201 doesn't run nftables.
+      services.crowdsec-firewall-bouncer.enable = true;
     };
 }
