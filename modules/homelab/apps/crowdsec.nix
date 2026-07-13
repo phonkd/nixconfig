@@ -62,11 +62,38 @@
         settings.capi.credentialsFile = "/var/lib/crowdsec/state/capi-credentials.yaml";
       };
 
+      # cscli loads the whole config on EVERY invocation and hard-fails if
+      # the CAPI credentials file above doesn't exist yet - which deadlocks
+      # the setup script's own `machine add` step, since `capi register`
+      # (the thing that writes the file) only runs after it. Upstream debs
+      # ship this file empty for exactly this reason.
+      systemd.tmpfiles.settings."11-crowdsec-homelab" = {
+        "/var/lib/crowdsec/state/capi-credentials.yaml".f = {
+          user = config.services.crowdsec.user;
+          group = config.services.crowdsec.group;
+          mode = "0600";
+        };
+      };
+
       # Enforcement: drops LAPI-banned IPs in the INPUT chain, ahead of
-      # traefik. Everything else is derived by the nixpkgs module: api_url
-      # follows listen_uri above, registration happens automatically against
-      # the local crowdsec (cscli bouncers add), and mode resolves to
+      # traefik. api_url follows listen_uri above; mode resolves to
       # "iptables" because 201 doesn't run nftables.
-      services.crowdsec-firewall-bouncer.enable = true;
+      #
+      # registerBouncer is deliberately OFF, twice broken as of
+      # nixpkgs 26.05: its oneshot pairs DynamicUser with
+      # StateDirectory=crowdsec, which migrates /var/lib/crowdsec into
+      # root-only /var/lib/private and bricks the crowdsec service itself
+      # (mkdir EACCES on every restart); and its script calls raw cscli
+      # without -c, expecting an /etc/crowdsec/config.yaml this module
+      # never writes. Instead the API key lives in sops; register it once
+      # on the host after the first successful crowdsec start:
+      #   sudo cscli bouncers add firewall-bouncer \
+      #     --key "$(sudo cat /run/secrets/crowdsec-bouncer-api-key)"
+      sops.secrets."crowdsec-bouncer-api-key" = { };
+      services.crowdsec-firewall-bouncer = {
+        enable = true;
+        registerBouncer.enable = false;
+        secrets.apiKeyPath = config.sops.secrets."crowdsec-bouncer-api-key".path;
+      };
     };
 }
