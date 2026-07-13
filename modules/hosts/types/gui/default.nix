@@ -82,6 +82,7 @@
       "grandperspective"
       "clipbook"
       "betterdisplay"
+      "shottr"
     ];
     homebrew.brews = ["yt-dlp"];
 
