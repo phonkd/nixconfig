@@ -183,6 +183,20 @@
 
         provision = {
           enable = true;
+
+          # Dashboards live as JSON files in modules/grafana-dashboards
+          # (import-tree only picks up *.nix, so they're inert as modules).
+          # Provisioned dashboards are read-only in the UI — edit the JSON
+          # and rebuild instead.
+          dashboards.settings.providers = [
+            {
+              name = "homelab";
+              type = "file";
+              disableDeletion = true;
+              options.path = ./grafana-dashboards;
+            }
+          ];
+
           datasources.settings.datasources = [
             {
               name = "Mimir";
@@ -369,6 +383,28 @@
                   # collector on the PVE host (Debian has no smartctl exporter
                   # package). Label for the drive differs too — device vs disk —
                   # so the annotations render both; exactly one is non-empty.
+                  # zpool_capacity_percent comes from the zpool-metrics
+                  # textfile collector on the PVE host (see the pve.alloy
+                  # comment below) — node_filesystem_* is blind to zvol
+                  # usage, so pool capacity has its own rules. Thresholds
+                  # are lower than the generic disk ones on purpose: ZFS
+                  # fragments badly and slows down well before 100%.
+                  - alert: ZpoolSpaceWarning
+                    expr: zpool_capacity_percent > 80
+                    for: 15m
+                    labels:
+                      severity: warning
+                    annotations:
+                      summary: "ZFS pool {{ $labels.zpool }} on {{ $labels.instance }} is {{ $value }}% full"
+                      description: "Pool {{ $labels.zpool }} is above 80% — ZFS performance degrades as pools fill."
+                  - alert: ZpoolSpaceCritical
+                    expr: zpool_capacity_percent > 90
+                    for: 15m
+                    labels:
+                      severity: critical
+                    annotations:
+                      summary: "ZFS pool {{ $labels.zpool }} on {{ $labels.instance }} is {{ $value }}% full"
+                      description: "Pool {{ $labels.zpool }} is above 90% — free space or expect severe fragmentation and slowdowns."
                   - alert: SmartUnhealthy
                     expr: >
                       smartctl_device_smart_status == 0
@@ -612,6 +648,12 @@
       #   apt install prometheus-node-exporter prometheus-node-exporter-collectors smartmontools
       # (the collectors package runs smartctl on a systemd timer and emits
       # smartmon_* metrics on :9100 — no separate exporter or port needed).
+      # Pool capacity can't come from node_filesystem_* (zvol-backed pools
+      # show used=0 on the root dataset), so oldblac also has a hand-installed
+      # /usr/local/bin/zpool-metrics.sh + zpool-metrics.timer (1 min) that
+      # writes zpool_{size,allocated,free}_bytes / zpool_capacity_percent /
+      # zpool_fragmentation_percent / zpool_online from `zpool list -Hp`
+      # into the same textfile-collector directory.
       # Gated to 201-mono ONLY: every VM carries observability-sender, and
       # scraping the same target from all of them would ship duplicate series.
       # instance/hostname are pinned in the target so the series are labelled

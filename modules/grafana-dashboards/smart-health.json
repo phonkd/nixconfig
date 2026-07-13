@@ -1,0 +1,711 @@
+{
+  "uid": "smart-health",
+  "title": "Disk & SMART health",
+  "tags": ["homelab", "storage"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-7d", "to": "now" },
+  "refresh": "5m",
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "ds",
+        "label": "Datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 0,
+        "current": {}
+      },
+      {
+        "name": "instance",
+        "label": "Host",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${ds}" },
+        "query": "label_values({__name__=~\"smartmon_device_smart_healthy|smartctl_device_smart_status\"}, instance)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "disk",
+        "label": "Disk",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${ds}" },
+        "query": "label_values(smartmon_device_smart_healthy{instance=~\"$instance\"}, disk)",
+        "refresh": 2,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Unhealthy disks",
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(smartmon_device_smart_healthy == 0 or smartctl_device_smart_status == 0) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Disks monitored",
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(smartmon_device_smart_healthy or smartctl_device_smart_status) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "ZFS pools not ONLINE",
+      "gridPos": { "h": 4, "w": 5, "x": 10, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(node_zfs_zpool_state{state!=\"online\"} == 1) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Hottest disk",
+      "gridPos": { "h": 4, "w": 4, "x": 15, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 45 },
+              { "color": "red", "value": 55 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(smartmon_temperature_celsius_raw_value or smartmon_airflow_temperature_cel_raw_value or node_hwmon_temp_celsius{chip=~\"nvme_.+\",sensor=\"temp1\"} or smartctl_device_temperature)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Oldest disk (years powered on)",
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 1,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "orange", "value": 8 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(smartmon_power_on_hours_raw_value or nvme_power_on_hours_total or smartctl_device_power_on_hours) / 8760",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Disk health",
+      "gridPos": { "h": 9, "w": 9, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": { "mappings": [] },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SMART OK" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": { "text": "FAIL", "color": "red", "index": 0 },
+                      "1": { "text": "OK", "color": "green", "index": 1 }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": { "type": "color-background" }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_device_smart_healthy{instance=~\"$instance\",disk=~\"$disk\"} or smartctl_device_smart_status{instance=~\"$instance\"}",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "job": true,
+              "hostname": true,
+              "smart_id": true
+            },
+            "renameByName": {
+              "instance": "Host",
+              "disk": "Disk",
+              "device": "Device",
+              "type": "Type",
+              "Value": "SMART OK"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Disk temperature",
+      "gridPos": { "h": 9, "w": 15, "x": 9, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": { "fillOpacity": 5, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_temperature_celsius_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}}"
+        },
+        {
+          "refId": "B",
+          "expr": "smartmon_airflow_temperature_cel_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}} (airflow)"
+        },
+        {
+          "refId": "C",
+          "expr": "smartctl_device_temperature{temperature_type=\"current\",instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} {{device}}"
+        },
+        {
+          "refId": "D",
+          "expr": "node_hwmon_temp_celsius{chip=~\"nvme_.+\",sensor=\"temp1\",instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} {{chip}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "SSD wearout",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 0,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 60 },
+              { "color": "orange", "value": 80 },
+              { "color": "red", "value": 90 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nvme_percentage_used_ratio{instance=~\"$instance\"} * 100",
+          "legendFormat": "{{instance}} {{device}}",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "expr": "100 - (smartmon_wear_leveling_count_value{instance=~\"$instance\",disk=~\"$disk\"} or smartmon_media_wearout_indicator_value{instance=~\"$instance\",disk=~\"$disk\"} or smartmon_ssd_life_left_value{instance=~\"$instance\",disk=~\"$disk\"})",
+          "legendFormat": "{{instance}} {{disk}}",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Sector / media / interface errors (raw counters)",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "fillOpacity": 0, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_reallocated_sector_ct_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}} reallocated"
+        },
+        {
+          "refId": "B",
+          "expr": "smartmon_current_pending_sector_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}} pending"
+        },
+        {
+          "refId": "C",
+          "expr": "smartmon_offline_uncorrectable_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}} offline-uncorrectable"
+        },
+        {
+          "refId": "D",
+          "expr": "smartmon_udma_crc_error_count_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}} udma-crc"
+        },
+        {
+          "refId": "E",
+          "expr": "nvme_media_errors_total{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} {{device}} media-errors"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Power-on hours",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "${ds}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h",
+          "custom": { "fillOpacity": 5, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "smartmon_power_on_hours_raw_value{instance=~\"$instance\",disk=~\"$disk\"}",
+          "legendFormat": "{{instance}} {{disk}}"
+        },
+        {
+          "refId": "B",
+          "expr": "smartctl_device_power_on_hours{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} {{device}}"
+        },
+        {
+          "refId": "C",
+          "expr": "nvme_power_on_hours_total{instance=~\"$instance\"}",
+          "legendFormat": "{{instance}} {{device}}"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "row",
+      "title": "SMART attribute details",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+      "panels": [
+        {
+          "id": 21,
+          "type": "table",
+          "title": "Raw attribute values",
+          "gridPos": { "h": 10, "w": 12, "x": 0, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${ds}" },
+          "fieldConfig": { "defaults": { "mappings": [] }, "overrides": [] },
+          "options": { "showHeader": true, "sortBy": [{ "displayName": "Attribute" }] },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{__name__=~\"smartmon_.+_raw_value\",instance=~\"$instance\",disk=~\"$disk\"}",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "job": true,
+                  "hostname": true,
+                  "type": true
+                },
+                "renameByName": {
+                  "__name__": "Attribute",
+                  "instance": "Host",
+                  "disk": "Disk",
+                  "smart_id": "ID",
+                  "Value": "Raw value"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 22,
+          "type": "table",
+          "title": "Normalized value / worst / threshold",
+          "gridPos": { "h": 10, "w": 12, "x": 12, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${ds}" },
+          "fieldConfig": { "defaults": { "mappings": [] }, "overrides": [] },
+          "options": { "showHeader": true, "sortBy": [{ "displayName": "Attribute" }] },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "{__name__=~\"smartmon_.+_(value|worst|threshold)\",instance=~\"$instance\",disk=~\"$disk\"}",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "job": true,
+                  "hostname": true,
+                  "type": true
+                },
+                "renameByName": {
+                  "__name__": "Attribute",
+                  "instance": "Host",
+                  "disk": "Disk",
+                  "smart_id": "ID",
+                  "Value": "Value"
+                }
+              }
+            },
+            {
+              "id": "filterByValue",
+              "options": {
+                "type": "exclude",
+                "match": "any",
+                "filters": [
+                  {
+                    "fieldName": "Attribute",
+                    "config": {
+                      "id": "regex",
+                      "options": { "value": ".*_raw_value" }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "id": 23,
+          "type": "table",
+          "title": "Device inventory",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+          "datasource": { "type": "prometheus", "uid": "${ds}" },
+          "fieldConfig": { "defaults": { "mappings": [] }, "overrides": [] },
+          "options": { "showHeader": true },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "smartmon_device_info{instance=~\"$instance\"} or smartctl_device{instance=~\"$instance\"}",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true,
+                  "__name__": true,
+                  "job": true,
+                  "hostname": true
+                },
+                "renameByName": {
+                  "instance": "Host",
+                  "disk": "Disk",
+                  "device": "Device",
+                  "device_model": "Model",
+                  "model_family": "Family",
+                  "model_name": "Model name",
+                  "serial_number": "Serial",
+                  "firmware_version": "Firmware"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "row",
+      "title": "ZFS details",
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "panels": [
+        {
+          "id": 31,
+          "type": "table",
+          "title": "Pool states",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+          "datasource": { "type": "prometheus", "uid": "${ds}" },
+          "fieldConfig": {
+            "defaults": { "mappings": [] },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "State" },
+                "properties": [
+                  {
+                    "id": "mappings",
+                    "value": [
+                      {
+                        "type": "value",
+                        "options": {
+                          "online": { "text": "ONLINE", "color": "green", "index": 0 }
+                        }
+                      },
+                      {
+                        "type": "special",
+                        "options": {
+                          "match": "null",
+                          "result": { "text": "-", "index": 1 }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "custom.cellOptions",
+                    "value": { "type": "color-background" }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": { "showHeader": true },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_zfs_zpool_state{instance=~\"$instance\"} == 1",
+              "instant": true,
+              "format": "table"
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true,
+                  "__name__": true,
+                  "job": true,
+                  "hostname": true
+                },
+                "renameByName": {
+                  "instance": "Host",
+                  "zpool": "Pool",
+                  "state": "State"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": 32,
+          "type": "timeseries",
+          "title": "ZFS ARC size",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+          "datasource": { "type": "prometheus", "uid": "${ds}" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "fillOpacity": 10, "showPoints": "never" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "node_zfs_arc_size{instance=~\"$instance\"}",
+              "legendFormat": "{{instance}} ARC"
+            }
+          ]
+        },
+        {
+          "id": 33,
+          "type": "timeseries",
+          "title": "ZFS ARC hit ratio",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+          "datasource": { "type": "prometheus", "uid": "${ds}" },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": { "fillOpacity": 10, "showPoints": "never" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "bottom" },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "rate(node_zfs_arc_hits{instance=~\"$instance\"}[10m]) / (rate(node_zfs_arc_hits{instance=~\"$instance\"}[10m]) + rate(node_zfs_arc_misses{instance=~\"$instance\"}[10m]))",
+              "legendFormat": "{{instance}} hit ratio"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
