@@ -246,7 +246,7 @@
       ];
 
       # Loki/Mimir ingestion (not Grafana) is also reachable over the Hetzner
-      # private network (this host = 10.0.0.1 on enp7s0): ext-mail has no
+      # private network (this host = 10.0.0.3 on enp7s0): ext-mail has no
       # route into the home LAN, so it ships its telemetry through here.
       networking.firewall.interfaces.enp7s0.allowedTCPPorts = [
         lokiHttpPort
@@ -584,9 +584,9 @@
             # Most senders reach the observability server through the
             # home-router WireGuard tunnel (10.9.0.1). ext-mail is an external
             # Hetzner VM with no route into the home LAN — it uses the Hetzner
-            # private network instead (obs server = 10.0.0.1, see the matching
+            # private network instead (obs server = 10.0.0.3, see the matching
             # firewall rule in observability-server above).
-            obsHost = if hostname == "ext-mail" then "10.0.0.1" else "10.9.0.1";
+            obsHost = if hostname == "ext-mail" then "10.0.0.3" else "10.9.0.1";
             lokiendpoint = "http://${obsHost}:3100/loki/api/v1/push";
             mimirendpoint = "http://${obsHost}:9009/api/v1/push";
           in
