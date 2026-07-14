@@ -167,6 +167,7 @@
     desktop = null;
     tags = [
       "vm"
+      "hetzner-vm"
       "mailserver"
     ];
     username = "phonkd";

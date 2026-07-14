@@ -26,7 +26,7 @@
 
           tlsrpt.enable = true;
           systemContact = "spam1@phonkd.net";
-          loginAccounts = {
+          accounts = {
             "phonkd@phonkd.net" = {
               hashedPasswordFile = config.sops.secrets."mail-secret".path;
               aliases = [
