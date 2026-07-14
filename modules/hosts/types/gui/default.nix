@@ -83,8 +83,12 @@
       "clipbook"
       "betterdisplay"
       "shottr"
+      "yubico-authenticator"
     ];
-    homebrew.brews = ["yt-dlp"];
+    homebrew.brews = [
+      "yt-dlp"
+      "lsusb-laniksj"
+    ];
 
     };
 }

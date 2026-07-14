@@ -295,7 +295,7 @@
                     name = "Generic Newznab";
                     #implementationName = "Generic Newznab;
 
-                    baseUrl = "https://scenenzbs.com/";
+                    baseUrl = "https://treasure-maps.com/";
                     apiKey._secret = "/run/secrets/scenenzbs-api-key";
                     #appProfileId = 1;
                   }
