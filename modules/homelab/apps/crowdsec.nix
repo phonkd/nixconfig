@@ -60,6 +60,16 @@
         # for the community blocklists.
         settings.lapi.credentialsFile = "/var/lib/crowdsec/state/lapi-credentials.yaml";
         settings.capi.credentialsFile = "/var/lib/crowdsec/state/capi-credentials.yaml";
+        # The module defaults console_path to a generated file in the nix
+        # store, so `cscli console enroll` dies rewriting it ("read-only
+        # file system"). Point it at the state dir instead; the tmpfiles
+        # rule below seeds it once with the module's defaults. Enroll
+        # manually after rebuild (then accept the machine on the site):
+        #   sudo cscli console enroll <key from app.crowdsec.net>
+        # (settings.console.tokenFile would automate this, but its setup
+        # script is broken too: the existence check on the token file is
+        # inverted, and enroll would still hit the store path.)
+        settings.general.api.server.console_path = "/var/lib/crowdsec/state/console.yaml";
       };
 
       # cscli loads the whole config on EVERY invocation and hard-fails if
@@ -69,6 +79,20 @@
       # ship this file empty for exactly this reason.
       systemd.tmpfiles.settings."11-crowdsec-homelab" = {
         "/var/lib/crowdsec/state/capi-credentials.yaml".f = {
+          user = config.services.crowdsec.user;
+          group = config.services.crowdsec.group;
+          mode = "0600";
+        };
+        # Seed a writable console.yaml (see console_path above). "C" only
+        # copies when the target doesn't exist, so an enrolled config is
+        # never clobbered. Content mirrors the module's defaults.
+        "/var/lib/crowdsec/state/console.yaml".C = {
+          argument = toString (pkgs.writeText "console-defaults.yaml" ''
+            share_manual_decisions: false
+            share_custom: false
+            share_tainted: false
+            share_context: false
+          '');
           user = config.services.crowdsec.user;
           group = config.services.crowdsec.group;
           mode = "0600";
