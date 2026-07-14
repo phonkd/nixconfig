@@ -6,18 +6,10 @@
 {
   flake.nixosModules."homelab-crowdsec" = { config, pkgs, lib, noughtyLib, ... }:
     lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
-      phonkds.modules.crowdsec = {
-        ip = "127.0.0.1";
-        port = 8081;
-        dashboard.enable = true;
-        traefik = {
-          enable = true;
-          auth = false;
-          domain = "crowdsec.int.w.phonkd.net";
-          ipfilter = true;
-        };
-      };
-      # --------------------------------------- #
+      # No phonkds.modules registry entry: the LAPI on 8081 is a
+      # machine-to-machine REST API with no web UI, so a traefik route
+      # would 404 forever. Dashboards live at app.crowdsec.net (console,
+      # see enroll note below) and in Grafana via the metrics scrape.
       services.crowdsec = {
         enable = true;
         autoUpdateService = true;
