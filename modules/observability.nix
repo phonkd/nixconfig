@@ -245,6 +245,14 @@
         mimirHttpPort
       ];
 
+      # Loki/Mimir ingestion (not Grafana) is also reachable over the Hetzner
+      # private network (this host = 10.0.0.1 on enp7s0): ext-mail has no
+      # route into the home LAN, so it ships its telemetry through here.
+      networking.firewall.interfaces.enp7s0.allowedTCPPorts = [
+        lokiHttpPort
+        mimirHttpPort
+      ];
+
       # ── Mimir alerting rules ─────────────────────────────────────────────────
       # Pushed into Mimir's ruler via its config API (mimirtool, bundled with
       # the mimir package) rather than dropped as a raw file — the "filesystem"
@@ -573,8 +581,14 @@
         text =
           let
             hostname = config.networking.hostName;
-            lokiendpoint = "http://10.9.0.1:3100/loki/api/v1/push";
-            mimirendpoint = "http://10.9.0.1:9009/api/v1/push";
+            # Most senders reach the observability server through the
+            # home-router WireGuard tunnel (10.9.0.1). ext-mail is an external
+            # Hetzner VM with no route into the home LAN — it uses the Hetzner
+            # private network instead (obs server = 10.0.0.1, see the matching
+            # firewall rule in observability-server above).
+            obsHost = if hostname == "ext-mail" then "10.0.0.1" else "10.9.0.1";
+            lokiendpoint = "http://${obsHost}:3100/loki/api/v1/push";
+            mimirendpoint = "http://${obsHost}:9009/api/v1/push";
           in
           ''
             prometheus.exporter.unix "gagu" {

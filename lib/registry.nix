@@ -168,6 +168,9 @@
     tags = [
       "vm"
       "mailserver"
+      # Ships telemetry over the Hetzner private network (10.0.0.1), not the
+      # home-router tunnel — see obsHost in the observability-sender module.
+      "observability-sender"
     ];
     username = "phonkd";
 
