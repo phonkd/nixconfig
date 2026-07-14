@@ -113,6 +113,23 @@
       # on the host after the first successful crowdsec start:
       #   sudo cscli bouncers add firewall-bouncer \
       #     --key "$(sudo cat /run/secrets/crowdsec-bouncer-api-key)"
+      # Ship crowdsec's own telemetry to Mimir: the nixpkgs module enables
+      # the Prometheus endpoint by default (127.0.0.1:6060, level "full"),
+      # but nothing scrapes it. Alloy (observability-sender, which this
+      # host also is) loads every /etc/alloy/*.alloy file and cross-file
+      # references work, so forward straight to the remote_write defined
+      # in config.alloy — same pattern as pve.alloy in observability.nix.
+      # Logs need no wiring: alloy already ships the whole journal to Loki.
+      environment.etc."alloy/crowdsec.alloy".text = ''
+        prometheus.scrape "crowdsec" {
+          targets = [{
+            "__address__" = "127.0.0.1:6060",
+          }]
+          job_name   = "crowdsec"
+          forward_to = [prometheus.remote_write.nixvms.receiver]
+        }
+      '';
+
       sops.secrets."crowdsec-bouncer-api-key" = { };
       services.crowdsec-firewall-bouncer = {
         enable = true;
