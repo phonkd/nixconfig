@@ -85,6 +85,19 @@ Senders (tag `observability-sender`) run Alloy: journal → Loki push, embedded
 - **Logs without journald**: Loki ingests OTLP natively at
   `http://10.9.0.1:3100/otlp/v1/logs` (traefik ships app+access logs this way;
   `experimental.otlpLogs = true` still required as of traefik 3.7).
+- **Reading Loki** (debugging): query API at `http://10.9.0.1:3100`
+  (`/loki/api/v1/query_range`, `.../labels`), reachable over wg-obs. Labels:
+  `component, hostname, job, service_name, unit`. Journal lines are
+  `{service_name="loki.source.journal"}` filtered by `unit="foo.service"`.
+  Traefik access logs are `{service_name="traefik"}` with each access-log field
+  exposed as structured metadata — filter on them, e.g.
+  ``{service_name="traefik"} | RequestHost=`home.phonkd.net` ``. Useful fields:
+  `RequestHost, RequestPath, RouterName, ServiceURL, ClientHost,
+  DownstreamStatus, OriginStatus`. **`OriginStatus` = what the backend returned**
+  vs `DownstreamStatus` = what traefik sent the client — the two diverging (or
+  `OriginStatus` being an app error like 400/502) isolates a backend fault from a
+  traefik/routing fault. (This is how the HA `home.phonkd.net` 400 was traced to
+  Home Assistant's `trusted_proxies` rejection, not traefik.)
 - **Alert rules**: pushed by `mimir-rules-sync` via mimirtool. `rules sync` is a
   mirror op — ALWAYS scope with `--namespaces=...` or it deletes every other
   namespace in the tenant (bit us live once).
