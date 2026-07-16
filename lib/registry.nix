@@ -12,6 +12,12 @@
 #   userTags    : freeform user tags
 #   gpu         : { vendors = [...]; compute = { vendor; vram; unified; }; }
 #
+#   deploy      : { hostname = "<ip>"; }  (optional)
+#       Opt a NixOS host into `deploy <host>` (deploy-rs, modules/deploy.nix).
+#       Only entries that set this become deploy-rs nodes. hostname is the
+#       address the Mac reaches it at (LAN .3.x go through the sing-box SOCKS
+#       proxy via ~/.ssh/config; 10.9.0.1 is direct over WireGuard).
+#
 #   extraModules : { self, inputs }: [ modules ]
 #       Escape hatch. Should shrink to per-host hardware paths over time.
 {
@@ -74,6 +80,7 @@
       "vm"
     ];
     username = "phonkd";
+    deploy.hostname = "192.168.3.201";
 
     extraModules =
       { self, inputs }:
@@ -97,6 +104,7 @@
       "observability-sender"
     ];
     username = "phonkd";
+    deploy.hostname = "192.168.3.203";
 
     extraModules =
       { self, inputs }:
@@ -117,6 +125,7 @@
       "observability-sender"
     ];
     username = "phonkd";
+    deploy.hostname = "192.168.3.204";
 
     extraModules =
       { self, inputs }:
@@ -138,6 +147,7 @@
       "observability-sender"
     ];
     username = "phonkd";
+    deploy.hostname = "192.168.3.205";
 
     extraModules =
       { self, inputs }:
@@ -197,6 +207,9 @@
       "observability-sender"
     ];
     username = "phonkd";
+    # Reachable only at 10.9.0.1 over WireGuard (direct, not via the SOCKS
+    # proxy) — `deploy observability` needs the wg-obs tunnel up.
+    deploy.hostname = "10.9.0.1";
 
     extraModules =
       { self, inputs }:

@@ -13,6 +13,9 @@
       ...
     }:
     lib.mkIf (config.noughty.host.name == "Eliss-MacBook-Pro") {
+      # `deploy <host> [branch]` — deploy-rs wrapper (modules/deploy.nix).
+      environment.systemPackages = [ self.packages.${pkgs.system}.deploy ];
+
       # Mac-specific HM extras layered on top of what gui-darwin imports.
       home-manager.users.phonkd.imports = [
         self.homeModules.work
