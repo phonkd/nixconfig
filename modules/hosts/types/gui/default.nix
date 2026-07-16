@@ -84,6 +84,7 @@
       "betterdisplay"
       "shottr"
       "yubico-authenticator"
+      "linearmouse"
     ];
     homebrew.brews = [
       "yt-dlp"
