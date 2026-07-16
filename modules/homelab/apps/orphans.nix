@@ -70,7 +70,6 @@
         home-assistant = {
           ip = "192.168.1.115";
           port = 8123;
-          path = "/home/overview";
           dashboard = {
             enable = true;
             icon = "home-assistant";
