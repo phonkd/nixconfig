@@ -17,6 +17,10 @@
     }:
     lib.mkIf (config.noughty.host.name == "203-media") {
       label.labels = [ "vm" ];
+      # Passwordless sudo so `deploy 203-media` (deploy-rs) can activate the
+      # system profile as root over ssh non-interactively — matches 201/204/205
+      # and the Hetzner VMs.
+      security.sudo.wheelNeedsPassword = false;
       networking.hostName = "203-media";
       networking.useDHCP = lib.mkForce false;
       networking.interfaces = {

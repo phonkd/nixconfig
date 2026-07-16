@@ -18,6 +18,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     sops-nix.url = "github:Mic92/sops-nix";
+    # deploy-rs: `deploy <host>` builds (offloaded to 205 via nix.buildMachines)
+    # and activates a NixOS host with magic rollback. Nodes are generated from
+    # lib/registry.nix in modules/deploy.nix.
+    deploy-rs = {
+      url = "github:serokell/deploy-rs";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-on-droid = {
       url = "github:nix-community/nix-on-droid/master";
       inputs.nixpkgs.follows = "nixpkgs";
