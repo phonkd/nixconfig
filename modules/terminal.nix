@@ -19,12 +19,6 @@
           # Translucent background with strong macOS blur behind it.
           background_opacity = "0.6";
           background_blur = 64;
-          # Cherry-pink border framing the (inset) window.
-          draw_minimal_borders = "no";
-          window_margin_width = 8;
-          window_border_width = "2pt";
-          active_border_color = "#ff4d8d";
-          inactive_border_color = "#5c2a3d";
         };
         keybindings = {
           "cmd+left" = "send_text all \\x01";
