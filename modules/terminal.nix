@@ -7,6 +7,7 @@
       programs.kitty = {
         enable = true;
         package = pkgs.kitty;
+        themeFile = "cherry-midnight";
         settings = {
           pixel_scroll = "yes";
           font_size = 16;
