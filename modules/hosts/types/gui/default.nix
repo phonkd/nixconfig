@@ -89,6 +89,8 @@
     homebrew.brews = [
       "yt-dlp"
       "lsusb-laniksj"
+      "cmake"
+      "sdl2"
     ];
 
     };
