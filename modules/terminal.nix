@@ -16,6 +16,9 @@
           repaint_delay = 6;
           input_delay = 1;
           sync_to_monitor = "yes";
+          # Translucent background with strong macOS blur behind it.
+          background_opacity = "0.6";
+          background_blur = 64;
         };
         keybindings = {
           "cmd+left" = "send_text all \\x01";
