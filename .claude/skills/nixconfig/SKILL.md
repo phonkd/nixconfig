@@ -5,6 +5,10 @@ description: How this NixOS/nix-darwin homelab flake is wired — module auto-im
 
 # Working in this nixconfig repo
 
+This skill covers how the config is *wired*. Operating the running systems —
+rebuilding a host with `deploy <host>`, the sing-box SOCKS proxy, live service
+debugging, Loki/Mimir queries, sops ops — is the companion `nixconfig-ops` skill.
+
 ## Architecture: three wiring layers
 
 1. **File discovery**: `flake.nix` uses flake-parts + `import-tree ./modules` — every
@@ -123,14 +127,18 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
 
 - **Never verify with full evals** — no `nixosConfigurations.<x>` toplevel builds or
   getFlake harnesses. `nix-instantiate --parse <file>` + grep for dangling refs is
-  the ceiling. The user rebuilds on the target and pastes failures back.
+  the ceiling. Rebuilds happen via `deploy <host>` (deploy-rs, `modules/deploy.nix`,
+  builds offload to 205-builder; see `nixconfig-ops`); the user runs it and pastes
+  failures back.
 - Verify NixOS option names against the real module source, not from memory. Locate
   nixpkgs: `nix eval --raw .#nixosConfigurations."203-media".pkgs.path`, then read
   `<path>/nixos/modules/...`.
 - **Default to committing straight to `main`, but don't push** — no feature branch,
   no PR — since most changes here are small homelab tweaks and PR ceremony is pure
-  overhead for a single-user repo. Leave the push to the user; they push (and pull
-  on the target) themselves. Only branch + open a PR when the user says so, or the
+  overhead for a single-user repo. Leave applying to the user: they run `deploy
+  <host>` from the Mac (see `nixconfig-ops`), which builds from the committed HEAD
+  and activates the target directly — no push-to-GitHub or pull-on-target step.
+  Only branch + open a PR when the user says so, or the
   change is large/risky enough that a review pass genuinely matters (e.g. something
   that could break the reverse-proxy host or take down multiple hosts at once). Don't
   `gh pr create` unprompted even then — the user opens/merges PRs themselves.
