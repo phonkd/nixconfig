@@ -65,6 +65,20 @@
     lib.mkIf config.noughty.host.is.darwinDesktop {
       home-manager.users.${config.noughty.user.name}.imports = [
         self.homeModules.gui
+        {
+          # cava on macOS: portaudio can only read *input* devices, so system
+          # audio is captured through the BlackHole loopback driver (cask
+          # below). One-time setup after switching: Audio MIDI Setup > "+" >
+          # Create Multi-Output Device (built-in speakers + BlackHole 2ch),
+          # then select it as the sound output device.
+          programs.cava = {
+            enable = true;
+            settings.input = {
+              method = "portaudio";
+              source = "BlackHole 2ch";
+            };
+          };
+        }
       ];
     homebrew.casks = [
       "zen"
@@ -85,6 +99,7 @@
       "shottr"
       "yubico-authenticator"
       "linearmouse"
+      "blackhole-2ch"
     ];
     homebrew.brews = [
       "yt-dlp"
