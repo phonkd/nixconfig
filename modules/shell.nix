@@ -53,6 +53,19 @@
             fi
             command jj "$@"
           '';
+        }
+        // lib.optionalAttrs pkgs.stdenv.isDarwin {
+          # cava reads system audio via BlackHole, which is an *input* device,
+          # so macOS gates it behind Microphone (TCC) permission granted to the
+          # launching app. kitty is ad-hoc signed and run from /nix/store, so it
+          # can't hold a stable TCC grant -- the prompt never fires. Relaunch
+          # cava under Terminal.app (Apple-signed, TCC-native) via LaunchServices
+          # (`open`, not AppleScript, to avoid needing Automation permission too).
+          # First run pops the mic prompt for Terminal.app; Allow once and it
+          # sticks. Bare `cava` only; args aren't forwarded through `open`.
+          cava = ''
+            open -a Terminal.app ${pkgs.cava}/bin/cava
+          '';
         };
         enableCompletion = true;
         completionInit = ''
