@@ -73,9 +73,12 @@
           # then select it as the sound output device.
           programs.cava = {
             enable = true;
-            settings.input = {
-              method = "portaudio";
-              source = "BlackHole 2ch";
+            settings = {
+              general.framerate = 90;
+              input = {
+                method = "portaudio";
+                source = "BlackHole 2ch";
+              };
             };
           };
         }
