@@ -10,10 +10,17 @@
 #      Mac that offloads x86_64-linux to 205-builder via nix.buildMachines, so
 #      "builds happen on the beefy builder" needs no extra wiring here.
 #
-#   2. perSystem packages.deploy — the CLI. `deploy 201` deploys 201-mono from
-#      the current checkout; `deploy 201 somebranch` builds+deploys that git
-#      branch; `deploy --all` does every node. Wired onto the Mac in
-#      modules/hosts/mac.nix.
+#      Node keys are the registry name with any leading "<digits>-" stripped
+#      ("201-mono" -> "mono"): deploy-rs parses the node as a Nix attr path, and
+#      a bare identifier can't start with a digit ("Unrecognized node or token").
+#      The profile still points at the real nixosConfigurations."201-mono".
+#
+#   2. perSystem packages.deploy-cli — the CLI (binary name `deploy`). `deploy
+#      201` deploys 201-mono from the current checkout; `deploy 201 somebranch`
+#      builds+deploys that git branch; `deploy --all` does every node. Wired onto
+#      the Mac in modules/hosts/mac.nix. The package attr is deploy-cli, NOT
+#      deploy, so it doesn't collide with the flake.deploy output (deploy-rs
+#      evaluates `<flake>#deploy` and must get the schema, not this derivation).
 #
 # Adding a host to `deploy` = adding `deploy.hostname` to its registry stanza.
 # Nothing here is edited per-host.
@@ -29,15 +36,16 @@ let
   # Opt-in: only entries carrying deploy.hostname become nodes.
   deployEntries = lib.filterAttrs (_: e: (e.deploy or { }) ? hostname) registry;
 
-  mkNode = name: entry: {
-    hostname = entry.deploy.hostname;
-    profiles.system.path =
-      inputs.deploy-rs.lib.${entry.platform or "x86_64-linux"}.activate.nixos
-        self.nixosConfigurations.${name};
-  };
+  # deploy-rs node key: strip a leading "<digits>-" so it never starts with a
+  # digit ("201-mono" -> "mono", "observability" -> "observability").
+  nodeNameOf =
+    name:
+    let
+      m = builtins.match "[0-9]+-(.*)" name;
+    in
+    if m != null then builtins.head m else name;
 
-  # Short alias per node: the numeric prefix ("201-mono" -> "201"), else the
-  # full name. Both the alias and the full name resolve in the CLI.
+  # Short numeric alias ("201-mono" -> "201"), else the name itself.
   shortOf =
     name:
     let
@@ -45,11 +53,27 @@ let
     in
     if m != null then builtins.head m else name;
 
+  mkNode = name: entry: {
+    hostname = entry.deploy.hostname;
+    profiles.system.path =
+      inputs.deploy-rs.lib.${entry.platform or "x86_64-linux"}.activate.nixos
+        self.nixosConfigurations.${name};
+  };
+
+  # CLI resolves any of: short alias (201), full registry name (201-mono), or
+  # node key (mono) -> the node key deploy-rs expects.
   aliasPairs = lib.concatStringsSep " " (
-    lib.concatMap (n: [
-      "[${shortOf n}]=${n}"
-      "[${n}]=${n}"
-    ]) (lib.attrNames deployEntries)
+    lib.concatMap (
+      n:
+      let
+        node = nodeNameOf n;
+      in
+      [
+        "[${shortOf n}]=${node}"
+        "[${n}]=${node}"
+        "[${node}]=${node}"
+      ]
+    ) (lib.attrNames deployEntries)
   );
 in
 {
@@ -62,13 +86,13 @@ in
       "-o"
       "ConnectTimeout=10"
     ];
-    nodes = lib.mapAttrs mkNode deployEntries;
+    nodes = lib.mapAttrs' (name: entry: lib.nameValuePair (nodeNameOf name) (mkNode name entry)) deployEntries;
   };
 
   perSystem =
     { pkgs, system, ... }:
     {
-      packages.deploy = pkgs.writeShellApplication {
+      packages.deploy-cli = pkgs.writeShellApplication {
         name = "deploy";
         runtimeInputs = [ pkgs.coreutils ];
         text = ''
@@ -84,7 +108,7 @@ in
                  deploy --all [branch]       deploy every node
                  deploy --list               list deployable hosts
 
-          host is a short alias (201) or full node name (201-mono).
+          host is a short alias (201), full name (201-mono), or node key (mono).
           With a branch, builds+deploys that git branch instead of the checkout.
           Builds offload to 205-builder; activation uses magic rollback.
           EOF
