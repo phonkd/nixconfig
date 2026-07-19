@@ -86,6 +86,7 @@
     homebrew.casks = [
       "zen"
       "firefox"
+      "obsidian"
       "spotify"
       "claude-code"
       "zed"
