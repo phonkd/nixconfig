@@ -183,7 +183,7 @@
           '';
 
           services.homepage-dashboard = {
-            environmentFile = config.sops.templates."homepage.env".path;
+            environmentFiles = [ config.sops.templates."homepage.env".path ];
           };
         })
 

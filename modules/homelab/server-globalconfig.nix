@@ -17,6 +17,15 @@
         dates = "weekly";
         options = "--delete-older-than 30d";
       };
+      # deploy-rs (from the Mac, over ssh as phonkd) pushes closures built on the
+      # 205 builder; those aren't signed by a key the target trusts, so the ssh
+      # user must be a trusted-user for `--no-check-sigs` to be honored -- else
+      # "cannot add path ... lacks a signature by a trusted key". phonkd is in
+      # wheel on every deploy target (oldblac-vm / hetzner-vm).
+      nix.settings.trusted-users = [
+        "root"
+        "@wheel"
+      ];
       services.openssh = {
         enable = true;
         settings.PasswordAuthentication = false;
