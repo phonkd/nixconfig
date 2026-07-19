@@ -55,8 +55,17 @@ let
     in
     if m != null then builtins.head m else name;
 
+  # Applied to every node; a node can add more via `deploy.sshOpts` in the
+  # registry (observability's sshd is on :5432 and wants the id_rsa key, so it
+  # can't be reached on the default :22).
+  commonSshOpts = [
+    "-o"
+    "ConnectTimeout=10"
+  ];
+
   mkNode = name: entry: {
     hostname = entry.deploy.hostname;
+    sshOpts = commonSshOpts ++ (entry.deploy.sshOpts or [ ]);
     profiles.system.path =
       inputs.deploy-rs.lib.${entry.platform or "x86_64-linux"}.activate.nixos
         self.nixosConfigurations.${name};
@@ -84,10 +93,7 @@ in
     user = "root";
     magicRollback = true;
     autoRollback = true;
-    sshOpts = [
-      "-o"
-      "ConnectTimeout=10"
-    ];
+    sshOpts = commonSshOpts;
     nodes = lib.mapAttrs' (name: entry: lib.nameValuePair (nodeNameOf name) (mkNode name entry)) deployEntries;
   };
 
