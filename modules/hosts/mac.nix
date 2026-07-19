@@ -13,8 +13,12 @@
       ...
     }:
     lib.mkIf (config.noughty.host.name == "Eliss-MacBook-Pro") {
-      # `deploy <host> [branch]` — deploy-rs wrapper (modules/deploy.nix).
-      environment.systemPackages = [ self.packages.${pkgs.system}.deploy-cli ];
+      environment.systemPackages = [
+        # `deploy <host> [branch]` — deploy-rs wrapper (modules/deploy.nix).
+        self.packages.${pkgs.system}.deploy-cli
+        # `vibe-kanban` — local AI-agent kanban board (modules/vibe-kanban.nix).
+        self.packages.${pkgs.system}.vibe-kanban
+      ];
 
       # Mac-specific HM extras layered on top of what gui-darwin imports.
       home-manager.users.phonkd.imports = [
