@@ -74,6 +74,18 @@
             identityFile = "~/.ssh/id_rsa";
             identitiesOnly = true;
           };
+          # 205-builder distributed-build account. nix.buildMachines already
+          # passes this key explicitly, so offload works without this block;
+          # it's for manual `ssh nixremote@192.168.3.205` (and anything not
+          # passing -i), which otherwise offers the default keys and gets
+          # Permission denied (only the nixremote pubkey is authorized there).
+          # Scoped to `user nixremote` so the phonkd login is untouched; the
+          # SOCKS proxyCommand is inherited from the proxy.ipRanges Host block.
+          programs.ssh.matchBlocks."205-builder-nixremote" = {
+            match = "host 192.168.3.205 user nixremote";
+            identityFile = "/Users/phonkd/.ssh/nixremote_ed25519";
+            identitiesOnly = true;
+          };
         }
       ];
 
