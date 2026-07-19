@@ -149,16 +149,24 @@
         };
         # The plugin broker refuses plugin binaries not OWNED by the user
         # crowdsec runs as — a symlink into the (root-owned) nix store
-        # fails that check, so copy the binary and chown it. C+ re-copies
-        # on every tmpfiles run, so package updates propagate; the z line
-        # fixes ownership/mode after each copy.
-        "/etc/crowdsec/plugins/notification-slack" = {
-          "C+".argument = "${config.services.crowdsec.package}/bin/notification-slack";
-          z = {
-            user = config.services.crowdsec.user;
-            group = config.services.crowdsec.group;
-            mode = "0750";
-          };
+        # fails that check, so copy the binary out and own it as crowdsec.
+        # C+ re-copies on every tmpfiles run, so package updates propagate.
+        #
+        # Set owner/mode as arguments ON the C+ line, NOT via a separate z
+        # line: the module owns the parent /etc/crowdsec/plugins as crowdsec,
+        # so a root-owned leaf (what C+ produces when mode/uid/gid are "-")
+        # is a crowdsec-dir → root-file "unsafe path transition". Modern
+        # systemd-tmpfiles aborts the WHOLE run (exit 73) on that, so the
+        # follow-up z never chowns, the plugin stays root-owned, and the
+        # crowdsec LAPI crash-loops refusing to load it (taking the firewall
+        # bouncer down with connection-refused). Copying straight to
+        # crowdsec:crowdsec keeps parent and leaf owners equal — no
+        # transition, one atomic op.
+        "/etc/crowdsec/plugins/notification-slack"."C+" = {
+          argument = "${config.services.crowdsec.package}/bin/notification-slack";
+          user = config.services.crowdsec.user;
+          group = config.services.crowdsec.group;
+          mode = "0750";
         };
         # Webhook config with the secret inline (see sops.templates above).
         # Configs, unlike plugin binaries, may be symlinks.
