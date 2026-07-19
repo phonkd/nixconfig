@@ -71,9 +71,11 @@ Two ways to wake Hermes on an alert. This plan picks **poll**:
 
 ## The pipeline, end to end
 
-1. **Cron fires** (`every 10m`). Preprocessor `--script` curls the Alertmanager
-   alerts API, filters `status.state == "active"` (firing), and prints new
-   fingerprints not already in the watermark; empty output → job stays `[SILENT]`.
+1. **Cron fires** (`every 10m`). The skill itself (no `--script` preprocessor)
+   curls the Alertmanager alerts API via the terminal toolset, filters
+   `status.state == "active"` (firing), and keeps only fingerprints not already in
+   the watermark; nothing new → the agent responds `[SILENT]` and delivery is
+   suppressed.
 2. **Triage** (`hermes-autofix` skill, below). For each new firing alert Hermes:
    pulls the alert's labels/annotations, optionally cross-checks Loki/Mimir for
    context (the `nixconfig-ops` conventions), and decides: **fixable in

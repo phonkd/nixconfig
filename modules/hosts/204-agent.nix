@@ -326,14 +326,24 @@
               — reachable over the home site-to-site VPN, which this host already
               has (same endpoint the `mimir-alerting` skill uses). No auth,
               single-tenant, no `X-Scope-OrgID` needed.
-            - **Repo:** `github.com/<owner>/nixconfig`. `gh` is already
+            - **Repo:** `phonkd/nixconfig` (this repo). `gh` is already
               authenticated via `GITHUB_TOKEN`; `claude` is authenticated via
-              `CLAUDE_CODE_OAUTH_TOKEN`. Confirm the remote with
-              `gh repo set-default` / `gh repo view` if unsure of the owner.
-            - **Watermark:** `$HERMES_HOME/autofix-state/handled.json` — a JSON
-              object mapping alert fingerprint to what you did (`"pr":<n>` or
-              `"skipped":"<reason>"`). Create the dir if missing. This is the dedupe
-              memory; treat a fingerprint present here as already handled.
+              `CLAUDE_CODE_OAUTH_TOKEN`. Clone/PR that repo explicitly — this is an
+              unattended pipeline, so never leave the owner as a placeholder that
+              could clone or PR the wrong repo.
+            - **Watermark:** `$HERMES_HOME/autofix-state/handled.json` — a single
+              JSON object mapping alert fingerprint to what you did (`{"pr":<n>}` or
+              `{"skipped":"<reason>"}`). Create the dir if missing. This is the
+              dedupe memory; treat a fingerprint present here as already handled.
+              **It must stay valid JSON — never append raw text to it.** Record a
+              result by *merging* one key in, atomically via a temp file:
+
+              ```bash
+              wm="$HERMES_HOME/autofix-state/handled.json"
+              # $fp = fingerprint, $entry = a JSON value like '{"pr":42}'
+              tmp=$(mktemp)
+              jq --arg fp "$fp" --argjson e "$entry" '. + {($fp): $e}' "$wm" > "$tmp" && mv "$tmp" "$wm"
+              ```
             - **The nixconfig skill.** The fix itself must follow this repo's wiring
               rules. Instruct Claude Code to read the repo's `.claude/skills/`
               `nixconfig` and `nixconfig-ops` skills before changing anything.
@@ -367,8 +377,10 @@
                `http://10.9.0.1:3100` for the failing unit's logs, or the ALERTS
                series in Mimir). Decide **fixable in nixconfig?**
 
-               - **No** → append `{"<fp>": {"skipped": "<one-line reason>"}}` to the
-                 watermark and add a one-line note to your Discord summary. Move on.
+               - **No** → merge `{"skipped": "<one-line reason>"}` for this
+                 fingerprint into the watermark (the atomic `jq` merge above — never
+                 append raw text) and add a one-line note to your Discord summary.
+                 Move on.
                - **Yes** → go to step 3.
 
             3. **Spawn Claude Code** (via the `autonomous-ai-agents/claude-code`
@@ -377,7 +389,7 @@
 
                ```bash
                work=$(mktemp -d)
-               gh repo clone <owner>/nixconfig "$work" -- --depth 1
+               gh repo clone phonkd/nixconfig "$work" -- --depth 1
                claude -p "You are fixing a homelab NixOS/nix-darwin config in $work.
                A monitoring alert is firing: <alertname> on <instance> —
                <summary>. Root cause and fix it in this repo.
@@ -401,8 +413,9 @@
                failure in the watermark and report it rather than retrying in a
                loop.
 
-            4. **Record + present.** Append `{"<fp>": {"pr": <n>}}` to the
-               watermark, then include a line in your Discord response:
+            4. **Record + present.** Merge `{"pr": <n>}` for this fingerprint into
+               the watermark (the atomic `jq` merge above — never append raw text),
+               then include a line in your Discord response:
 
                - Fixable + PR opened:
                  `🔧 <alertname> on <instance> → draft PR #<n>: <one-line what it does>`
