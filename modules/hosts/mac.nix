@@ -55,6 +55,16 @@
               port = 445;
             }
           ];
+          # 10.9.0.1 = observability (Hetzner). Its sshd is on :5432 and
+          # authorizes the id_rsa key; the generic proxy block only supplies the
+          # SOCKS proxyCommand, so without this ssh -- and deploy-rs, which
+          # honors ~/.ssh/config -- default to :22 + id_ed25519 and time out.
+          # Rendered before `Host *`, so this port/key win.
+          programs.ssh.matchBlocks."10.9.0.1" = {
+            port = 5432;
+            identityFile = "~/.ssh/id_rsa";
+            identitiesOnly = true;
+          };
         }
       ];
 

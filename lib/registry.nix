@@ -12,13 +12,13 @@
 #   userTags    : freeform user tags
 #   gpu         : { vendors = [...]; compute = { vendor; vram; unified; }; }
 #
-#   deploy      : { hostname = "<ip>"; sshOpts = [ ... ]; }  (optional)
+#   deploy      : { hostname = "<ip>"; }  (optional)
 #       Opt a NixOS host into `deploy <host>` (deploy-rs, modules/deploy.nix).
 #       Only entries that set this become deploy-rs nodes. hostname is the
 #       address the Mac reaches it at (LAN .3.x go through the sing-box SOCKS
-#       proxy via ~/.ssh/config; 10.9.0.1 is direct over WireGuard). sshOpts
-#       are appended to the shared ssh options for that node (e.g. a non-22
-#       sshd port or a specific key on the hetzner VMs).
+#       proxy via ~/.ssh/config; 10.9.0.1 over WireGuard). Per-host ssh quirks
+#       (e.g. the hetzner VMs' :5432 sshd + id_rsa key) live in that host's
+#       programs.ssh.matchBlocks, not here — deploy-rs honors ~/.ssh/config.
 #
 #   extraModules : { self, inputs }: [ modules ]
 #       Escape hatch. Should shrink to per-host hardware paths over time.
@@ -212,14 +212,6 @@
     # Reachable only at 10.9.0.1 over WireGuard (direct, not via the SOCKS
     # proxy) — `deploy observability` needs the wg-obs tunnel up.
     deploy.hostname = "10.9.0.1";
-    # sshd runs on :5432 (hetzner-vm) and authorizes the id_rsa key; without
-    # these deploy-rs dials :22 through the sing-box proxy and times out.
-    deploy.sshOpts = [
-      "-p"
-      "5432"
-      "-i"
-      "/Users/phonkd/.ssh/id_rsa"
-    ];
 
     extraModules =
       { self, inputs }:
