@@ -1,6 +1,11 @@
 # headscale mesh
 
-**Repo(s):** nixconfig   **Status:** draft
+**Repo(s):** nixconfig   **Status:** in-progress
+
+_Decisions locked:_ embedded DERP (no tailscale.com relays); **Tailscale SSH**
+(model A — identity+ACL, sshd:5432 kept as break-glass); coordinator at
+`hs.phonkd.net` with built-in Let's Encrypt. Coordinator module + inert client
+module landed; next is minting the pre-auth key and wiring the client in.
 
 ## Goal
 
