@@ -16,6 +16,7 @@ NixOS hosts are rebuilt with one command (deploy-rs, defined in
 ```
 deploy 201            # rebuild 201-mono from the current checkout's committed HEAD
 deploy 203 mybranch   # build + deploy 203-media from git branch `mybranch`
+deploy observability -r  # build ON the target, not on 205 (see below)
 deploy --all          # every node
 deploy --list         # show deployable hosts
 ```
@@ -27,6 +28,13 @@ deploy --list         # show deployable hosts
   offloads every `x86_64-linux` derivation to 205 via `nix.buildMachines`
   (`modules/hosts/mac.nix`). Nothing host-side to trigger. (To move the build
   elsewhere later, that's the `nix.buildMachines` block, not the deploy tool.)
+- **`--remote-build` / `-r` — fallback when 205 is offline.** Passes
+  `--remote-build` to deploy-rs so the target host builds its own closure
+  (every deploy node is `x86_64-linux`, so it can). Use it when the builder VM
+  is down: `deploy observability -r`. Costs the target transient build deps in
+  its own store (fine for incremental rebuilds; watch it on tight-disk hosts
+  like observability's 20 GB Hetzner root). Default (no flag) still offloads to
+  205, which is faster and spares the target.
 - **Magic rollback is on**: if a host drops off the network after activating
   (e.g. you break its networking or the reverse proxy), it auto-reverts to the
   previous generation. This is the safety net for 201, which fronts everything.

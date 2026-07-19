@@ -17,7 +17,9 @@
 #
 #   2. perSystem packages.deploy-cli — the CLI (binary name `deploy`). `deploy
 #      201` deploys 201-mono from the current checkout; `deploy 201 somebranch`
-#      builds+deploys that git branch; `deploy --all` does every node. Wired onto
+#      builds+deploys that git branch; `deploy --all` does every node;
+#      `deploy <host> --remote-build` builds on the target itself instead of
+#      offloading to 205 (fallback when the builder VM is offline). Wired onto
 #      the Mac in modules/hosts/mac.nix. The package attr is deploy-cli, NOT
 #      deploy, so it doesn't collide with the flake.deploy output (deploy-rs
 #      evaluates `<flake>#deploy` and must get the schema, not this derivation).
@@ -104,15 +106,35 @@ in
 
           usage() {
             cat >&2 <<EOF
-          usage: deploy <host> [branch]     deploy one host (branch optional)
+          usage: deploy <host> [branch] [--remote-build]
+                                             deploy one host (branch optional)
                  deploy --all [branch]       deploy every node
                  deploy --list               list deployable hosts
 
           host is a short alias (201), full name (201-mono), or node key (mono).
           With a branch, builds+deploys that git branch instead of the checkout.
           Builds offload to 205-builder; activation uses magic rollback.
+          --remote-build (-r): build on the target host instead of offloading
+          to 205 -- use when the builder is down (the target is x86_64-linux and
+          can build its own closure natively).
           EOF
           }
+
+          # Pull the --remote-build/-r flag out of the args; the rest are
+          # positional (host, branch).
+          remote_build=0
+          positional=()
+          for arg in "$@"; do
+            case "$arg" in
+              -r | --remote-build) remote_build=1 ;;
+              *) positional+=("$arg") ;;
+            esac
+          done
+          if [ "''${#positional[@]}" -gt 0 ]; then
+            set -- "''${positional[@]}"
+          else
+            set --
+          fi
 
           case "''${1:-}" in
             "" | -h | --help)
@@ -148,8 +170,17 @@ in
             ref="$flake"
           fi
 
-          echo ">> deploy: ''${node:-ALL nodes} from ''${branch:-current checkout}" >&2
-          exec "$deploybin" --skip-checks "$ref"
+          args=( --skip-checks )
+          if [ "$remote_build" = 1 ]; then
+            args+=( --remote-build )
+            where="on the target host"
+          else
+            where="offloaded to 205-builder"
+          fi
+          args+=( "$ref" )
+
+          echo ">> deploy: ''${node:-ALL nodes} from ''${branch:-current checkout} (build $where)" >&2
+          exec "$deploybin" "''${args[@]}"
         '';
       };
     };
