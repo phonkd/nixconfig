@@ -19,6 +19,7 @@
       # Mac-specific HM extras layered on top of what gui-darwin imports.
       home-manager.users.phonkd.imports = [
         self.homeModules.work
+        self.homeModules.notes # Obsidian (programs.obsidian, no settings)
         inputs.sops-nix.homeManagerModules.sops
         {
           sops.age.keyFile = "/Users/phonkd/.config/sops/age/keys.txt";
