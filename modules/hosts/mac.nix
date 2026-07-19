@@ -65,6 +65,15 @@
             identityFile = "~/.ssh/id_rsa";
             identitiesOnly = true;
           };
+          # ext-mail — same Hetzner :5432 + id_rsa. NB: 10.0.0.2 is the Hetzner
+          # private range and is NOT in proxy.ipRanges above, so sing-box only
+          # reaches it if the wg outbound already carries 10.0.0.0/8; if not,
+          # this fixes the port/key but the connection still won't route.
+          programs.ssh.matchBlocks."10.0.0.2" = {
+            port = 5432;
+            identityFile = "~/.ssh/id_rsa";
+            identitiesOnly = true;
+          };
         }
       ];
 
