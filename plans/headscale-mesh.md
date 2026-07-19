@@ -75,23 +75,30 @@ the observability pipeline, so it's its own effort.
 
 ## Open decisions
 
-- **DERP relay.** Default = Tailscale's public DERP servers (relay only, encrypted,
-  no traffic/control visibility to them) — easiest, but a partial external
-  dependency, which slightly undercuts "self-hosted". Alternative = headscale
-  **embedded DERP** (fully self-hosted, a bit more config + a UDP port). *Rec:*
-  start on Tailscale DERP, switch to embedded in a follow-up if the SaaS-adjacency
-  bothers you. **Flagging because you chose Headscale specifically to avoid SaaS.**
-- **Tailscale SSH vs keep sshd.** *Rec:* Tailscale SSH (retires port/key/known_hosts
-  entirely). Alternative: keep sshd on :5432 and just use tailnet IPs/names — simpler
-  mental model, but keeps the exact complexity we're trying to shed. Note deploy-rs
-  activation still needs a privileged user; ACL can grant `root` directly or keep
-  phonkd+sudo.
-- **Coordinator TLS.** *Rec:* headscale built-in Let's Encrypt on `hs.phonkd.net`.
-  Alternative: a tiny nginx/caddy in front. Built-in is fewer moving parts.
+- ~~DERP relay~~ **RESOLVED: embedded DERP** (`derp.server.enabled`, `urls = []`) —
+  fully self-hosted, no tailscale.com dependency.
+- ~~Tailscale SSH vs sshd~~ **RESOLVED: Tailscale SSH** (identity + ACL). sshd on
+  :5432 kept as off-tailnet break-glass. deploy-rs activation stays phonkd+sudo
+  initially (ACL could grant root later).
+- ~~Coordinator TLS~~ **RESOLVED: headscale built-in Let's Encrypt** on `hs.phonkd.net`.
+- **Mac DNS — work-traffic isolation (OPEN).** Work traffic must keep flowing
+  through sing-box, never headscale. Structurally safe already: the tailnet is
+  `100.64.0.0/10` (disjoint from all work/homelab RFC1918), no subnet routes and
+  no exit node are used, and `override_local_dns = false`, so tailscale only ever
+  handles `100.64/10` + the `ts.phonkd.net` DNS domain — sing-box stays the
+  classifier for everything else. The *one* real interaction is the macOS system
+  resolver. Two Mac-only options: (a) `--accept-dns=false` — tailscale touches DNS
+  zero, guaranteed work-DNS isolation, but no MagicDNS on the Mac (reach hosts by
+  tailnet IP); (b) keep MagicDNS and verify work split-DNS still resolves. *Rec:*
+  (a) for the Mac given the hard work constraint. Servers are unaffected either way.
 - **Enrollment scope.** Servers + Mac now; laptops (blac, g14) and phone later.
 
 ## Risks / rollout
 
+- **HARD RULE — never advertise `10.0.0.0/8` (or other work ranges) over the
+  tailnet.** The Mac's work VPN uses overlapping RFC1918 space; a subnet router
+  advertising it would hijack work traffic. Every host stays its own client; no
+  subnet routers, no exit nodes. This is what keeps work traffic on sing-box.
 - **New public surface on observability:** headscale is internet-facing (443/80).
   It's the coordinator, so it must be — mitigate by keeping it patched; it's a
   small, well-scoped Go service. Today obs only exposes the wg UDP port.
