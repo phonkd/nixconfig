@@ -12,24 +12,36 @@
       # Retrieve the central app configuration
       apps = config.phonkds.modules;
 
-      # Filter apps that have Traefik enabled AND Dashboard enabled AND have a domain
+      # Show an app when the dashboard is enabled AND it's reachable: either
+      # via a traefik route (enabled + domain) or a plain dashboard.link that
+      # deep-links straight to the device (LAN-only tiles, not reverse-proxied).
       enabledApps = lib.filterAttrs (
-        _: v: v.traefik.enable && v.dashboard.enable && v.traefik.domain != null
+        _: v:
+        v.dashboard.enable
+        && ((v.traefik.enable && v.traefik.domain != null) || v.dashboard.link != null)
       ) apps;
 
       # Convert the filtered apps into the homepage-dashboard service format
       # Structure: [ { "AppName" = { icon = "..."; href = "..."; ... }; } ]
-      mkServiceList = lib.mapAttrsToList (name: app: {
-        "${name}" = {
-          icon = if app.dashboard.icon != null then app.dashboard.icon else "${name}.png";
+      mkServiceList = lib.mapAttrsToList (
+        name: app:
+        let
+          hasDomain = app.traefik.enable && app.traefik.domain != null;
           href = if app.dashboard.link != null then app.dashboard.link else "https://${app.traefik.domain}";
-          description = if app.traefik.domain != null then app.traefik.domain else "";
-          # Green/red status dot; goes through traefik so it reflects what a
-          # browser would actually get.
-          siteMonitor = "https://${app.traefik.domain}";
+        in
+        {
+          "${name}" = {
+            icon = if app.dashboard.icon != null then app.dashboard.icon else "${name}.png";
+            inherit href;
+            description = if hasDomain then app.traefik.domain else app.ip;
+            # Green/red status dot. For proxied apps it goes through traefik so
+            # it reflects what a browser would get; for direct-link tiles it
+            # pings the device itself (no traefik involved).
+            siteMonitor = if hasDomain then "https://${app.traefik.domain}" else href;
+          }
+          // lib.optionalAttrs (app.dashboard.widget != null) { widget = app.dashboard.widget; };
         }
-        // lib.optionalAttrs (app.dashboard.widget != null) { widget = app.dashboard.widget; };
-      });
+      );
 
       # Two columns: live-stats cards left, plain links right.
       widgetApps = lib.filterAttrs (_: app: app.dashboard.widget != null) enabledApps;

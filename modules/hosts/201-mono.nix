@@ -4,7 +4,7 @@
 # from lib/registry.nix. The cross-host feature modules (traefik,
 # dashboard, *arrs, etc.) live in alwaysImport and self-gate on tags:
 #   reverse-proxy  -> traefik/dashboard/ddns/authelia/orphans
-#   homelab-server -> syncthing/vaultwarden/paperless/arr/aislop/garage
+#   homelab-server -> syncthing/vaultwarden/paperless/arr/garage
 #   is.server      -> server-globalconfig/server-sops
 #
 # This file owns the bits that are truly unique to the 201-mono box:

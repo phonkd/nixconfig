@@ -81,6 +81,28 @@
             ipfilter = true;
           };
         };
+        # Direct-link tiles only -- deliberately NOT reverse-proxied. They
+        # render via dashboard.link (see homelab-dashboard) rather than a
+        # traefik route, so they just deep-link to the device on the LAN.
+        jetkvm = {
+          ip = "192.168.1.39";
+          port = 80;
+          dashboard = {
+            enable = true;
+            icon = "sh-jetkvm";
+            link = "http://192.168.1.39";
+          };
+        };
+        mystrom = {
+          ip = "192.168.1.102";
+          port = 80;
+          dashboard = {
+            enable = true;
+            # No selfh.st/dashboard-icons entry for myStrom -> generic MDI plug.
+            icon = "mdi-power-socket-eu";
+            link = "http://192.168.1.102";
+          };
+        };
         grafana = {
           ip = "10.9.0.1";
           port = 3000;

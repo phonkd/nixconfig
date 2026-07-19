@@ -22,6 +22,9 @@
           ip = "192.168.3.203";
           port = 9200;
           dashboard.enable = true;
+          # Default icon resolves to a nonexistent "ocis.png" -> broken tile.
+          # oCIS = ownCloud Infinite Scale; selfh.st ships the ownCloud glyph.
+          dashboard.icon = "sh-owncloud";
           traefik = {
             enable = true;
             domain = "ocis.w.phonkd.net";
