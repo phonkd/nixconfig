@@ -78,6 +78,10 @@
         cudatoolkit
       ];
 
+      # openipmi.service fails on blac because the hardware has no IPMI
+      # controller. Disable it so SystemdServiceFailed stops matching.
+      systemd.services.openipmi.enable = false;
+
       services.sunshine = {
         enable = false;
         autoStart = true;
