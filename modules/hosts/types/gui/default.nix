@@ -102,6 +102,7 @@
       "betterdisplay"
       "shottr"
       "yubico-authenticator"
+      "caffeine"
       "linearmouse"
       "blackhole-2ch"
       "bitwarden"
