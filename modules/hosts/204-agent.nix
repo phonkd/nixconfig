@@ -34,7 +34,17 @@
       users.users.phonkd.extraGroups = [ "hermes" ];
 
       sops.secrets."hermes-openrouter-key" = { owner = "hermes"; };
+      # Discord config is split one env-var-per-secret (each decrypted file is a
+      # single `KEY=VALUE` line). They were previously crammed into ONE secret
+      # space-separated on a single line, so python-dotenv read the whole blob as
+      # DISCORD_BOT_TOKEN's value → Discord rejected the malformed token with a
+      # LoginFailure. One var per file keeps each value atomic and newline-clean.
+      #   hermes-discord      → DISCORD_BOT_TOKEN=<bot token>
+      #   hermes-discord-users→ DISCORD_ALLOWED_USERS=<comma-separated user IDs>
+      #   hermes-discord-home → DISCORD_HOME_CHANNEL=<channel ID>
       sops.secrets."hermes-discord" = { owner = "hermes"; };
+      sops.secrets."hermes-discord-users" = { owner = "hermes"; };
+      sops.secrets."hermes-discord-home" = { owner = "hermes"; };
       # GITHUB_TOKEN (fine-grained PAT) — for the gh CLI only. The Copilot API
       # rejects PATs of any kind ("Personal Access Tokens are not supported"),
       # regardless of the Copilot Requests permission.
@@ -92,6 +102,8 @@
         environmentFiles = [
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
+          config.sops.secrets."hermes-discord-users".path
+          config.sops.secrets."hermes-discord-home".path
           config.sops.secrets."hermes-github".path
           config.sops.secrets."hermes-copilot".path
           config.sops.secrets."hermes-claude".path
