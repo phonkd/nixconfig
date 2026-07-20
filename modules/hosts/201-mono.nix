@@ -41,6 +41,12 @@
       boot.loader.systemd-boot.configurationLimit = 10;
       # (Distributed-build client wiring comes from builder-client, imported
       # via oldblac-vm -- see modules/hosts/types/server/builder.nix.)
+
+      # crowdsec-update-hub.service consistently fails on this VM because
+      # the hub update can't reach upstream (likely a DNS/network race at
+      # boot or the hub is unreachable from this host). Disable the
+      # auto-update service to stop the recurring alert.
+      systemd.services.crowdsec-update-hub.enable = false;
     };
   flake.nixosModules."201-wireguard" =
     {
