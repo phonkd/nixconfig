@@ -55,10 +55,15 @@ sudo nix run nix-darwin/nix-darwin-26.05#darwin-rebuild -- switch --flake ~/git/
 (`--impure` is load-bearing; keep the `nix-darwin-26.05` ref in step with the
 flake's nixpkgs branch on upgrades.)
 
-**Who runs it:** the command is short and safe enough for an agent to run for
-non-critical hosts. For `201-mono` (reverse proxy, fronts every other service)
-still confirm with the user first — magic rollback protects against *lost
-connectivity*, not against a config that comes up wrong-but-reachable.
+**Who runs it:** the agent runs `deploy <host>` itself — including
+`deploy 201` — the user has authorized this (they got tired of pasting deploy
+output back). The command is short, magic rollback catches lost connectivity,
+and re-running it is cheap. So after committing a change, deploy it yourself and
+report the result rather than handing the command back. Two caveats that still
+warrant a heads-up first: (1) a config that could come up *wrong-but-reachable*
+on `201-mono` (magic rollback won't catch that — it only reverts on lost
+connectivity), and (2) anything that would drop multiple hosts at once. When in
+doubt on 201, deploy but watch the result and be ready to roll back.
 
 ## Connectivity: everything rides the sing-box SOCKS proxy
 
