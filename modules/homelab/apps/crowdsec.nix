@@ -98,6 +98,17 @@
         ];
       };
 
+      # autoUpdateService's crowdsec-update-hub oneshot runs as the
+      # unprivileged crowdsec DynamicUser (NoNewPrivileges, PrivateUsers),
+      # but upstream tacks on `ExecStartPost = systemctl reload
+      # crowdsec.service` — which needs root/polkit and so dies with
+      # "Access denied" (exit 4/NOPERMISSION), failing the whole unit even
+      # though `cscli hub update` already succeeded. The reload is pointless
+      # anyway: `hub update` only refreshes the local .index.json metadata,
+      # it never upgrades an *installed* collection, so a live crowdsec has
+      # nothing new to pick up. Drop the broken post-hook.
+      systemd.services.crowdsec-update-hub.serviceConfig.ExecStartPost = lib.mkForce [ ];
+
       # The notification config embeds the Discord webhook URL, so it can't
       # be a nix-store file (which localConfig.notifications would produce).
       # Render it via sops-nix templating instead — same shared secret the
