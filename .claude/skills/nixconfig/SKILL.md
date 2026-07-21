@@ -128,16 +128,17 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
 - **Never verify with full evals** — no `nixosConfigurations.<x>` toplevel builds or
   getFlake harnesses. `nix-instantiate --parse <file>` + grep for dangling refs is
   the ceiling. Rebuilds happen via `deploy <host>` (deploy-rs, `modules/deploy.nix`,
-  builds offload to 205-builder; see `nixconfig-ops`); the user runs it and pastes
-  failures back.
+  builds offload to 205-builder; see `nixconfig-ops`). After committing, the
+  agent runs `deploy <host>` itself (incl. `deploy 201`) and reports the result
+  — the user authorized this; don't hand the command back.
 - Verify NixOS option names against the real module source, not from memory. Locate
   nixpkgs: `nix eval --raw .#nixosConfigurations."203-media".pkgs.path`, then read
   `<path>/nixos/modules/...`.
 - **Default to committing straight to `main`, but don't push** — no feature branch,
   no PR — since most changes here are small homelab tweaks and PR ceremony is pure
-  overhead for a single-user repo. Leave applying to the user: they run `deploy
-  <host>` from the Mac (see `nixconfig-ops`), which builds from the committed HEAD
-  and activates the target directly — no push-to-GitHub or pull-on-target step.
+  overhead for a single-user repo. Then apply it yourself: run `deploy <host>`
+  from the Mac (see `nixconfig-ops`), which builds from the committed HEAD and
+  activates the target directly — no push-to-GitHub or pull-on-target step.
   Only branch + open a PR when the user says so, or the
   change is large/risky enough that a review pass genuinely matters (e.g. something
   that could break the reverse-proxy host or take down multiple hosts at once). Don't
