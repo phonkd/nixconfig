@@ -136,6 +136,7 @@
         self.nixosModules."204-agent"
         inputs.hermes-agent.nixosModules.default
         inputs.slop-trove.nixosModules.default
+        inputs.llm-noobservability.nixosModules.default
       ];
   };
 
