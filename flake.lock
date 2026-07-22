@@ -302,15 +302,15 @@
       "locked": {
         "lastModified": 1784759724,
         "narHash": "sha256-tIAgql2TLwi/7Q7mjQL3yxcoEwbt0y6Sdq31l1NjKnQ=",
-        "ref": "refs/heads/main",
+        "owner": "phonkd",
+        "repo": "llm-NOOBservability",
         "rev": "6e190bc472b2b7e7f9a788283f573db17e6b11b0",
-        "revCount": 1,
-        "type": "git",
-        "url": "file:///Users/phonkd/git/llm-noobservability"
+        "type": "github"
       },
       "original": {
-        "type": "git",
-        "url": "file:///Users/phonkd/git/llm-noobservability"
+        "owner": "phonkd",
+        "repo": "llm-NOOBservability",
+        "type": "github"
       }
     },
     "mkdocs-catppuccin": {
