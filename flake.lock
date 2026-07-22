@@ -300,11 +300,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784759724,
-        "narHash": "sha256-tIAgql2TLwi/7Q7mjQL3yxcoEwbt0y6Sdq31l1NjKnQ=",
+        "lastModified": 1784761464,
+        "narHash": "sha256-5a5bt16KMH9ShquUc/QQ4y0VJOMSe2d3LDyJpdLran8=",
         "owner": "phonkd",
         "repo": "llm-NOOBservability",
-        "rev": "6e190bc472b2b7e7f9a788283f573db17e6b11b0",
+        "rev": "f60295c6d63295d5faa94c7c4d73e97ff1373c79",
         "type": "github"
       },
       "original": {
