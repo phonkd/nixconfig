@@ -23,6 +23,10 @@
         };
 
         services.syncthing.enable = true;
+        # Behind traefik the Host header is syncthing.w.phonkd.net, not a loopback
+        # address, so syncthing's GUI host check returns 403 "Host check error".
+        # Access is already gated by traefik + ipfilter, so skip the check.
+        services.syncthing.settings.gui.insecureSkipHostcheck = true;
         services.syncthing.dataDir = "/mnt/syncthing/data";
         systemd.tmpfiles.rules = [
           "d /mnt/syncthing/data 0755 syncthing syncthing -"
