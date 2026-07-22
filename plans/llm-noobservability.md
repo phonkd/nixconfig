@@ -89,9 +89,14 @@ for hard questions later — off by default, this is a local-first project.
   best ollama/structured-output ecosystem, matches slop-trove precedent.
   Alternative: Go for a single static binary — nicer artifact, slower to
   iterate on prompt/loop logic.
-- **Model** — recommend starting with `qwen2.5-coder:7b-instruct` (or the
-  current Qwen3 8B) and measuring hit-rate on ~20 real questions before
-  considering anything else. It's a config string; cheap to swap.
+- **Model** — recommend **Qwen3.5 small series** (released 2026-03): start
+  with `qwen3.5:9b` (6.6 GB on ollama — fits the 3060 Ti's 8 GB only while
+  the GPU is otherwise idle) and keep `qwen3.5:4b` (3.4 GB) as the fallback
+  default, since jellyfin NVENC transcodes share that GPU's VRAM on 203.
+  Measure hit-rate on ~20 real questions before judging. Note ollama's
+  structured outputs are grammar-constrained sampling, so *valid JSON* is
+  guaranteed regardless of model — the model only determines query quality.
+  It's a config string; cheap to swap.
 - **Streaming vs blocking API** — recommend streaming (NDJSON) from day one;
   the repair loop makes answers slow enough that progress events matter, and
   the phase-2 chat UI wants them anyway.
