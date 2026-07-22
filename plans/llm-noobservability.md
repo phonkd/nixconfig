@@ -2,7 +2,9 @@
 
 **Repo(s):** new repo `llm-noobservability` (service code, package, NixOS module,
 flake) + `nixconfig` (flake input, host wiring on `204-agent`, traefik/dashboard
-entries). **Status:** draft.
+entries). **Status:** in-progress — phase 1 (API + CLI, steps 1–4, 6, 8) is
+deployed on 204 and verified live; phase 2 (chat UI + graph, steps 5, 7) is next.
+Code: github.com/phonkd/llm-NOOBservability.
 
 ## Goal
 
