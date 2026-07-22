@@ -108,6 +108,18 @@
     username = "phonkd";
     deploy.hostname = "192.168.3.203";
 
+    # RTX 3060 Ti (Ampere, 8 GB) passed through from Proxmox — drives Jellyfin
+    # NVENC and ollama-cuda (see arr-slime.nix / 203-media.nix). Declaring it
+    # here is what gates the nvidia-gpu exporter in the observability sender
+    # (noughty.host.gpu.hasNvidia).
+    gpu = {
+      vendors = [ "nvidia" ];
+      compute = {
+        vendor = "nvidia";
+        vram = 8;
+      };
+    };
+
     extraModules =
       { self, inputs }:
       [

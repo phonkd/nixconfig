@@ -577,6 +577,17 @@
         ];
       };
 
+      # NVIDIA GPU metrics (utilisation, VRAM, temperature, power, per-process
+      # usage). Gated on hosts that declare an NVIDIA GPU in lib/registry.nix
+      # (noughty.host.gpu.hasNvidia) — currently only 203-media, whose RTX
+      # 3060 Ti drives Jellyfin NVENC and ollama-cuda. The exporter shells out
+      # to nvidia-smi (config.hardware.nvidia.package.bin), which the media
+      # host already configures via arr-slime.nix. Listens on :9835, scraped
+      # locally by gpu.alloy below — no firewall port is opened.
+      services.prometheus.exporters.nvidia-gpu = lib.mkIf config.noughty.host.gpu.hasNvidia {
+        enable = true;
+      };
+
       environment.etc."alloy/config.alloy" = {
         text =
           let
@@ -685,6 +696,20 @@
               "hostname"    = "oldblac",
             }]
             job_name   = "integrations/unix"
+            forward_to = [prometheus.remote_write.nixvms.receiver]
+          }
+        '';
+      };
+
+      # Scrape the nvidia_gpu_exporter (nvidia-smi wrapper, port 9835) enabled
+      # above. Gated on the same registry-driven GPU flag so the scrape job
+      # can't point at a port nothing is listening on. Produces nvidia_smi_*
+      # metrics (utilisation, memory, temperature, power draw, fan, per-PID).
+      environment.etc."alloy/gpu.alloy" = lib.mkIf config.noughty.host.gpu.hasNvidia {
+        text = ''
+          prometheus.scrape "nvidia_gpu" {
+            targets    = [{"__address__" = "127.0.0.1:9835"}]
+            job_name   = "integrations/nvidia-gpu"
             forward_to = [prometheus.remote_write.nixvms.receiver]
           }
         '';
