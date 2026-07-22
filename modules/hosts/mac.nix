@@ -28,6 +28,13 @@
           };
         }
         {
+          # Syncthing as a launchd user agent (nix-darwin has no syncthing
+          # module; home-manager runs it under launchd on macOS). GUI on
+          # http://127.0.0.1:8384 — pair with 201-mono there, same as the
+          # servers do (they only `enable`, no declarative devices/folders).
+          services.syncthing.enable = true;
+        }
+        {
           targets.darwin = {
             copyApps.enable = false;
             linkApps.enable = true;
