@@ -83,21 +83,59 @@ conflict-layer question. On top of that SilverBullet gives:
    create, edit `.ics` + sync to push. Read unrestricted; **create/modify only for
    events I asked for; never `khal delete`, never bulk-reschedule.**
 
-### The Hermes skill
+### Claude Code work-state sync (plans → PRs → deploys → tasks)
 
-A single **`task-notes`** skill (installed via activation script like
-`mimir-alerting`/`hermes-autofix`) documents: the SilverBullet space layout, the
-task syntax + date attributes, the `Backlog`/daily/`Inbox` pages, the "planning =
-set a date attribute" workflow, and the read-all / stage-to-`Inbox` /
-write-only-what-I-asked rule. Editing pages = plain file ops under `spaceDir`.
-This is the piece I'll iterate on most — a `SKILL.md` edit, not a redeploy.
+The missing piece: **in-flight engineering work is itself a task, at every stage
+until it's actually live** — which is exactly the `done-means-deployed` rule
+encoded as task state. A single nixconfig change moves through:
+
+| Stage | Detected from | Task reads |
+|---|---|---|
+| planned, not executed | `plans/*.md` with `Status:` draft/approved/in-progress | "execute plan `<topic>`" |
+| executed, PR open, not merged | `gh pr list --state open` (incl. `hermes-autofix`'s own draft PRs) | "review & merge PR #N: `<title>`" |
+| merged, not deployed | host's deployed rev ≠ `origin/main` | "`deploy <host>`" |
+| deployed / verified | host rev == `origin/main` | task closes |
+
+This is a **projection**, not a hand-maintained list. A separate **`cc-sync`**
+skill on its own `hermes cron` job (every ~15m) polls those three sources and
+**rewrites a dedicated `Engineering` page** in the space — Hermes is the *sole
+writer* to that page, so it never conflicts with my edits, and I act on the
+PR/deploy, not the task line (which updates next tick). Tasks there are tagged
+`#cc` so the `Backlog` query can fold them in or filter them out.
+
+Detection notes:
+
+- **Plans / PRs** need no new plumbing — `Status:` is already parseable and Hermes
+  has `gh`/`GITHUB_TOKEN`.
+- **Merged-but-not-deployed** is the one gap: **set `system.configurationRevision`
+  in the flake** (currently unset) so every host reports its running rev via
+  `nixos-version`. Then Hermes learns each host's deployed rev **without ssh** by
+  querying Mimir — expose the rev as a node metric label (textfile collector) and
+  Hermes reads it the same way the `mimir-alerting`/`hermes-autofix` skills already
+  hit `10.9.0.1`. (ssh-per-host is the fallback if the metric route is more work
+  than it's worth.)
+
+### The Hermes skills
+
+Two skills, both installed via activation script like
+`mimir-alerting`/`hermes-autofix`:
+
+- **`task-notes`** — the SilverBullet space layout, task syntax + date attributes,
+  the `Backlog`/daily/`Inbox` pages, the "planning = set a date attribute"
+  workflow, and the read-all / stage-to-`Inbox` / write-only-what-I-asked rule.
+  Editing pages = plain file ops under `spaceDir`.
+- **`cc-sync`** — the projection above: poll plans/PRs/deploys and rewrite the
+  `Engineering` page. Sole writer to that page; read-only against the repo/hosts.
+
+These are the pieces I'll iterate on most — `SKILL.md` edits, not redeploys.
 
 ### Keeping it in step
 
-A `hermes cron` job (`every 15m`, created once by hand like the autofix job) runs
-`vdirsyncer sync` so `khal`'s view is fresh; it can also surface today's
-overdue/near items. `[SILENT]` when nothing's up. This is the natural "plan my
-day" entry point each morning.
+Two `hermes cron` jobs (created once by hand like the autofix job): one `every
+15m` runs `vdirsyncer sync` so `khal`'s view is fresh and can surface today's
+overdue items; a second drives `cc-sync` to rewrite the `Engineering` page.
+`[SILENT]` when nothing's up. The morning tick is the natural "plan my day" entry
+point.
 
 ## Steps
 
@@ -109,15 +147,24 @@ day" entry point each morning.
    (`owner`/env as needed); append caldav secret to `environmentFiles`. Add both
    secrets to `secret.yaml`.
 3. **`nixconfig`** — activation scripts writing the `vdirsyncer`/`khal` config +
-   the `caldav` and `task-notes` `SKILL.md` files into the hermes state dir.
-4. **Deploy** `deploy 204-agent` (and `deploy 201-mono` for the traefik route).
-5. **Runtime (one-time)** — `vdirsyncer discover`/first sync; seed the SilverBullet
-   space with `Backlog`, `Today`, `Inbox` pages + their queries; create the
-   `hermes cron` job; log into the SilverBullet PWA on my phone/desktop.
-6. **Verify** — `khal list` shows real events; I add a task in a note on the phone
+   the `caldav`, `task-notes`, and `cc-sync` `SKILL.md` files into the hermes
+   state dir.
+4. **`nixconfig` (for `cc-sync`)** — set `system.configurationRevision` from the
+   flake `self.rev`, and expose it as a node metric (textfile collector) so Hermes
+   can read each host's deployed rev from Mimir. (Small, generally-useful change:
+   you can then always see what rev a host runs.)
+5. **Deploy** `deploy 204-agent` (and `deploy 201-mono` for the traefik route);
+   redeploy hosts once so they report `configurationRevision`.
+6. **Runtime (one-time)** — `vdirsyncer discover`/first sync; seed the SilverBullet
+   space with `Backlog`, `Today`, `Inbox`, `Engineering` pages + their queries;
+   create the two `hermes cron` jobs; log into the SilverBullet PWA on
+   phone/desktop.
+7. **Verify** — `khal list` shows real events; I add a task in a note on the phone
    and it appears in the `Backlog` query; Hermes sets a `due:today` on one and it
    shows on the daily page; Hermes and I edit the same page seconds apart and the
-   server reconciles to one page — **no `.sync-conflict` file anywhere**.
+   server reconciles to one page (**no `.sync-conflict` anywhere**); this very
+   plan/PR shows up on the `Engineering` page as a task, and advances stage when it
+   merges and again when `204-agent` is deployed.
 
 ## Open decisions
 
@@ -137,6 +184,15 @@ Defaults picked; say if you'd override:
   simplest; switch to the API only if we ever see a race writing the same page.
 - **CalDAV access = `khal`/`vdirsyncer` CLI** (recommended) vs. raw `curl` vs. a
   `caldav` MCP server — unchanged rationale.
+- **Deployed-rev detection = `configurationRevision` + Mimir metric**
+  (recommended) vs. Hermes ssh-ing each host. The metric route reuses the
+  Mimir-query capability Hermes already has and needs no ssh keys on `204-agent`;
+  ssh is the fallback.
+- **`Engineering` tasks: separate `#cc` page, one task per work-item advancing
+  through stages** (recommended) vs. a task per stage, and vs. folding them
+  straight into `Backlog`. One-item-with-stages keeps a change as a single line
+  from plan→PR→deploy; the `#cc` tag lets me include/exclude them from the big
+  list at will.
 - **Whole-space read exposure (accepted)** — Hermes can read every page, chosen so
   it has project context. Write restraint rests on the skill rules + `Inbox`
   staging.
@@ -157,6 +213,11 @@ Defaults picked; say if you'd override:
   worth their own backup (a periodic `git`/`restic` snapshot of `spaceDir`) since
   they're now a primary source of truth on `204-agent`, not just a replica.
 - **Whole-space read exposure** — see the decision above.
+- **`cc-sync` is read-derived** — it only *reads* plans/PRs/host-revs and
+  *writes* the one `Engineering` page it solely owns; it never merges, deploys, or
+  edits other pages. Worst case is a stale/wrong task line, corrected next tick —
+  no action taken on the repo or hosts. Requires `configurationRevision` to be set
+  or the deploy-stage tasks are blind.
 - **Permissions bridge** — silverbullet-user vs hermes-user access to `spaceDir`
   is the one fiddly bit; get the shared group + group-writable dir right or Hermes
   can't write.
