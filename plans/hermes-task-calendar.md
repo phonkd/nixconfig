@@ -65,10 +65,17 @@ conflict-layer question. On top of that SilverBullet gives:
      scheduling (SilverBullet task attributes, e.g. a `due`/`scheduled` date or a
      `#today` tag).
    - A **`Backlog`** page holds a live query: every open task across the space.
-   - A **daily page** (`Journal/YYYY-MM-DD` or a `Today` page) holds a query
-     filtering tasks scheduled/due today. **Planning the day** — me or Hermes — is
-     just *setting the date attribute* on backlog tasks; the day view assembles
-     itself. One source of truth; the day is a lens.
+   - A **daily page** (`Journal/YYYY-MM-DD` or a `Today` page) holds a query for
+     **open tasks scheduled on-or-before today** — so anything planned but not
+     finished on its day *carries forward* and keeps showing until it's done,
+     never dropped. **Planning the day** — me or Hermes — is just *setting the date
+     attribute* on backlog tasks; the day view assembles itself.
+   - **Planning ≠ completion.** Scheduling a task for a day only sets metadata; the
+     task stays open until *I* check it off. A day is a lens over open tasks, not a
+     bucket that consumes them. The `cc-sync` deploy-stage tasks obey the same rule
+     — they close only when the change is actually live. This is the invariant the
+     `task-notes` skill enforces: Hermes may set/bump dates when planning, but
+     **never checks a task off to "clear" a day.**
 4. **Propose, don't mutate.** Hermes drops new/uncertain tasks onto an **`Inbox`**
    page; I triage them into their real project pages. It may set date attributes /
    check off only tasks I explicitly asked about. Read = the whole space; write is
@@ -134,8 +141,15 @@ These are the pieces I'll iterate on most — `SKILL.md` edits, not redeploys.
 Two `hermes cron` jobs (created once by hand like the autofix job): one `every
 15m` runs `vdirsyncer sync` so `khal`'s view is fresh and can surface today's
 overdue items; a second drives `cc-sync` to rewrite the `Engineering` page.
-`[SILENT]` when nothing's up. The morning tick is the natural "plan my day" entry
-point.
+`[SILENT]` when nothing's up.
+
+The morning tick is the **calendar-aware "plan my day"** flow, and it's the payoff
+of colocating tasks + calendar under one agent: Hermes reads the day's CalDAV
+events (`khal`) *and* the open `Backlog` (including carried-over and `#cc` deploy
+tasks), then proposes a realistic day by *setting date attributes* on the tasks
+that fit the gaps around my commitments — it doesn't invent time I don't have. I
+adjust; nothing gets closed by planning. Whatever I don't finish is still open
+tomorrow.
 
 ## Steps
 
