@@ -106,8 +106,10 @@
         # skills toolsets are already in the hermes-discord preset.
         # khal + vdirsyncer: the caldav skill's CLI pair (sync against
         # radicale on cal.phonkd.net; config installed by the
-        # hermesCaldavConfig activation script below).
-        extraPackages = [ pkgs.gh pkgs.claude-code pkgs.tmux pkgs.jq pkgs.khal pkgs.vdirsyncer ];
+        # hermesCaldavConfig activation script below). curl: the SilverBullet
+        # HTTP API client used by the task-notes skill and the cc-sync script
+        # (NOT on the service PATH otherwise — only the system profile has it).
+        extraPackages = [ pkgs.gh pkgs.claude-code pkgs.tmux pkgs.jq pkgs.khal pkgs.vdirsyncer pkgs.curl ];
         # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
@@ -886,6 +888,27 @@
           '';
           deps = [ ];
         };
+
+      # cc-sync as a DETERMINISTIC SCRIPT, not an LLM skill. The projection is
+      # purely mechanical (list plans, list open PRs, format, PUT to
+      # SilverBullet) and the cheap main model (deepseek-v4-flash) would not
+      # reliably follow it — verified live: it kept re-emitting the removed
+      # per-host "deploy <host>" lines regardless of skill/prompt edits. So the
+      # cc-sync cron job runs this script directly via `--no-agent --script
+      # cc-sync.sh` (that job config is runtime state in ~/.hermes/cron/jobs.json,
+      # set by hand like the other cron jobs — the SKILL.md above stays only as
+      # design documentation). Needs curl + gh on PATH (both in extraPackages)
+      # and reads GITHUB_TOKEN from the service env + the silverbullet-token
+      # secret at runtime.
+      system.activationScripts.hermesCcSyncScript = {
+        text = ''
+          install -D -m 0755 \
+            -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+            ${./cc-sync.sh} \
+            ${config.services.hermes-agent.stateDir}/.hermes/scripts/cc-sync.sh
+        '';
+        deps = [ ];
+      };
 
       # Personal-data embedding + semantic search (the "thing"); Hermes queries
       # it via the MCP entry above. Postgres + pgvector are created locally.
