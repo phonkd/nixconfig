@@ -110,6 +110,11 @@
       # hold a TCC Microphone grant, which cava (reading BlackHole, an input
       # device) needs. Run cava from this build and the mic permission sticks.
       "kitty"
+      # Handy — offline on-device whisper STT (push-to-talk dictation).
+      # A signed, self-contained app captures the mic in-process, so it holds
+      # a TCC Microphone grant. The old DIY whisper.cpp+Hammerspoon rig failed
+      # because macOS TCC won't extend a mic grant to spawned nix CLI helpers.
+      "handy"
     ];
     homebrew.brews = [
       "yt-dlp"
