@@ -27,6 +27,9 @@
     {
       imports = [ self.nixosModules.builder-server ];
       config = lib.mkIf (config.noughty.host.name == "205-builder") {
+        # Limit /boot generations so the small vfat partition doesn't fill up.
+        # (Default is 100, which exceeds the available space on this VM.)
+        boot.loader.grub.configurationLimit = 10;
         label.labels = [ "vm" ];
         networking.hostName = "205-builder";
         networking.interfaces.ens18.ipv4.addresses = [
