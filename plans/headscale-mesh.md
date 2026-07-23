@@ -6,24 +6,31 @@ _Decisions locked:_ embedded DERP (no tailscale.com relays); **Tailscale SSH**
 (model A — identity+ACL, sshd:5432 kept as break-glass); coordinator at
 `hs.phonkd.net` with built-in Let's Encrypt.
 
-_Status (2026-07-23):_ **Phase 1 all but one host done.** Coordinator live on obs
+_Status (2026-07-24):_ **Phase 1 servers all done.** Coordinator live on obs
 (headscale 0.28, valid LE cert, HTTPS 200). headscale user `phonkd` + a reusable
 1-year pre-auth key minted and stored as sops `headscale_authkey`. Client module
 `tailnet` wired into builder.nix `alwaysImport`; canonical ACL applied to the
-coordinator (`headscale-policy.hujson`, `policy set`). **Enrolled + verified over
-the tailnet: 204-agent, 205-builder, 203-media, observability** — direct P2P
-Tailscale SSH by MagicDNS name works, incl. cross-network home↔Hetzner (30ms).
-Remaining: **201-mono** (blocked, see below) and the **Mac client** (Phase 1 step 5,
-cask + `tailscale login`). Nothing retired yet — wg-obs/sing-box/proxyCommand
-still live.
+coordinator (`headscale-policy.hujson`, `policy set`). **All 5 servers enrolled +
+verified over the tailnet: 201-mono (100.64.0.5), 203-media, 204-agent,
+205-builder, observability** — direct P2P Tailscale SSH by MagicDNS name works,
+incl. cross-network home↔Hetzner (30ms). Remaining: the **Mac client** (Phase 1
+step 5, cask + `tailscale login`, `--accept-dns=false`). Nothing retired yet —
+wg-obs/sing-box/proxyCommand still live.
 
-_201-mono blocker:_ 201's config change is committed but not yet deployed. The
-Mac→201 path over the sing-box SOCKS proxy times out at the SSH banner (only .201;
-.203/.204/.205 are fine, and 201's sshd is healthy from the LAN), so `deploy 201`
-can't push from the Mac. Pre-existing, unrelated to this change (201 is still on
-its old generation). Deploy it from a network where the proxy reaches 201, or via
-`ssh -J 192.168.3.203` (proven reachable) — once enrolled, 201 is reachable by
-tailnet IP and the proxy hairpin stops mattering.
+_201-mono notes (both faults external to this change):_
+- **Mac→201 over the sing-box proxy is dead** (SSH banner timeout — only .201;
+  .203/.204/.205 fine, 201's sshd healthy from the LAN). Worked around by
+  deploying via `ssh -J 192.168.3.203` (see `~/deploy-201-via-jump.sh`, a
+  throwaway). Now that 201 is on the tailnet, reach it at `201-mono` / 100.64.0.5
+  instead — the proxy hairpin no longer matters for management.
+- **201's uplink to the internet is intermittent.** Its gateway 192.168.3.1 (the
+  `.3` segment; note 203 uses 192.168.1.1) periodically drops all of 201's
+  TCP/UDP + DNS while still passing ICMP — every earlier deploy hit a down window
+  (crowdsec-update-hub / tailscaled-autoconnect failed on DNS → rollback). The
+  deploy that stuck landed during a healthy window (0/20 loss, DNS resolving).
+  This is a standing 201/router problem worth fixing on its own (it breaks ACME
+  renewals etc.), unrelated to headscale. `tailnet.nix` pins hs.phonkd.net→10.9.0.1
+  on 201 so mesh control/DERP rides the wg tunnel it can always reach.
 
 ## Goal
 
