@@ -1,183 +1,170 @@
-# Hermes co-managed tasks + calendar
+# Hermes co-managed tasks + calendar (SilverBullet)
 
-**Repo(s):** `nixconfig` (all lands on `204-agent`, same pattern as the
-`mimir-alerting` / `hermes-autofix` skills). Vault *content* lives in a synced
-Obsidian vault, outside this repo. **Status:** draft.
+**Repo(s):** `nixconfig`. Service + Hermes skills land on **`204-agent`**; the
+traefik route registers on **`201-mono`** (same cross-host split as
+`hermes.nix`). The notes/tasks live in a SilverBullet *space* (markdown files) on
+`204-agent`; the calendar stays on the existing self-hosted CalDAV server.
+**Status:** draft.
 
 ## Goal
 
-Manage my calendar and task list **together with** Hermes — not delegate to it,
-not take orders from it. Both of us get equal *read* access to the same CalDAV
-calendar and the same Obsidian vault; Hermes gets *write* only on things I asked
-for, and it stages speculative items rather than silently reorganizing my list.
-Works from any device (phone included) because Hermes runs server-side on
-`204-agent` and I reach it over Discord — Obsidian on the phone is just a synced
-*view*, never the thing the agent has to reach.
+Manage my calendar and tasks **together with** Hermes — equal access, not
+delegation. I write detailed prose state for tasks/projects, so tasks must live
+**next to my notes** (note-adjacency). I also want **one big list of every open
+task** plus a **daily list** where either of us picks what fits the day. And it
+has to survive an agent and me writing concurrently, from any device including
+the phone.
 
-**Task model I want:** *one big list* of all open tasks (a single backlog file,
-not a file-per-task), and a **daily list** — either of us plans the day by
-picking tasks from the backlog that fit. The daily list is a *lens*, not a copy:
-each task carries an optional scheduled date, and "today" is a Tasks-plugin query
-over the one backlog. Planning the day = setting scheduled dates; there's only
-ever one source of truth, so the day plan can't drift from the backlog.
+**Why not Obsidian (the pivot):** Obsidian is a single-user editor over flat
+files. Every hard thing in the earlier drafts — git merge layers, LiveSync,
+sync-conflict files, append-only conventions — existed only to make *two replicas
++ dumb sync* fake a shared datastore. That's the real defect: wrong storage
+model. Switching to another flat-file PKM (Logseq, Joplin, Foam) changes nothing.
 
-The original sketch was four pieces: CalDAV server, an MCP caldav tool, an MCP
-vault tool, and a task-management skill. Reading the running config collapses two
-of them:
+**The fix: a server-authoritative notes tool — SilverBullet.** It keeps
+note-adjacent markdown, but there is **one authoritative copy** (a `spaceDir` of
+`.md` files on one server) that my phone (PWA), my desktop, and Hermes all talk
+to — not N replicas that need merging. That single fact deletes the entire
+conflict-layer question. On top of that SilverBullet gives:
 
-- **The terminal toolset already *is* the "vault tool."** Hermes runs
-  `bash`/`git`/file ops directly (that's how `mimir-alerting` and `hermes-autofix`
-  work). "Vault access" = *the agent keeps a checkout/replica of the vault* + a
-  skill that says where it may write. No new tool server.
-- **CalDAV is just HTTP**, so it's the same shape as the Mimir skill — a skill
-  over a CLI/`curl`, not a bespoke MCP server. A local calendar CLI (`khal` +
-  `vdirsyncer`) does the iCalendar/timezone grunt work that raw `curl` +
-  hand-written `VEVENT` would make miserable.
-
-## The conflict problem (and why the sync layer is the whole decision)
-
-I want the **entire vault synced** and **one big shared list**, not
-one-file-per-task. That reopens the concurrent-edit problem: one file, two
-writers (me on mobile, Hermes on `204-agent`), and a sync layer decides what
-happens when both touch it.
-
-**The key fact:** plain **S3 and plain Syncthing replicate, they don't merge.**
-Two edits to one file → last-write-wins clobber, or a `.sync-conflict-<date>.md`
-dupe. They're fine for whole-vault device sync, but a file *two of us edit* needs
-a layer that actually merges. The two that do:
-
-- **Git (recommended).** Obsidian Git plugin on every device (auto pull/commit)
-  + Hermes as an ordinary git client with a checkout. Line-level 3-way merge:
-  collisions happen only on the *same line*, and they surface as real, resolvable
-  conflicts — never a silent dupe. Fits this repo's culture, and Hermes editing
-  is just `git pull --rebase` → edit → commit → push. S3 can still back it (git
-  remote or plain object push), but git — not S3 — is what merges.
-- **Obsidian LiveSync (self-hosted CouchDB).** Purpose-built for concurrent
-  Obsidian editing, best mobile story, chunk-level merge. Cost: Hermes editing
-  *outside* Obsidian is harder — it talks to CouchDB or keeps a replica, more
-  moving parts than a git checkout. A homelab CouchDB is a new service.
-
-On top of whichever merge layer, **convention keeps real collisions near zero:**
-Hermes works in short pull→edit→push bursts and edits *append-mostly* (drops new
-items under an `## Inbox` heading, sets a scheduled date on its own line) rather
-than reordering my lines. Same-line collisions with me become vanishingly rare,
-and when one happens it's a git conflict I can resolve, not lost data.
+- **Note-adjacency** — I write full project state in a page; tasks (`- [ ]`) live
+  inline in that page with the prose around them.
+- **A query/index engine** — it indexes tasks across the whole space, so "one big
+  list of every open task" and "today" are **live queries**, not files I hand-
+  maintain. My backlog+daily model is native, and note-adjacency stops fighting
+  the one-big-list want: tasks live where they belong; the queries assemble them.
+- **Trivial Hermes access** — the space is plain `.md` files *on the same host as
+  Hermes* (`204-agent`). Hermes reads/writes them with the terminal toolset it
+  already has — no MCP tool, no API, no replica. (`services.silverbullet` is in
+  our nixpkgs: `silverbullet-2.6.1`, module `services.silverbullet` with
+  `spaceDir`/`listenPort`/`listenAddress`/`envFile`.)
 
 ## Approach
 
-### Tasks (one Obsidian vault, git-synced)
+### Notes + tasks (SilverBullet on `204-agent`)
 
-1. **Whole vault synced, via git as the merge layer.** Obsidian Git plugin on
-   desktop + mobile; the vault is a git repo (remote on the homelab or a private
-   GitHub repo — small sub-decision). Hermes keeps a checkout on `204-agent` and
-   `git pull --rebase` / commit / push around every edit.
-2. **One big backlog file** — e.g. `tasks/backlog.md`, every open task as a
-   Tasks-plugin checkbox with optional metadata (`📅 scheduled`, `⏳`,
-   `🔺 priority`, tags). No file-per-task, no Kanban single-board file.
-3. **Daily list = a query, not a copy.** A daily note `daily/YYYY-MM-DD.md` holds
-   a Tasks query (`(scheduled on YYYY-MM-DD) OR (due before tomorrow)`) that
-   renders today's picks live from the backlog. **Planning the day** — by me or
-   Hermes — is just *setting scheduled dates* on backlog items. One source of
-   truth; the day is a lens over it.
-4. **Propose, don't mutate.** Hermes appends new/uncertain tasks under an
-   `## Inbox` region (of `backlog.md` or a separate `inbox.md`); I triage them
-   into the list. It may set scheduled dates / check off only tasks I explicitly
-   asked it to. Enforced by the skill's rules + the append-mostly convention.
-5. A `task-management` skill documents: the Tasks-plugin syntax I use, the
-   backlog/daily-note layout, the `## Inbox` staging rule, the "planning = set a
-   `📅` date" workflow, and the git pull→edit→push discipline. This is the piece
-   I'll iterate on most — keeping it a skill (not a tool) means changing my mind
-   about the layout is a `SKILL.md` edit, not a service redeploy.
+1. **Run SilverBullet on `204-agent`**, colocated with Hermes, following the
+   `hermes.nix` cross-host structure (not the generic `homelab-server` gate,
+   because `204-agent` isn't that tag):
+   - On **`reverse-proxy`** (201-mono): register `phonkds.modules.silverbullet`
+     with `ip = "192.168.3.204"`, the port, a dashboard tile, and a traefik route
+     (`silverbullet.w.phonkd.net`, `ipfilter = true`).
+   - On **`204-agent`**: `services.silverbullet.enable = true` with
+     `listenAddress = "0.0.0.0"`, a `listenPort`, `spaceDir =
+     /var/lib/silverbullet/space`, and `envFile` (basic-auth creds from a sops
+     secret). Add an nftables rule allowing that port from `192.168.3.201` only —
+     copy the hermes-dashboard firewall pattern.
+2. **Bridge the space to Hermes.** SilverBullet runs as its own user; Hermes runs
+   as `hermes`. Give both read/write on `spaceDir` — simplest is to set
+   `services.silverbullet.group = "hermes"` (or a shared group) and make the space
+   group-writable, so Hermes edits pages directly. SilverBullet watches the space
+   and re-indexes external file changes, so Hermes writing `.md` files straight to
+   disk is a supported path.
+3. **Task model in the space:**
+   - Tasks are inline `- [ ]` items inside project/note pages, with attributes for
+     scheduling (SilverBullet task attributes, e.g. a `due`/`scheduled` date or a
+     `#today` tag).
+   - A **`Backlog`** page holds a live query: every open task across the space.
+   - A **daily page** (`Journal/YYYY-MM-DD` or a `Today` page) holds a query
+     filtering tasks scheduled/due today. **Planning the day** — me or Hermes — is
+     just *setting the date attribute* on backlog tasks; the day view assembles
+     itself. One source of truth; the day is a lens.
+4. **Propose, don't mutate.** Hermes drops new/uncertain tasks onto an **`Inbox`**
+   page; I triage them into their real project pages. It may set date attributes /
+   check off only tasks I explicitly asked about. Read = the whole space; write is
+   governed by the skill rules below.
 
-### Calendar (CalDAV — server already self-hosted)
+### Calendar (CalDAV — unchanged from the earlier draft)
 
-1. Add `pkgs.khal` + `pkgs.vdirsyncer` to `services.hermes-agent.extraPackages`
-   on `204-agent` (alongside the existing `gh`/`claude-code`/`tmux`/`jq`).
-2. `vdirsyncer` + `khal` config in the hermes state dir, pointed at the CalDAV
-   URL; credentials from a new sops secret `hermes-caldav` (`owner = "hermes"`,
-   added to `environmentFiles`), same one-var-per-file discipline the Discord
-   secrets use.
-3. A `caldav` skill (`$HERMES_HOME/skills/personal/caldav/SKILL.md`, installed by
-   activation script like the others): `vdirsyncer sync` first, `khal list <range>`
-   to read, `khal new` to create, edit via the on-disk `.ics` + `vdirsyncer sync`
-   to push. Read unrestricted; **create/modify only for events I asked for; never
-   `khal delete`, never bulk-reschedule** — those need a human.
+1. `pkgs.khal` + `pkgs.vdirsyncer` in `services.hermes-agent.extraPackages`.
+2. `vdirsyncer`/`khal` config in the hermes state dir; creds from sops secret
+   `hermes-caldav` (`owner = "hermes"`, in `environmentFiles`).
+3. A `caldav` skill: `vdirsyncer sync` → `khal list` to read, `khal new` to
+   create, edit `.ics` + sync to push. Read unrestricted; **create/modify only for
+   events I asked for; never `khal delete`, never bulk-reschedule.**
+
+### The Hermes skill
+
+A single **`task-notes`** skill (installed via activation script like
+`mimir-alerting`/`hermes-autofix`) documents: the SilverBullet space layout, the
+task syntax + date attributes, the `Backlog`/daily/`Inbox` pages, the "planning =
+set a date attribute" workflow, and the read-all / stage-to-`Inbox` /
+write-only-what-I-asked rule. Editing pages = plain file ops under `spaceDir`.
+This is the piece I'll iterate on most — a `SKILL.md` edit, not a redeploy.
 
 ### Keeping it in step
 
 A `hermes cron` job (`every 15m`, created once by hand like the autofix job) runs
-`vdirsyncer sync` + `git pull` so `khal`'s and the vault's views are fresh, and
-optionally surfaces today's/overdue items. `[SILENT]` when there's nothing to
-say, so no Discord spam. This is also the natural "plan my day" entry point in
-the morning.
+`vdirsyncer sync` so `khal`'s view is fresh; it can also surface today's
+overdue/near items. `[SILENT]` when nothing's up. This is the natural "plan my
+day" entry point each morning.
 
 ## Steps
 
-Per-repo, each verifiable on its own:
-
-1. **`nixconfig` / `204-agent.nix`** — add `khal` + `vdirsyncer` to
-   `extraPackages`; add `sops.secrets."hermes-caldav"` (`owner = "hermes"`) and
-   append its path to `environmentFiles`. Add the CalDAV creds to `secret.yaml`.
-   If a git remote needs a token for the vault repo, add that secret too.
-2. **`nixconfig` / `hermes.nix` (or `204-agent.nix`)** — activation script that
-   writes the `vdirsyncer`/`khal` config from the secret, plus the `caldav`
-   `SKILL.md`. Model on the existing `hermesMimirAlertingSkill` activation script.
-3. **`nixconfig`** — activation script for the `task-management` `SKILL.md`.
-4. **Deploy** `deploy 204-agent`.
-5. **Runtime (one-time, on the host)** — `vdirsyncer discover`/first sync; clone
-   the vault repo to Hermes' checkout and configure git identity/credentials;
-   create the `hermes cron` sync job. On my devices: install + configure the
-   Obsidian Git plugin (or LiveSync). Document these in the plan's tail like the
-   autofix "one-time setup".
-6. **Verify** — `khal list` shows real events; I add a task on the phone and
-   Hermes sees it after a pull; Hermes drops an item under `## Inbox` and it
-   shows up in Obsidian; concurrent edits to `backlog.md` produce a git merge,
-   **not** a `.sync-conflict` dupe.
+1. **`nixconfig` / new `modules/homelab/apps/silverbullet.nix`** — the cross-host
+   module: traefik registration on `reverse-proxy`, `services.silverbullet` +
+   firewall rule on `204-agent`, group bridge to `hermes`. Model on `hermes.nix`.
+2. **`nixconfig` / `204-agent.nix`** — `pkgs.khal` + `pkgs.vdirsyncer` to
+   `extraPackages`; sops secrets `hermes-caldav` and `silverbullet-auth`
+   (`owner`/env as needed); append caldav secret to `environmentFiles`. Add both
+   secrets to `secret.yaml`.
+3. **`nixconfig`** — activation scripts writing the `vdirsyncer`/`khal` config +
+   the `caldav` and `task-notes` `SKILL.md` files into the hermes state dir.
+4. **Deploy** `deploy 204-agent` (and `deploy 201-mono` for the traefik route).
+5. **Runtime (one-time)** — `vdirsyncer discover`/first sync; seed the SilverBullet
+   space with `Backlog`, `Today`, `Inbox` pages + their queries; create the
+   `hermes cron` job; log into the SilverBullet PWA on my phone/desktop.
+6. **Verify** — `khal list` shows real events; I add a task in a note on the phone
+   and it appears in the `Backlog` query; Hermes sets a `due:today` on one and it
+   shows on the daily page; Hermes and I edit the same page seconds apart and the
+   server reconciles to one page — **no `.sync-conflict` file anywhere**.
 
 ## Open decisions
 
 Defaults picked; say if you'd override:
 
-- **Sync/merge layer = git** (Obsidian Git + Hermes git client) — recommended,
-  because it's the only option that both (a) merges one shared list without dupes
-  and (b) lets Hermes edit with plain terminal/git, no new service. Alternative:
-  **Obsidian LiveSync/CouchDB** (better concurrent-edit + mobile UX, but a new
-  homelab service and Hermes-access is clunkier). **Plain S3 or plain Syncthing
-  alone is rejected** for the shared list — they replicate without merging, so a
-  two-writer file conflicts. (S3 can still be the git *remote* if I want it.)
+- **Notes tool = SilverBullet** (recommended) vs. Trilium/TriliumNext (server DB +
+  REST API, but not markdown and tasks aren't first-class) vs. staying on Obsidian
+  with LiveSync/CouchDB (keeps the editor, but Hermes access is clunkier and it's
+  a heavier service). SilverBullet uniquely gives markdown note-adjacency + a task
+  query engine + plain-file Hermes access on one authoritative store.
+- **Host placement = `204-agent`, colocated with Hermes** (recommended) — gives
+  Hermes direct filesystem access to the space. Alternative: run it on a
+  `homelab-server` host and have Hermes reach it over the HTTP API — cleaner tag
+  fit, but loses the plain-file access that makes the skill trivial.
+- **Hermes edit path = direct file ops on `spaceDir`** (recommended; SilverBullet
+  re-indexes external changes) vs. the SilverBullet **HTTP API**. Direct files is
+  simplest; switch to the API only if we ever see a race writing the same page.
 - **CalDAV access = `khal`/`vdirsyncer` CLI** (recommended) vs. raw `curl` vs. a
-  Python `caldav` MCP server. CLI wins: no new service, handles
-  timezones/ETags/`VEVENT`, fits the skill-over-terminal pattern. MCP server is
-  the fallback only if I want the calendar reachable by something other than
-  Hermes.
-- **Whole-vault exposure (accepted).** Syncing the entire vault means Hermes can
-  *read* every note, not just tasks — I chose this so it can reason over context.
-  Write restraint now rests on skill rules + the append-mostly convention, not on
-  folder scope. Fine as long as I'm okay with the whole vault being in the agent's
-  read surface.
-- **Vault git remote** — homelab-hosted (Forgejo/Gitea, keeps it in-network) vs.
-  a private GitHub repo (Hermes already has `gh`/`GITHUB_TOKEN`). Lean private
-  GitHub for zero new infra; homelab if I want the vault to never leave the LAN.
-- **Autonomy envelope** (recommended, matches the `hermes-autofix` house rule):
-  read everything; write only what I asked for; stage speculative items under
-  `## Inbox`; **no** `khal delete`, **no** autonomous rescheduling, **no**
-  deleting tasks. Loosen per-capability later if a specific chore proves safe.
+  `caldav` MCP server — unchanged rationale.
+- **Whole-space read exposure (accepted)** — Hermes can read every page, chosen so
+  it has project context. Write restraint rests on the skill rules + `Inbox`
+  staging.
+- **Autonomy envelope** (matches the `hermes-autofix` house rule): read
+  everything; write only what I asked; stage speculative items to `Inbox`; **no**
+  `khal delete`, **no** autonomous rescheduling, **no** deleting tasks.
 
 ## Risks / rollout
 
-- **Sync conflicts** — the main hazard, now addressed by the *merge layer* (git)
-  + append-mostly convention rather than one-file-per-task. Worst case is a git
-  conflict on `backlog.md`, which is resolvable and non-destructive — not silent
-  data loss. Back-out is trivial.
-- **Vault content is not in this repo.** The plan and all nix wiring are
-  version-controlled here; task/calendar data live in the vault's own git repo +
-  CalDAV. Losing `204-agent` loses no source of truth — it's a peer/consumer.
-- **Whole-vault read exposure** — see the decision above; the trade for
-  context-awareness is that the agent's read surface is my entire vault.
-- **Rollout** is additive and host-local: `deploy 204-agent`. Nothing touches the
-  reverse proxy, networking, or other hosts. Back out by dropping the two
-  `extraPackages`, the secret(s), and the activation scripts, then redeploy; the
-  git checkout + cron job are runtime state removed by hand.
-- **Credential blast radius** — `hermes-caldav` gives Hermes full calendar
-  write; the git token gives full vault write. Scope both as tightly as the
-  servers allow.
+- **Concurrent edits** — the whole reason for SilverBullet. One authoritative
+  on-disk space + a re-indexing server means there's no two-replica merge and no
+  `.sync-conflict` files. Residual surface: Hermes and a client writing the *exact
+  same page* in the same instant is last-write on one store (not a fork); the
+  `Inbox`-staging + set-attributes-not-reorder convention keeps even that near
+  zero. Far smaller than the Obsidian model.
+- **Space is not in this repo.** The plan + nix wiring are versioned here; the
+  notes/tasks live in the SilverBullet space, the calendar in CalDAV. Both are
+  worth their own backup (a periodic `git`/`restic` snapshot of `spaceDir`) since
+  they're now a primary source of truth on `204-agent`, not just a replica.
+- **Whole-space read exposure** — see the decision above.
+- **Permissions bridge** — silverbullet-user vs hermes-user access to `spaceDir`
+  is the one fiddly bit; get the shared group + group-writable dir right or Hermes
+  can't write.
+- **Rollout** is additive: `deploy 204-agent` + `deploy 201-mono`. Nothing else on
+  the reverse proxy changes beyond one route. Back out by removing the
+  silverbullet module, the two `extraPackages`, the secrets, and the activation
+  scripts, then redeploy; the space dir + cron job are runtime state removed by
+  hand.
+- **Credential blast radius** — `hermes-caldav` = full calendar write;
+  SilverBullet basic-auth guards the notes. Scope each as tightly as the servers
+  allow; the traefik `ipfilter` already gates network reach.
