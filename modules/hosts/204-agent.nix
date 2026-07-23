@@ -685,7 +685,7 @@
               so don't edit them in place. Full-page PUT:
 
               ```bash
-              curl -sS -X PUT "http://127.0.0.1:9121/<Page>.md" \
+              curl -sS -X PUT "http://127.0.0.1:9121/.fs/<Page>.md" \
                 -H "Authorization: Bearer $(cat /run/secrets/silverbullet-token)" \
                 -H "Content-Type: text/markdown" \
                 --data-binary @newcontent.md
@@ -859,7 +859,7 @@
                owns the space files — never write them directly):
 
                ```bash
-               curl -sS -X PUT "http://127.0.0.1:9121/Engineering.md" \
+               curl -sS -X PUT "http://127.0.0.1:9121/.fs/Engineering.md" \
                  -H "Authorization: Bearer $(cat /run/secrets/silverbullet-token)" \
                  -H "Content-Type: text/markdown" \
                  --data-binary @newpage.md
