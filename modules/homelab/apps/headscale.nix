@@ -20,8 +20,8 @@
 # ACL / Tailscale-SSH policy is managed at runtime (`policy.mode = "database"`,
 # `headscale policy set`), NOT baked here: the coordinator must start cleanly
 # before any user exists, and a malformed file policy would block startup. The
-# canonical policy is applied once, after enrolment (see plans/headscale-mesh.md
-# step 6).
+# canonical policy is version-controlled next door in headscale-policy.hujson
+# and applied out of band after enrolment (see plans/headscale-mesh.md step 6).
 { ... }:
 {
   flake.nixosModules.headscale-server =

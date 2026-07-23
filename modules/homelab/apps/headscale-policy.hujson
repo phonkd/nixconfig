@@ -1,0 +1,33 @@
+// Canonical headscale ACL / Tailscale-SSH policy for the homelab mesh.
+//
+// NOT loaded by Nix (headscale runs `policy.mode = "database"`, see
+// headscale.nix). This file is the source of truth kept under version control;
+// apply it to the running coordinator out of band:
+//
+//   scp modules/homelab/apps/headscale-policy.hujson observability:/tmp/
+//   sudo headscale policy check -f /tmp/headscale-policy.hujson   # validate
+//   sudo headscale policy set   -f /tmp/headscale-policy.hujson   # store in db
+//
+// Re-apply after editing. See plans/headscale-mesh.md step 6.
+{
+  // Single-user tailnet: every node is enrolled under headscale user `phonkd`.
+  // Allow full connectivity among the user's own devices...
+  "acls": [
+    {
+      "action": "accept",
+      "src": ["*"],
+      "dst": ["*:*"],
+    },
+  ],
+  // ...and Tailscale SSH into any of them, as any non-root user or root.
+  // `root` is listed explicitly (autogroup:nonroot excludes it) so deploy-rs
+  // activation can use tailnet SSH in Phase 2.
+  "ssh": [
+    {
+      "action": "accept",
+      "src": ["autogroup:member"],
+      "dst": ["autogroup:self"],
+      "users": ["autogroup:nonroot", "root"],
+    },
+  ],
+}

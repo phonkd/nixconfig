@@ -4,8 +4,26 @@
 
 _Decisions locked:_ embedded DERP (no tailscale.com relays); **Tailscale SSH**
 (model A — identity+ACL, sshd:5432 kept as break-glass); coordinator at
-`hs.phonkd.net` with built-in Let's Encrypt. Coordinator module + inert client
-module landed; next is minting the pre-auth key and wiring the client in.
+`hs.phonkd.net` with built-in Let's Encrypt.
+
+_Status (2026-07-23):_ **Phase 1 all but one host done.** Coordinator live on obs
+(headscale 0.28, valid LE cert, HTTPS 200). headscale user `phonkd` + a reusable
+1-year pre-auth key minted and stored as sops `headscale_authkey`. Client module
+`tailnet` wired into builder.nix `alwaysImport`; canonical ACL applied to the
+coordinator (`headscale-policy.hujson`, `policy set`). **Enrolled + verified over
+the tailnet: 204-agent, 205-builder, 203-media, observability** — direct P2P
+Tailscale SSH by MagicDNS name works, incl. cross-network home↔Hetzner (30ms).
+Remaining: **201-mono** (blocked, see below) and the **Mac client** (Phase 1 step 5,
+cask + `tailscale login`). Nothing retired yet — wg-obs/sing-box/proxyCommand
+still live.
+
+_201-mono blocker:_ 201's config change is committed but not yet deployed. The
+Mac→201 path over the sing-box SOCKS proxy times out at the SSH banner (only .201;
+.203/.204/.205 are fine, and 201's sshd is healthy from the LAN), so `deploy 201`
+can't push from the Mac. Pre-existing, unrelated to this change (201 is still on
+its old generation). Deploy it from a network where the proxy reaches 201, or via
+`ssh -J 192.168.3.203` (proven reachable) — once enrolled, 201 is reachable by
+tailnet IP and the proxy hairpin stops mattering.
 
 ## Goal
 
