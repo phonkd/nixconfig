@@ -23,6 +23,11 @@
         keybindings = {
           "cmd+left" = "send_text all \\x01";
           "cmd+right" = "send_text all \\x05";
+          # New tabs/windows inherit the active tab's working directory
+          # (relies on shell integration's OSC 7 cwd reporting below).
+          "cmd+t" = "new_tab_with_cwd";
+          "cmd+enter" = "new_window_with_cwd";
+          "cmd+n" = "new_os_window_with_cwd";
         };
         shellIntegration.enableZshIntegration = true;
       };
