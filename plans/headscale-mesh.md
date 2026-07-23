@@ -87,12 +87,24 @@ Phase 1 — stand it up (additive, nothing retired):
    nodes. Verify `ssh 201-mono`, `ssh ext-mail`, etc. over the tailnet.
 
 Phase 2 — cut over + delete (once Phase 1 verified):
-7. Point `deploy.hostname` in `lib/registry.nix` at tailnet MagicDNS names.
-   Re-verify `deploy <host>` for each node.
-8. Remove the per-host ssh match blocks (`10.9.0.1`, `10.0.0.2`) and the
-   `proxy.nix`-generated homelab `proxyCommand` entries; drop the homelab
-   `ip_cidr` ranges from sing-box (keep Spotify + the bedag work VPN — sing-box is
-   NOT deleted, only its homelab-access role).
+7. **DONE (2026-07-24).** `deploy.hostname` for the 4 homelab nodes now points at
+   their tailnet IP (201→100.64.0.5, 203→100.64.0.3, 204→100.64.0.1,
+   205→100.64.0.2), not the 192.168.3.x sing-box address. Used **IPs not MagicDNS
+   names** so it stays valid whichever way the Mac DNS decision goes (below).
+   Re-verified: `deploy 201/203/204/205` all activate cleanly over the tailnet —
+   incl. **`deploy 201` with no jump script**, the host whose Mac→proxy hairpin is
+   dead. observability stays on 10.9.0.1 (wg-obs — most reliable path to Hetzner,
+   and wg-obs is the data plane until Phase 3). Build offload still goes to
+   192.168.3.205 over sing-box (unchanged in step 7).
+8. **TODO — needs a Mac `darwin-rebuild` (sudo, user-run) + two inputs.** Move
+   `nix.buildMachines` to 205's tailnet IP (primitive verified: root→
+   nixremote@100.64.0.2 works), then strip the now-redundant homelab entries from
+   `proxy.ipRanges` in `modules/hosts/mac.nix` and the `10.9.0.1`/`10.0.0.2` ssh
+   match blocks. Blocked on: (a) which of the *other* proxy.ipRanges addresses
+   (192.168.1.46/.47/.150/.203, 192.168.3.200) are NOT on the tailnet and must
+   stay in sing-box — don't strip those or the Mac loses them; (b) the Mac DNS
+   decision (see open decisions) since removing routes interacts with it. Keep
+   Spotify + bedag — sing-box stays, only its homelab-host-access role goes.
 
 Phase 3 — later, optional: move metrics/log ingestion onto the tailnet and retire
 wg-obs + the home-router VPN-client route. Biggest simplification, but it touches
