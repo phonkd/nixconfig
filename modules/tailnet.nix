@@ -7,12 +7,11 @@
 # stays only as off-tailnet break-glass). Headless: registers with a headscale
 # pre-auth key delivered by sops.
 #
-# NOT YET wired into modules/builder.nix `alwaysImport`: it references
-# sops.secrets.headscale_authkey, which only exists once headscale is up and a
-# reusable pre-auth key has been minted and `sops set` into
-# modules/homelab/global-secrets/secret.yaml. Add `tailnet` to alwaysImport
-# after that (plans/headscale-mesh.md step 4/5), then `deploy` each host to
-# enrol it.
+# Wired into modules/builder.nix `alwaysImport`. It references
+# sops.secrets.headscale_authkey, a reusable pre-auth key (headscale user
+# `phonkd`) minted once headscale was up and `sops set` into
+# modules/homelab/global-secrets/secret.yaml. `deploy` a host to enrol it
+# (plans/headscale-mesh.md step 4/5).
 { ... }:
 {
   flake.nixosModules.tailnet =

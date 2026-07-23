@@ -79,11 +79,12 @@ let
     observability-vpn
     observability-sender
 
-    # Headscale mesh control plane (gated on "observability-server"). The
-    # Tailscale *client* (nixosModules.tailnet) is intentionally NOT here yet --
-    # it needs the sops pre-auth key that only exists once headscale is running.
-    # See plans/headscale-mesh.md.
+    # Headscale mesh control plane (gated on "observability-server") + the
+    # Tailscale client on every server (gated on host.is.server). The client
+    # self-registers with the sops pre-auth key (headscale_authkey) minted after
+    # headscale came up. See plans/headscale-mesh.md.
     headscale-server
+    tailnet
   ];
 
   # Darwin-side: cross-host feature modules.
