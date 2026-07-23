@@ -29,5 +29,18 @@
           "--ssh"
         ];
       };
+
+      # 201-mono can't reach obs's *public* IP: its default gateway
+      # (192.168.3.1) diverts Hetzner-bound traffic into the wg-obs tunnel, so
+      # hs.phonkd.net (89.167.83.90) is unreachable and enrolment hangs. It does
+      # reach obs at the tunnel IP 10.9.0.1 (verified: HTTPS 200), so pin the
+      # control-server name there for this host only. The cert is valid over
+      # that path (SNI is unchanged) and headscale listens on 0.0.0.0. Every
+      # other host reaches the public IP via its own uplink and is unaffected.
+      # (201's inability to route to Hetzner is a separate, pre-existing uplink
+      # fault — this just keeps mesh control/DERP on the tunnel it can use.)
+      networking.hosts = lib.mkIf (config.noughty.host.name == "201-mono") {
+        "10.9.0.1" = [ "hs.phonkd.net" ];
+      };
     };
 }
