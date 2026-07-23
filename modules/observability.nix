@@ -577,6 +577,26 @@
         ];
       };
 
+      # Expose the running config's git revision as a metric via the textfile
+      # collector above. `nixos_configuration_revision{revision="<sha>"} 1`
+      # per host is what cc-sync (on 204-agent) compares against origin/main
+      # to spot merged-but-not-deployed hosts -- no ssh needed. The file is a
+      # store symlink, which the textfile collector reads fine; it changes
+      # exactly when a new generation is activated.
+      environment.etc."prometheus-textfiles/nixos-configuration-revision.prom".text =
+        let
+          rev =
+            if config.system.configurationRevision != null then
+              config.system.configurationRevision
+            else
+              "unknown";
+        in
+        ''
+          # HELP nixos_configuration_revision Git revision of the running NixOS configuration.
+          # TYPE nixos_configuration_revision gauge
+          nixos_configuration_revision{revision="${rev}"} 1
+        '';
+
       environment.etc."alloy/config.alloy" = {
         text =
           let
@@ -592,7 +612,10 @@
           in
           ''
             prometheus.exporter.unix "gagu" {
-              enable_collectors = ["systemd"]
+              enable_collectors = ["systemd", "textfile"]
+              textfile {
+                directory = "/etc/prometheus-textfiles"
+              }
             }
 
             // Configure a prometheus.scrape component to collect unix metrics.

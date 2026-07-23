@@ -4,7 +4,7 @@
 traefik route registers on **`201-mono`** (same cross-host split as
 `hermes.nix`). The notes/tasks live in a SilverBullet *space* (markdown files) on
 `204-agent`; the calendar stays on the existing self-hosted CalDAV server.
-**Status:** draft.
+**Status:** in-progress.
 
 ## Goal
 

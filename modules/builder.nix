@@ -71,6 +71,7 @@ let
     homelab-garage
     homelab-notes
     homelab-hermes
+    homelab-silverbullet
 
     # Observability stack (server + VPN gated on "observability-server",
     # sender gated on "observability-sender").
@@ -136,6 +137,12 @@ let
       modules = [
         ../lib/noughty
         (noughtyHostModule name entry)
+        # Record the git revision this config was built from, so every host
+        # reports it via `nixos-version --configuration-revision` and (via
+        # the observability-sender textfile metric) into Mimir -- that's how
+        # cc-sync detects merged-but-not-deployed hosts. Dirty trees get the
+        # "<rev>-dirty" pseudo-rev (or null on nix without dirtyRev).
+        { system.configurationRevision = self.rev or self.dirtyRev or null; }
       ]
       ++ hmNixosBase
       ++ alwaysImport

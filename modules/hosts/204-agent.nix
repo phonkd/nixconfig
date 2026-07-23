@@ -63,6 +63,12 @@
       # on a logged-in machine, no per-token API billing. REQUIRED before deploy:
       # sops-nix fails activation if this key is missing from secret.yaml.
       sops.secrets."hermes-claude" = { owner = "hermes"; };
+      # Plaintext radicale password (the phonkd@phonkd.net account on
+      # cal.phonkd.net, see modules/hetzner/mail/mail.nix) -- vdirsyncer
+      # reads it with a password.fetch command straight from this path, so
+      # it's a bare password, NOT env-file format, and is deliberately not
+      # in environmentFiles.
+      sops.secrets."hermes-caldav" = { owner = "hermes"; };
 
       services.hermes-agent = {
         enable = true;
@@ -73,7 +79,10 @@
         # (print mode + interactive PTY via tmux; jq parses its stream-json).
         # The skill auto-seeds into ~/.hermes/skills on startup; terminal +
         # skills toolsets are already in the hermes-discord preset.
-        extraPackages = [ pkgs.gh pkgs.claude-code pkgs.tmux pkgs.jq ];
+        # khal + vdirsyncer: the caldav skill's CLI pair (sync against
+        # radicale on cal.phonkd.net; config installed by the
+        # hermesCaldavConfig activation script below).
+        extraPackages = [ pkgs.gh pkgs.claude-code pkgs.tmux pkgs.jq pkgs.khal pkgs.vdirsyncer ];
         # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
@@ -468,6 +477,377 @@
               -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
               ${skillFile} \
               ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/hermes-autofix/SKILL.md
+          '';
+          deps = [ ];
+        };
+
+      # vdirsyncer + khal client config for the caldav skill below. Written
+      # into the hermes state dir (HOME for the hermes services) so both
+      # tools find it at their default paths. The remote is radicale on
+      # ext-mail (cal.phonkd.net, modules/hetzner/mail/mail.nix); the
+      # password is fetched at runtime from the hermes-caldav sops secret,
+      # so no credential lands in the nix store.
+      system.activationScripts.hermesCaldavConfig =
+        let
+          vdirsyncerConfig = pkgs.writeText "vdirsyncer-config" ''
+            [general]
+            status_path = "~/.vdirsyncer/status/"
+
+            [pair phonkd_cal]
+            a = "phonkd_cal_local"
+            b = "phonkd_cal_remote"
+            collections = ["from a", "from b"]
+            metadata = ["displayname", "color"]
+
+            [storage phonkd_cal_local]
+            type = "filesystem"
+            path = "~/.calendars/"
+            fileext = ".ics"
+
+            [storage phonkd_cal_remote]
+            type = "caldav"
+            url = "https://cal.phonkd.net/"
+            username = "phonkd@phonkd.net"
+            password.fetch = ["command", "cat", "${config.sops.secrets."hermes-caldav".path}"]
+          '';
+          khalConfig = pkgs.writeText "khal-config" ''
+            [calendars]
+
+            [[phonkd]]
+            path = ~/.calendars/*
+            type = discover
+
+            [locale]
+            timeformat = %H:%M
+            dateformat = %Y-%m-%d
+            longdateformat = %Y-%m-%d
+            datetimeformat = %Y-%m-%d %H:%M
+            longdatetimeformat = %Y-%m-%d %H:%M
+          '';
+        in
+        {
+          text = ''
+            install -D -m 0644 \
+              -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+              ${vdirsyncerConfig} \
+              ${config.services.hermes-agent.stateDir}/.config/vdirsyncer/config
+            install -D -m 0644 \
+              -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+              ${khalConfig} \
+              ${config.services.hermes-agent.stateDir}/.config/khal/config
+          '';
+          deps = [ ];
+        };
+
+      # Custom Hermes skill: read/manage the personal calendar over CalDAV
+      # with khal + vdirsyncer (see plans/hermes-task-calendar.md). Installed
+      # like the skills above; the client config comes from
+      # hermesCaldavConfig.
+      system.activationScripts.hermesCaldavSkill =
+        let
+          skillFile = pkgs.writeText "SKILL.md" ''
+            ---
+            name: caldav
+            description: "Read and manage phonkd's personal calendar over CalDAV using vdirsyncer + khal. Read freely; create or modify only events explicitly asked for; never delete."
+            version: 1.0.0
+            author: phonkd homelab
+            license: Unlicense
+            platforms: [linux, macos]
+            metadata:
+              hermes:
+                tags: [calendar, caldav, khal, vdirsyncer, homelab]
+                category: productivity
+                requires_toolsets: [terminal]
+                related_skills: [task-notes]
+            ---
+
+            # CalDAV Calendar
+
+            Read and manage the personal calendar that lives on the self-hosted
+            radicale server (`https://cal.phonkd.net/`). Everything happens
+            through two preinstalled CLIs: `vdirsyncer` (sync with the server)
+            and `khal` (read/create events on the local copy).
+
+            ## When to Use
+
+            - "What's on my calendar today/this week?", planning the day around
+              meetings (together with the `task-notes` skill).
+            - The user asks to create or change a calendar event.
+            - The 15m calendar cron tick: run `vdirsyncer sync` so the local
+              view stays fresh; surface anything starting soon if asked to.
+
+            ## Hard rules
+
+            - **Never `khal delete`** and never delete `.ics` files. If an event
+              must go away, tell the user and let them remove it.
+            - **Never bulk-reschedule.** Create/modify only the specific events
+              the user explicitly asked about.
+            - Reading is unrestricted.
+
+            ## Before you start
+
+            - Config is preinstalled: `~/.config/vdirsyncer/config` and
+              `~/.config/khal/config`. The local calendar copy syncs into
+              `~/.calendars/`. Credentials come from a sops secret referenced
+              inside the vdirsyncer config — never echo it.
+            - First run ever on a fresh state dir: `vdirsyncer discover`
+              (accept the collections), then `vdirsyncer sync`.
+
+            ## Procedure
+
+            - **Read:** `vdirsyncer sync` first (the local copy is stale
+              otherwise), then `khal list today 7d` (or `khal at`, `khal
+              calendar`). Always sync before answering questions about the
+              calendar.
+            - **Create** (only when asked): `khal new -a phonkd <start>
+              <end> <summary>` (khal datetime format `%Y-%m-%d %H:%M`), then
+              `vdirsyncer sync` to push it to the server.
+            - **Modify** (only when asked): `khal edit <search>` is
+              interactive, so prefer editing the matching `.ics` under
+              `~/.calendars/` directly (find it by grepping for the SUMMARY),
+              bump its SEQUENCE and LAST-MODIFIED, then `vdirsyncer sync`.
+
+            ## Verification
+
+            - After create/modify: `khal list` shows the event with the right
+              time, and `vdirsyncer sync` exits 0 (the change reached the
+              server).
+            - Tell the user exactly what was created/changed, or `[SILENT]` on
+              a cron tick with nothing to report.
+          '';
+        in
+        {
+          text = ''
+            install -D -m 0644 \
+              -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+              ${skillFile} \
+              ${config.services.hermes-agent.stateDir}/.hermes/skills/productivity/caldav/SKILL.md
+          '';
+          deps = [ ];
+        };
+
+      # Custom Hermes skill: co-manage tasks/notes in the SilverBullet space
+      # served from this host (modules/homelab/apps/silverbullet.nix). The
+      # space is plain .md files that Hermes edits directly; SilverBullet
+      # re-indexes external writes, so no API is involved.
+      system.activationScripts.hermesTaskNotesSkill =
+        let
+          skillFile = pkgs.writeText "SKILL.md" ''
+            ---
+            name: task-notes
+            description: "Co-manage phonkd's tasks and notes in the SilverBullet space at /var/lib/silverbullet: read everything, plan by setting date attributes, stage new tasks to Inbox, never check off or delete tasks to clear a day."
+            version: 1.0.0
+            author: phonkd homelab
+            license: Unlicense
+            platforms: [linux, macos]
+            metadata:
+              hermes:
+                tags: [tasks, notes, silverbullet, planning, homelab]
+                category: productivity
+                requires_toolsets: [terminal]
+                related_skills: [caldav, cc-sync]
+            ---
+
+            # Task Notes (SilverBullet space)
+
+            The user's notes and tasks live in a SilverBullet space: plain
+            markdown files under `/var/lib/silverbullet` on this host. You have
+            group write access — editing a page is a plain file edit, and the
+            SilverBullet server picks up external changes and re-indexes them.
+            This is the ONE authoritative copy; there are no replicas to sync.
+
+            ## Space layout
+
+            - **Project/note pages** (anywhere in the space): prose state with
+              inline tasks (`- [ ] thing to do [due: 2026-07-30] #sometag`).
+              Tasks belong next to their context, not in a central list.
+            - **`Backlog.md`** — a live SilverBullet query over every open task
+              in the space. Do not edit task lines here; edit the source page
+              the query pulled them from.
+            - **`Inbox.md`** — YOUR staging page. Anything new or uncertain
+              goes here for the user to triage into real pages.
+            - **`Journal/<YYYY-MM-DD>.md`** — daily pages. The day view is a
+              query over open tasks with `due` on-or-before that day, so
+              unfinished tasks carry forward automatically.
+            - **`Engineering.md`** — owned exclusively by the `cc-sync` skill.
+              Never write it from this skill.
+
+            ## Task model
+
+            - Open task: `- [ ] description`; done: `- [x] description`.
+            - Scheduling metadata is an inline attribute: `[due: 2026-07-30]`.
+              **Planning a day = setting/bumping that attribute** on existing
+              backlog tasks. Nothing moves, nothing closes.
+            - **Planning ≠ completion.** A date is a lens, not a bucket: a task
+              stays open until the USER checks it off. NEVER mark a task done
+              to "clear" a day, and never delete a task. Check one off only
+              when the user explicitly says it's done.
+
+            ## Write rules (the autonomy envelope)
+
+            - **Read**: the whole space, freely — that's your project context.
+            - **Write**: only what the user explicitly asked for (set/bump a
+              date attribute, check off a named task, append to a page they
+              named). Everything speculative goes to `Inbox.md` as an appended
+              `- [ ]` line with today's date and a short why.
+            - Never reorder or rewrite the user's prose, never delete pages,
+              never rename files.
+            - Write atomically: build the new page in a temp file, then `mv`
+              over the original — the server may read mid-write otherwise.
+              Keep the group-writable bits (your service umask handles it).
+
+            ## Common operations
+
+            - Every open task:
+              `grep -rn '^\s*- \[ \]' /var/lib/silverbullet --include='*.md'`
+            - Today's plate: the open tasks whose `[due: ...]` is on-or-before
+              today (compare the dates; absence of `due` = unscheduled
+              backlog).
+            - **Plan-my-day flow** (with the `caldav` skill): read today's
+              events with khal, read the open backlog (including `#cc` tasks
+              from `Engineering.md`), propose which tasks fit the gaps by
+              setting `[due: <today>]` on them, and present the proposal. Do
+              not invent time the calendar says doesn't exist; do not close
+              anything.
+
+            ## Verification
+
+            After an edit: re-read the file to confirm the change landed and
+            the markdown is intact (task lines still parse, attributes still
+            bracketed). Report exactly which pages/lines you touched.
+          '';
+        in
+        {
+          text = ''
+            install -D -m 0644 \
+              -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+              ${skillFile} \
+              ${config.services.hermes-agent.stateDir}/.hermes/skills/productivity/task-notes/SKILL.md
+          '';
+          deps = [ ];
+        };
+
+      # Custom Hermes skill: project nixconfig work-state (plans → PRs →
+      # deploys) into the Engineering page of the SilverBullet space. Pure
+      # read-derived projection: reads GitHub + Mimir, writes exactly one
+      # page it solely owns, touches nothing else.
+      system.activationScripts.hermesCcSyncSkill =
+        let
+          skillFile = pkgs.writeText "SKILL.md" ''
+            ---
+            name: cc-sync
+            description: "Project in-flight nixconfig work (plans, open PRs, merged-but-undeployed hosts) into the Engineering page of the SilverBullet space. Sole writer of that page; read-only against the repo and hosts; never merges or deploys."
+            version: 1.0.0
+            author: phonkd homelab
+            license: Unlicense
+            platforms: [linux, macos]
+            metadata:
+              hermes:
+                tags: [nixconfig, tasks, automation, homelab]
+                category: devops
+                requires_toolsets: [terminal]
+                related_skills: [task-notes, hermes-autofix]
+            ---
+
+            # Claude Code Work-State Sync
+
+            In-flight engineering work is itself a task at every stage until it
+            is live ("done means deployed"). Every tick, rebuild
+            `/var/lib/silverbullet/Engineering.md` as a projection of three
+            sources. You are the SOLE writer of that page; you never edit any
+            other page, and you never act on the repo or hosts — worst case is
+            a stale task line, corrected next tick.
+
+            ## Stages (one task line per work item, advancing)
+
+            | Stage | Detected from | Task line |
+            |---|---|---|
+            | planned | `plans/*.md` with Status draft/approved/in-progress | `- [ ] execute plan <topic> #cc` |
+            | PR open | `gh pr list` | `- [ ] review & merge PR #N: <title> #cc` |
+            | merged, not deployed | host rev ≠ origin/main | `- [ ] deploy <host> #cc` |
+            | deployed | host rev == origin/main | line disappears |
+
+            A work item shows ONE line, at its most advanced stage: if a plan's
+            PR is open, show the PR line, not the plan line (match PR
+            branch/title against the plan topic; if unsure, keep both). A line
+            disappearing from the projection is the only way tasks here close —
+            that is correct for this page and does not violate the task-notes
+            no-checkoff rule, which governs user tasks.
+
+            ## Sources
+
+            - **Plans:** `gh api repos/phonkd/nixconfig/contents/plans --jq
+              '.[].name'`, then fetch each file and read its `**Status:**`
+              line. draft / approved / in-progress count; done/superseded do
+              not.
+            - **Open PRs:** `gh pr list --repo phonkd/nixconfig --state open
+              --json number,title,headRefName,isDraft` (drafts included —
+              hermes-autofix's own PRs are work items too).
+            - **Deployed revs:** origin/main is `gh api
+              repos/phonkd/nixconfig/commits/main --jq .sha`. Each host's
+              running rev comes from Mimir (same endpoint as mimir-alerting):
+
+              ```bash
+              curl -sSG http://10.9.0.1:9009/prometheus/api/v1/query \
+                --data-urlencode 'query=nixos_configuration_revision' \
+                | jq -r '.data.result[] | .metric.hostname + " " + .metric.revision'
+              ```
+
+              Hosts tracked: 201-mono, 203-media, 204-agent, 205-builder,
+              observability. A missing host or a rev of "unknown" /
+              "<sha>-dirty" is UNVERIFIABLE — list it as
+              `- [ ] deploy <host> (rev unverifiable) #cc` rather than
+              guessing. A host rev that is an ancestor stale sha simply means
+              not deployed yet; string-compare against main's sha, nothing
+              fancier.
+
+            ## Procedure
+
+            1. Gather all three sources (above).
+            2. Build the page content:
+
+               ```markdown
+               # Engineering
+
+               <!-- Rewritten by the cc-sync skill every tick (sole writer:
+               Hermes). Don't edit by hand — act on the PR/deploy instead;
+               this page follows reality on the next tick. -->
+
+               - [ ] review & merge PR #47: silverbullet + task skills #cc
+               - [ ] deploy 203-media #cc
+               ```
+
+            3. Write it atomically as the hermes user:
+               `tmp=$(mktemp) && cat > "$tmp" && mv "$tmp"
+               /var/lib/silverbullet/Engineering.md && chmod 664
+               /var/lib/silverbullet/Engineering.md` (the space is
+               group-shared; keep it group-writable so the SilverBullet server
+               can still save it).
+            4. If the new content is identical to what was already there,
+               respond `[SILENT]` (cron tick, nothing changed). Otherwise
+               reply with a one-line diff summary ("PR #47 merged → deploy
+               204-agent pending").
+
+            ## Hard rules
+
+            - Sole writer of `Engineering.md`; never touch any other page.
+            - Read-only everywhere else: never `gh pr merge`, never push,
+              never `deploy`, never ssh into hosts.
+            - Don't invent work items: no source line, no task.
+
+            ## Verification
+
+            After writing: the page exists, is valid markdown, every task line
+            ends with `#cc`, and the file is still owned group-hermes and
+            group-writable.
+          '';
+        in
+        {
+          text = ''
+            install -D -m 0644 \
+              -o ${config.services.hermes-agent.user} -g ${config.services.hermes-agent.group} \
+              ${skillFile} \
+              ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/cc-sync/SKILL.md
           '';
           deps = [ ];
         };
