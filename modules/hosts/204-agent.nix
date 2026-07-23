@@ -774,7 +774,7 @@
           skillFile = pkgs.writeText "SKILL.md" ''
             ---
             name: cc-sync
-            description: "Project in-flight nixconfig work (plans, open PRs, merged-but-undeployed hosts) into the Engineering page of the SilverBullet space. Sole writer of that page; read-only against the repo and hosts; never merges or deploys."
+            description: "Project in-flight nixconfig work (unexecuted plans and open PRs) into the Engineering page of the SilverBullet space. Sole writer of that page; read-only against the repo; never merges or deploys."
             version: 1.0.0
             author: phonkd homelab
             license: Unlicense
@@ -789,21 +789,32 @@
 
             # Claude Code Work-State Sync
 
-            In-flight engineering work is itself a task at every stage until it
-            is live ("done means deployed"). Every tick, rebuild
-            `/var/lib/silverbullet/Engineering.md` as a projection of three
-            sources. You are the SOLE writer of that page; you never edit any
-            other page, and you never act on the repo or hosts — worst case is
-            a stale task line, corrected next tick.
+            In-flight engineering work is itself a task until it lands. Every
+            tick, rebuild `/var/lib/silverbullet/Engineering.md` as a
+            projection of TWO sources — unexecuted plans and open PRs. You are
+            the SOLE writer of that page; you never edit any other page, and
+            you never act on the repo or hosts — worst case is a stale task
+            line, corrected next tick.
 
-            ## Stages (one task line per work item, advancing)
+            **No deploy-stage detection.** An earlier version tried to flag
+            "deploy <host>" when a host's git rev differed from `origin/main`,
+            but `configurationRevision` is the git sha and bumps on EVERY
+            commit — docs, another host's change, a flake input one host uses —
+            so it flagged every host on nearly every commit. That was pure
+            noise and is intentionally removed. Do **not** query host revs, do
+            **not** emit `deploy <host>` lines, and do not use the
+            `nixos_configuration_revision` Mimir metric here (it still exists
+            for humans to eyeball a host's rev — just not for this page). Act
+            on the PR: merging + deploying is the human's job, and once a PR is
+            merged it drops off this page on the next tick.
+
+            ## Stages (one task line per work item)
 
             | Stage | Detected from | Task line |
             |---|---|---|
             | planned | `plans/*.md` with Status draft/approved/in-progress | `- [ ] execute plan <topic> #cc` |
             | PR open | `gh pr list` | `- [ ] review & merge PR #N: <title> #cc` |
-            | merged, not deployed | host rev ≠ main AND the diff affects that host | `- [ ] deploy <host> #cc` |
-            | deployed | host rev == origin/main | line disappears |
+            | merged | PR no longer open / plan status done | line disappears |
 
             A work item shows ONE line, at its most advanced stage: if a plan's
             PR is open, show the PR line, not the plan line (match PR
@@ -821,68 +832,21 @@
             - **Open PRs:** `gh pr list --repo phonkd/nixconfig --state open
               --json number,title,headRefName,isDraft` (drafts included —
               hermes-autofix's own PRs are work items too).
-            - **Deployed revs:** origin/main is `gh api
-              repos/phonkd/nixconfig/commits/main --jq .sha`. Each host's
-              running rev comes from Mimir (same endpoint as mimir-alerting):
-
-              ```bash
-              curl -sSG http://10.9.0.1:9009/prometheus/api/v1/query \
-                --data-urlencode 'query=nixos_configuration_revision' \
-                | jq -r '.data.result[] | .metric.hostname + " " + .metric.revision'
-              ```
-
-              Hosts tracked: 201-mono, 203-media, 204-agent, 205-builder,
-              observability. A missing host or a rev of "unknown" /
-              "<sha>-dirty" is UNVERIFIABLE — list it as
-              `- [ ] deploy <host> (rev unverifiable) #cc` rather than
-              guessing.
-
-            - **Does the drift actually affect the host? (avoid false
-              positives — this is the #1 way this page cries wolf.)** A host's
-              rev bumps on EVERY commit, including ones that can't change its
-              build (a doc, a plan, another host's file, an input it doesn't
-              use). `host rev == main` → deployed, skip. When they differ, run
-              `git diff --name-only <hostrev>..origin/main` and **drop the
-              host unless a changed path can affect ITS build.** Classify each
-              path:
-              - Never affects any host → ignore: `plans/**`, `**/*.md`,
-                `.claude/**`, and `modules/deploy.nix` (it defines
-                `flake.deploy`, the deploy tooling — NOT part of any
-                nixosConfiguration). NB: `flake.lock` is NOT a doc — it can
-                change closures; handle it below.
-              - `modules/hosts/<name>*.nix` → affects only host `<name>`.
-                Ignore it for every *other* host.
-              - `flake.nix` / `flake.lock` → an input was added/bumped. Find
-                the input name from the diff, then check
-                `git show origin/main:lib/registry.nix`: if this host's
-                `extraModules` block does not reference that input
-                (`inputs.<name>`), the change doesn't touch it.
-              - `lib/registry.nix` → inspect the hunks
-                (`git diff <hostrev>..origin/main -- lib/registry.nix`); if the
-                changes sit only inside a *different* host's stanza, skip.
-              - Anything else under `modules/**` (shared modules, `lib/`,
-                `flake` logic you can't attribute) → assume it DOES affect the
-                host; flag the deploy.
-              - If you genuinely can't decide, keep the task but suffix it
-                ` (verify — may be no-op)` instead of asserting it's needed.
-              Only `deploy <host>` lines that survive this filter go on the
-              page. Do NOT string-compare shas and flag every mismatch —
-              that's the bug this replaces.
 
             ## Procedure
 
-            1. Gather all three sources (above).
+            1. Gather the two sources above.
             2. Build the page content:
 
                ```markdown
                # Engineering
 
                <!-- Rewritten by the cc-sync skill every tick (sole writer:
-               Hermes). Don't edit by hand — act on the PR/deploy instead;
+               Hermes). Don't edit by hand — act on the PR/plan instead;
                this page follows reality on the next tick. -->
 
+               - [ ] execute plan headscale-mesh #cc
                - [ ] review & merge PR #47: silverbullet + task skills #cc
-               - [ ] deploy 203-media #cc
                ```
 
             3. Write it through the SilverBullet localhost API (the server
@@ -896,8 +860,8 @@
                ```
             4. If the new content is identical to what was already there,
                respond `[SILENT]` (cron tick, nothing changed). Otherwise
-               reply with a one-line diff summary ("PR #47 merged → deploy
-               204-agent pending").
+               reply with a one-line diff summary ("PR #44 merged → dropped;
+               new plan headscale-mesh").
 
             ## Hard rules
 
