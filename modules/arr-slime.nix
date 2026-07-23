@@ -430,6 +430,17 @@
             };
           };
 
+          # prowlarr-indexers.service is a oneshot that configures indexers
+          # via the Prowlarr API. If Prowlarr isn't ready yet, the API call
+          # fails with exit code 1. Add restart behaviour so transient
+          # failures (e.g. Prowlarr starting up) retry automatically.
+          systemd.services."prowlarr-indexers" = {
+            serviceConfig = {
+              Restart = lib.mkOverride 90 "on-failure";
+              RestartSec = lib.mkOverride 90 "10s";
+            };
+          };
+
           # Nixflix sets Restart=on-failure but doesn't set RestartSec or
           # StartLimitBurst, so rapid restarts hit the systemd default rate
           # limit (5 failures / 10s) and the unit is permanently stopped.
