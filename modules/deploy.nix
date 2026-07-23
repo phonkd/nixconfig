@@ -87,6 +87,16 @@ in
     sshOpts = [
       "-o"
       "ConnectTimeout=10"
+      # deploy-rs replaces NIX_SSHOPTS with exactly this list for its
+      # `nix copy --to ssh://...` push, so any per-host `IdentitiesOnly yes`
+      # in ~/.ssh/config would otherwise force ONLY the configured key. The
+      # observability host's block pins a passphrase-locked id_rsa that isn't
+      # in the agent, which blocked `deploy observability` even though the
+      # agent's ed25519 key is authorized there. IdentitiesOnly=no lets the
+      # agent keys be offered alongside the configured one — it never breaks
+      # hosts that already authenticate (only widens which keys are tried).
+      "-o"
+      "IdentitiesOnly=no"
     ];
     nodes = lib.mapAttrs' (name: entry: lib.nameValuePair (nodeNameOf name) (mkNode name entry)) deployEntries;
   };
