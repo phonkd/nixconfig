@@ -32,8 +32,14 @@
 
       # ── Service + space permissions + firewall (runs on 204-agent) ────────
       (lib.mkIf (config.noughty.host.name == "204-agent") {
-        # SB_USER=<user>:<password> basic-auth line, read by systemd as root.
+        # SB_USER=<user>:<password> (web basic-auth) + SB_AUTH_TOKEN (API
+        # bearer token) env lines, read by systemd as root.
         sops.secrets."silverbullet-auth" = { };
+        # The same API token alone, readable by hermes: page WRITES go
+        # through the localhost HTTP API (server-written files come out 640,
+        # so direct group writes onto server-created pages don't work);
+        # reads still go straight to the files via group r.
+        sops.secrets."silverbullet-token" = { owner = "hermes"; };
 
         services.silverbullet = {
           enable = true;

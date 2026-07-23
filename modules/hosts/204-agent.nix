@@ -651,10 +651,24 @@
             # Task Notes (SilverBullet space)
 
             The user's notes and tasks live in a SilverBullet space: plain
-            markdown files under `/var/lib/silverbullet` on this host. You have
-            group write access — editing a page is a plain file edit, and the
-            SilverBullet server picks up external changes and re-indexes them.
-            This is the ONE authoritative copy; there are no replicas to sync.
+            markdown files under `/var/lib/silverbullet` on this host. This is
+            the ONE authoritative copy; there are no replicas to sync.
+
+            - **Read** pages directly from the files (you have group read).
+            - **Write** pages through the server's localhost HTTP API — the
+              server owns the files and pages it writes are not group-writable,
+              so don't edit them in place. Full-page PUT:
+
+              ```bash
+              curl -sS -X PUT "http://127.0.0.1:9121/<Page>.md" \
+                -H "Authorization: Bearer $(cat /run/secrets/silverbullet-token)" \
+                -H "Content-Type: text/markdown" \
+                --data-binary @newcontent.md
+              ```
+
+              To change one line: read the file, build the full new page
+              content, PUT it back. Re-read the file afterwards to confirm it
+              landed.
 
             ## Space layout
 
@@ -692,9 +706,8 @@
               `- [ ]` line with today's date and a short why.
             - Never reorder or rewrite the user's prose, never delete pages,
               never rename files.
-            - Write atomically: build the new page in a temp file, then `mv`
-              over the original — the server may read mid-write otherwise.
-              Keep the group-writable bits (your service umask handles it).
+            - All writes via the HTTP API (above) — never write the space
+              files directly.
 
             ## Common operations
 
@@ -817,12 +830,15 @@
                - [ ] deploy 203-media #cc
                ```
 
-            3. Write it atomically as the hermes user:
-               `tmp=$(mktemp) && cat > "$tmp" && mv "$tmp"
-               /var/lib/silverbullet/Engineering.md && chmod 664
-               /var/lib/silverbullet/Engineering.md` (the space is
-               group-shared; keep it group-writable so the SilverBullet server
-               can still save it).
+            3. Write it through the SilverBullet localhost API (the server
+               owns the space files — never write them directly):
+
+               ```bash
+               curl -sS -X PUT "http://127.0.0.1:9121/Engineering.md" \
+                 -H "Authorization: Bearer $(cat /run/secrets/silverbullet-token)" \
+                 -H "Content-Type: text/markdown" \
+                 --data-binary @newpage.md
+               ```
             4. If the new content is identical to what was already there,
                respond `[SILENT]` (cron tick, nothing changed). Otherwise
                reply with a one-line diff summary ("PR #47 merged → deploy
@@ -837,9 +853,9 @@
 
             ## Verification
 
-            After writing: the page exists, is valid markdown, every task line
-            ends with `#cc`, and the file is still owned group-hermes and
-            group-writable.
+            After writing: re-read `/var/lib/silverbullet/Engineering.md` and
+            confirm the PUT landed, the page is valid markdown, and every task
+            line ends with `#cc`.
           '';
         in
         {
