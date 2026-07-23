@@ -88,7 +88,7 @@
       "firefox"
       "obsidian"
       "spotify"
-      "claude-code"
+      "claude-code@latest"
       "zed"
       "utm"
       "eqmac"
@@ -115,12 +115,14 @@
       # a TCC Microphone grant. The old DIY whisper.cpp+Hammerspoon rig failed
       # because macOS TCC won't extend a mic grant to spawned nix CLI helpers.
       "handy"
+      "tidal"
     ];
     homebrew.brews = [
       "yt-dlp"
       "lsusb-laniksj"
       "cmake"
       "sdl2"
+      "ffmpeg"
     ];
 
     };
