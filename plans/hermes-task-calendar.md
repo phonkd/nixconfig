@@ -4,7 +4,42 @@
 traefik route registers on **`201-mono`** (same cross-host split as
 `hermes.nix`). The notes/tasks live in a SilverBullet *space* (markdown files) on
 `204-agent`; the calendar stays on the existing self-hosted CalDAV server.
-**Status:** in-progress.
+**Status:** deployed (nix wiring live on 201/204; runtime one-time steps
+pending — see bottom).
+
+## Remaining runtime steps (2026-07-23)
+
+The nix side is committed to `main` (`b82b7e4`) and deployed to 201-mono +
+204-agent; 203/205 redeployed so all four LAN hosts now report
+`nixos_configuration_revision` into Mimir (verified). Still to do by hand:
+
+1. **Set the real radicale password** — `hermes-caldav` is a placeholder.
+   It's the plaintext `phonkd@phonkd.net` password (the account behind
+   `cal.phonkd.net`): `sops set modules/homelab/global-secrets/secret.yaml
+   '["hermes-caldav"]' '"<password>"'` then `deploy 204`.
+2. **vdirsyncer first sync** (as the hermes user on 204): `vdirsyncer
+   discover` (accept collections) → `vdirsyncer sync` → `khal list`.
+3. **Seed the query pages** `Backlog` / `Today` in the SilverBullet PWA
+   (do it in-app to get SB 2.6 Space-Lua query autocomplete rather than
+   hand-writing syntax). `Inbox` + `Engineering` are already seeded.
+4. **Create the two `hermes cron` jobs** (like the autofix job): one runs
+   the `caldav` skill (`vdirsyncer sync` + surface today), one runs
+   `cc-sync` to rewrite `Engineering`.
+5. **PWA login** on phone + desktop (basic-auth creds =
+   `silverbullet-auth` secret; the generated password was reported in-chat).
+6. **observability host** wasn't redeployed (its `id_rsa` needs a
+   passphrase only you have) — `deploy observability` once so it also
+   reports its rev; until then cc-sync lists it as "rev unverifiable".
+
+Implementation notes that differed from the draft:
+- **spaceDir stays at the module default** `/var/lib/silverbullet` — the
+  nixpkgs module derives systemd's `StateDirectory` from the *last* path
+  segment, so a nested `.../space` would make systemd create `/var/lib/space`
+  and never the real dir.
+- **Hermes writes pages via the localhost HTTP API** (`PUT /.fs/<page>`
+  with an `SB_AUTH_TOKEN` bearer), not direct file writes: server-created
+  pages come out `0640`, so hermes can read them but can't edit in place.
+  Reads are still plain file reads.
 
 ## Goal
 
