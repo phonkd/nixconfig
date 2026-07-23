@@ -58,13 +58,11 @@
           # StateDirectory defaults to 0755 -- hermes couldn't write. No
           # setgid needed: both services' primary group is already hermes.
           StateDirectoryMode = "0770";
-          UMask = "0002";
+          # Same value the hermes-agent module ships upstream (0007), so
+          # pages written by either side come out group-writable and the
+          # other can edit them. No world access.
+          UMask = "0007";
         };
-        # Mirror image: pages Hermes creates must stay writable for the
-        # silverbullet user (in group hermes), or saving them in the web UI
-        # would fail. Group-writable state files are contained: only
-        # silverbullet and phonkd are also in the hermes group.
-        systemd.services.hermes-agent.serviceConfig.UMask = "0002";
 
         networking.nftables.enable = true;
         # Allow the silverbullet port from 201-mono only.
