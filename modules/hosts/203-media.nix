@@ -49,6 +49,20 @@
         address = lib.mkForce "192.168.1.1";
         interface = "ens18";
       };
+
+      # Static networking (useDHCP = false) means DHCP never supplies a
+      # resolver, so without this resolvconf writes an empty /etc/resolv.conf
+      # and the host can't resolve anything external. That broke
+      # `deploy 203` specifically: deploy-rs pushes with
+      # `nix copy --substitute-on-destination`, which makes THIS host pull
+      # closures from cache.nixos.org — impossible with no nameserver, so the
+      # deploy fell back to source-building (e.g. ollama-cuda, ~3h) or the
+      # daemon's substituter workers crashed under the flood of failed
+      # lookups. homelab-dns runs on 201; the router is the fallback.
+      networking.nameservers = [
+        "192.168.3.201"
+        "192.168.3.1"
+      ];
       networking.iproute2.enable = true;
       # `onlink` is required: this service can run before ens19 has its
       # 192.168.3.203/24 address, and without it `ip route add ... via
