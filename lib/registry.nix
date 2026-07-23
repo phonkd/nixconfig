@@ -82,7 +82,10 @@
       "vm"
     ];
     username = "phonkd";
-    deploy.hostname = "192.168.3.201";
+    # Tailnet IP (headscale mesh) — was 192.168.3.201 over sing-box. deploy now
+    # rides the tailnet, independent of the sing-box SOCKS proxy (whose Mac->201
+    # hairpin is dead anyway). See plans/headscale-mesh.md Phase 2.
+    deploy.hostname = "100.64.0.5";
 
     extraModules =
       { self, inputs }:
@@ -106,7 +109,7 @@
       "observability-sender"
     ];
     username = "phonkd";
-    deploy.hostname = "192.168.3.203";
+    deploy.hostname = "100.64.0.3"; # tailnet (was 192.168.3.203 via sing-box)
 
     # RTX 3060 Ti (Ampere, 8 GB) passed through from Proxmox — drives Jellyfin
     # NVENC and ollama-cuda (see arr-slime.nix / 203-media.nix). Declaring it
@@ -139,7 +142,7 @@
       "observability-sender"
     ];
     username = "phonkd";
-    deploy.hostname = "192.168.3.204";
+    deploy.hostname = "100.64.0.1"; # tailnet (was 192.168.3.204 via sing-box)
 
     extraModules =
       { self, inputs }:
@@ -162,7 +165,7 @@
       "observability-sender"
     ];
     username = "phonkd";
-    deploy.hostname = "192.168.3.205";
+    deploy.hostname = "100.64.0.2"; # tailnet (was 192.168.3.205 via sing-box)
 
     extraModules =
       { self, inputs }:
