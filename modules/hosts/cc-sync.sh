@@ -14,6 +14,13 @@ REPO="phonkd/nixconfig"
 SB="http://127.0.0.1:9121"
 TOKEN_FILE="/run/secrets/silverbullet-token"
 
+# The `--no-agent` cron subprocess does NOT inherit the hermes-agent
+# service's EnvironmentFile vars, so gh would run unauthenticated. Pull the
+# token straight from its sops secret if it isn't already in the env.
+if [ -z "${GITHUB_TOKEN:-}${GH_TOKEN:-}" ] && [ -r /run/secrets/hermes-github ]; then
+  set -a; . /run/secrets/hermes-github; set +a
+fi
+
 command -v gh   >/dev/null || { echo "cc-sync: gh missing"   >&2; exit 1; }
 command -v curl >/dev/null || { echo "cc-sync: curl missing" >&2; exit 1; }
 [ -r "$TOKEN_FILE" ] || { echo "cc-sync: no silverbullet token" >&2; exit 1; }
