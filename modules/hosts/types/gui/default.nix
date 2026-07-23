@@ -116,6 +116,7 @@
       # because macOS TCC won't extend a mic grant to spawned nix CLI helpers.
       "handy"
       "tidal"
+      "tailscale"
     ];
     homebrew.brews = [
       "yt-dlp"
