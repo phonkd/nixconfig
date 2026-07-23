@@ -64,6 +64,13 @@
       ];
 
       # Build throughput (nix.gc is handled by server-globalconfig).
+      # Builder disks fill quickly with nix store garbage; override global
+      # weekly+30d GC to daily+7d to keep / from filling up.
+      nix.gc = {
+        automatic = true;
+        dates = "daily";
+        options = "--delete-older-than 7d";
+      };
       nix.settings.max-jobs = 8;
       nix.optimise.automatic = true;
     };
