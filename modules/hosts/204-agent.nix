@@ -802,7 +802,7 @@
             |---|---|---|
             | planned | `plans/*.md` with Status draft/approved/in-progress | `- [ ] execute plan <topic> #cc` |
             | PR open | `gh pr list` | `- [ ] review & merge PR #N: <title> #cc` |
-            | merged, not deployed | host rev ≠ origin/main | `- [ ] deploy <host> #cc` |
+            | merged, not deployed | host rev ≠ main AND the diff affects that host | `- [ ] deploy <host> #cc` |
             | deployed | host rev == origin/main | line disappears |
 
             A work item shows ONE line, at its most advanced stage: if a plan's
@@ -835,9 +835,39 @@
               observability. A missing host or a rev of "unknown" /
               "<sha>-dirty" is UNVERIFIABLE — list it as
               `- [ ] deploy <host> (rev unverifiable) #cc` rather than
-              guessing. A host rev that is an ancestor stale sha simply means
-              not deployed yet; string-compare against main's sha, nothing
-              fancier.
+              guessing.
+
+            - **Does the drift actually affect the host? (avoid false
+              positives — this is the #1 way this page cries wolf.)** A host's
+              rev bumps on EVERY commit, including ones that can't change its
+              build (a doc, a plan, another host's file, an input it doesn't
+              use). `host rev == main` → deployed, skip. When they differ, run
+              `git diff --name-only <hostrev>..origin/main` and **drop the
+              host unless a changed path can affect ITS build.** Classify each
+              path:
+              - Never affects any host → ignore: `plans/**`, `**/*.md`,
+                `.claude/**`, and `modules/deploy.nix` (it defines
+                `flake.deploy`, the deploy tooling — NOT part of any
+                nixosConfiguration). NB: `flake.lock` is NOT a doc — it can
+                change closures; handle it below.
+              - `modules/hosts/<name>*.nix` → affects only host `<name>`.
+                Ignore it for every *other* host.
+              - `flake.nix` / `flake.lock` → an input was added/bumped. Find
+                the input name from the diff, then check
+                `git show origin/main:lib/registry.nix`: if this host's
+                `extraModules` block does not reference that input
+                (`inputs.<name>`), the change doesn't touch it.
+              - `lib/registry.nix` → inspect the hunks
+                (`git diff <hostrev>..origin/main -- lib/registry.nix`); if the
+                changes sit only inside a *different* host's stanza, skip.
+              - Anything else under `modules/**` (shared modules, `lib/`,
+                `flake` logic you can't attribute) → assume it DOES affect the
+                host; flag the deploy.
+              - If you genuinely can't decide, keep the task but suffix it
+                ` (verify — may be no-op)` instead of asserting it's needed.
+              Only `deploy <host>` lines that survive this filter go on the
+              page. Do NOT string-compare shas and flag every mismatch —
+              that's the bug this replaces.
 
             ## Procedure
 
