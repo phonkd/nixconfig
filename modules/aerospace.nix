@@ -69,6 +69,7 @@
             alt-tab = "workspace-back-and-forth";
             alt-shift-period = "mode service";
             alt-b = "exec-and-forget /usr/bin/open -a /Applications/Zen.app";
+            alt-m = "exec-and-forget /usr/bin/open -a /Applications/Tidal.app";
           };
           on-window-detected = [
             {
