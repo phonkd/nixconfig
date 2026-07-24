@@ -96,15 +96,26 @@ Phase 2 — cut over + delete (once Phase 1 verified):
    dead. observability stays on 10.9.0.1 (wg-obs — most reliable path to Hetzner,
    and wg-obs is the data plane until Phase 3). Build offload still goes to
    192.168.3.205 over sing-box (unchanged in step 7).
-8. **TODO — needs a Mac `darwin-rebuild` (sudo, user-run) + two inputs.** Move
-   `nix.buildMachines` to 205's tailnet IP (primitive verified: root→
-   nixremote@100.64.0.2 works), then strip the now-redundant homelab entries from
-   `proxy.ipRanges` in `modules/hosts/mac.nix` and the `10.9.0.1`/`10.0.0.2` ssh
-   match blocks. Blocked on: (a) which of the *other* proxy.ipRanges addresses
-   (192.168.1.46/.47/.150/.203, 192.168.3.200) are NOT on the tailnet and must
-   stay in sing-box — don't strip those or the Mac loses them; (b) the Mac DNS
-   decision (see open decisions) since removing routes interacts with it. Keep
-   Spotify + bedag — sing-box stays, only its homelab-host-access role goes.
+8. **TODO — config-only, but needs a Mac `darwin-rebuild` (sudo, user-run) and is
+   entangled with the work ssh config.** Decisions made (2026-07-24): reach
+   non-enrolled LAN boxes by **ssh-jump through 203**, no subnet router; Mac goes
+   **accept-dns=false**. All primitives verified: deploy-over-tailnet ✓, build
+   offload root→nixremote@100.64.0.2 ✓, Mac→203(tailnet)→Proxmox(192.168.3.47)
+   ssh-jump authenticates ✓. 192.168.3.200 is offline (non-issue);
+   192.168.1.46/.47 unneeded. The edits: `nix.buildMachines` hostName →
+   100.64.0.2; strip all 192.168.x from `proxy.ipRanges` (keep 10.9.0.0/24 for obs
+   until Phase 3); add tailnet name aliases (201-mono→100.64.0.5 etc.) + a
+   `Host 192.168.3.*` `ProxyCommand ssh phonkd@100.64.0.3 nc %h %p` jump block;
+   repoint the nixremote matchBlock to 100.64.0.2. SMB forward (8445→203) keeps
+   working (routes via the wg outbound, independent of ipRanges).
+   **The catch:** the catch-all `Host * → socat SOCKS 2080` that currently proxies
+   all unmatched ssh comes from `~/git/bedag-setup/home-manager/ssh.nix` (the WORK
+   repo, imported into HM). The new jump/alias blocks must render BEFORE it or
+   homelab ssh falls through to the work catch-all and fails — and HM matchBlock
+   ordering can't be checked without a full eval (workflow-forbidden) or the
+   rebuild. So this step should be done INTERACTIVELY: apply, `darwin-rebuild`,
+   inspect the generated ~/.ssh/config ordering + confirm work ssh still works,
+   roll back the darwin generation if off. Not a fire-and-forget edit.
 
 Phase 3 — later, optional: move metrics/log ingestion onto the tailnet and retire
 wg-obs + the home-router VPN-client route. Biggest simplification, but it touches
