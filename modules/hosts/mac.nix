@@ -39,20 +39,19 @@
             copyApps.enable = false;
             linkApps.enable = true;
           };
+          # Homelab hosts are reached over the headscale tailnet now (Phase 2 of
+          # plans/headscale-mesh.md), NOT sing-box — so the 192.168.x ranges are
+          # gone. sing-box keeps only its non-homelab roles: the obs wg range
+          # (10.9.0.1 = Loki/Mimir + `deploy observability`, until Phase 3), plus
+          # Spotify + `.w.phonkd.net` (the `domains` list in the sing-box wrapper)
+          # and the bedag work VPN. Non-enrolled LAN boxes (Proxmox 192.168.3.47)
+          # are reached by ssh-jump through 203 — see the ssh matchBlocks below.
           proxy.ipRanges = [
-            "192.168.1.47/32"
-            "192.168.3.201/32"
-            "192.168.1.46/32"
-            "192.168.3.200/32"
-            "192.168.1.150/32"
-            "192.168.3.203/24"
-            "192.168.1.203/32"
-            "192.168.3.204/32"
-            "192.168.3.205/32"
-            "10.9.0.0/24"
+            "10.9.0.0/24" # observability over wg-obs (Phase 3 moves this too)
           ];
-          # Finder SMB can't use a SOCKS proxy, so give it a local port
-          # that sing-box forwards to 203's samba over wg:
+          # Finder SMB to 203: local 127.0.0.1:8445 forwarded to 203's samba over
+          # the wg outbound (routes by inbound tag, independent of ipRanges above,
+          # so it survives the homelab-range removal):
           #   Finder > Cmd+K > smb://127.0.0.1:8445
           proxy.tcpForwards = [
             {
@@ -80,17 +79,58 @@
             identityFile = "~/.ssh/id_rsa";
             identitiesOnly = true;
           };
-          # 205-builder distributed-build account. nix.buildMachines already
-          # passes this key explicitly, so offload works without this block;
-          # it's for manual `ssh nixremote@192.168.3.205` (and anything not
-          # passing -i), which otherwise offers the default keys and gets
-          # Permission denied (only the nixremote pubkey is authorized there).
-          # Scoped to `user nixremote` so the phonkd login is untouched; the
-          # SOCKS proxyCommand is inherited from the proxy.ipRanges Host block.
+          # 205-builder distributed-build account, now over the tailnet (matches
+          # nix.buildMachines.hostName = 100.64.0.2). nix.buildMachines passes the
+          # key explicitly so offload works without this block; it's for manual
+          # `ssh nixremote@100.64.0.2`. Scoped to `user nixremote` so the phonkd
+          # login is untouched. (Tailscale SSH would authorise nixremote by
+          # identity anyway; the key is the regular-sshd fallback.)
           programs.ssh.matchBlocks."205-builder-nixremote" = {
-            match = "host 192.168.3.205 user nixremote";
+            match = "host 100.64.0.2 user nixremote";
             identityFile = "/Users/phonkd/.ssh/nixremote_ed25519";
             identitiesOnly = true;
+          };
+
+          # --- Tailnet (headscale mesh) -------------------------------------
+          # Reach every enrolled homelab host by name over the tailnet, direct
+          # (proxyCommand none defeats the bedag `Host *` SOCKS catch-all, which
+          # otherwise routes even tailnet IPs through sing-box). These render
+          # before that catch-all, so they win. Tailscale SSH authorises by
+          # identity — no port/key/known_hosts to manage.
+          programs.ssh.matchBlocks."201-mono" = {
+            hostname = "100.64.0.5";
+            user = "phonkd";
+            proxyCommand = "none";
+          };
+          programs.ssh.matchBlocks."203-media" = {
+            hostname = "100.64.0.3";
+            user = "phonkd";
+            proxyCommand = "none";
+          };
+          programs.ssh.matchBlocks."204-agent" = {
+            hostname = "100.64.0.1";
+            user = "phonkd";
+            proxyCommand = "none";
+          };
+          programs.ssh.matchBlocks."205-builder" = {
+            hostname = "100.64.0.2";
+            user = "phonkd";
+            proxyCommand = "none";
+          };
+          # Raw tailnet IPs (deploy targets, MagicDNS FQDNs) go direct too.
+          programs.ssh.matchBlocks."tailnet-cgnat" = {
+            host = "100.64.0.*";
+            proxyCommand = "none";
+          };
+          # Non-enrolled LAN boxes (Proxmox 192.168.3.47, etc.) are reached by
+          # ssh-jump through 203 over the tailnet — no sing-box, no subnet
+          # router. Verified: Mac -> 203(tailnet) -> Proxmox authenticates.
+          programs.ssh.matchBlocks."homelab-lan-jump" = {
+            host = "192.168.1.* 192.168.3.*";
+            user = "phonkd";
+            identityFile = "~/.ssh/id_ed25519_priv";
+            identitiesOnly = true;
+            proxyCommand = "ssh -o StrictHostKeyChecking=no phonkd@100.64.0.3 nc %h %p";
           };
         }
       ];
@@ -103,8 +143,9 @@
       # x86_64-linux derivations (NixOS configs, ISOs, amd64 OCI images...).
       # The nixremote private key is delivered by sops-nix (homeManagerModules)
       # to /Users/phonkd/.ssh/nixremote_ed25519. The nix-daemon (root) reads it
-      # there. Seed the builder's host key once after first deploy:
-      #   sudo -H ssh -i /Users/phonkd/.ssh/nixremote_ed25519 nixremote@192.168.3.205 true
+      # there. Seed the builder's host key once after first deploy (over the
+      # tailnet now — Tailscale SSH accepts it by identity):
+      #   sudo -H ssh -i /Users/phonkd/.ssh/nixremote_ed25519 nixremote@100.64.0.2 true
       nix.distributedBuilds = true;
       nix.settings.builders-use-substitutes = true;
       nix.settings.trusted-users = [
@@ -113,7 +154,7 @@
       ];
       nix.buildMachines = [
         {
-          hostName = "192.168.3.205";
+          hostName = "100.64.0.2"; # 205-builder tailnet IP (was 192.168.3.205)
           sshUser = "nixremote";
           sshKey = "/Users/phonkd/.ssh/nixremote_ed25519";
           system = "x86_64-linux";

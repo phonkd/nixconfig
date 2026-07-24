@@ -96,8 +96,20 @@ Phase 2 — cut over + delete (once Phase 1 verified):
    dead. observability stays on 10.9.0.1 (wg-obs — most reliable path to Hetzner,
    and wg-obs is the data plane until Phase 3). Build offload still goes to
    192.168.3.205 over sing-box (unchanged in step 7).
-8. **TODO — config-only, but needs a Mac `darwin-rebuild` (sudo, user-run) and is
-   entangled with the work ssh config.** Decisions made (2026-07-24): reach
+8. **WRITTEN (2026-07-24), pending the Mac `darwin-rebuild` (sudo, user-run) to
+   apply + verify.** In modules/hosts/mac.nix: proxy.ipRanges reduced to just
+   10.9.0.0/24 (obs); nix.buildMachines.hostName → 100.64.0.2; nixremote
+   matchBlock → 100.64.0.2; added name aliases 201-mono/203-media/204-agent/
+   205-builder → tailnet IP with `proxyCommand none` (beats the bedag `Host *`
+   socat catch-all, which sorts LAST in the generated ~/.ssh/config), a
+   `Host 100.64.0.*` none block, and a `Host 192.168.1.* 192.168.3.*` block that
+   ssh-jumps through 203 (`ProxyCommand ssh phonkd@100.64.0.3 nc %h %p`) for
+   non-enrolled LAN boxes. SMB (8445→203) kept (routes via wg, independent of
+   ipRanges). After rebuild, verify: `deploy` still works, `ssh 201-mono` +
+   `ssh root@192.168.3.47` (Proxmox) resolve, work ssh unaffected. Also uncheck
+   "Use Tailscale DNS" for accept-dns=false. Roll back the darwin generation if
+   anything's off. Original decisions/notes below.
+   Decisions made (2026-07-24): reach
    non-enrolled LAN boxes by **ssh-jump through 203**, no subnet router; Mac goes
    **accept-dns=false**. All primitives verified: deploy-over-tailnet ✓, build
    offload root→nixremote@100.64.0.2 ✓, Mac→203(tailnet)→Proxmox(192.168.3.47)
