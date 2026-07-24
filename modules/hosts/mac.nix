@@ -49,17 +49,9 @@
           proxy.ipRanges = [
             "10.9.0.0/24" # observability over wg-obs (Phase 3 moves this too)
           ];
-          # Finder SMB to 203: local 127.0.0.1:8445 forwarded to 203's samba over
-          # the wg outbound (routes by inbound tag, independent of ipRanges above,
-          # so it survives the homelab-range removal):
-          #   Finder > Cmd+K > smb://127.0.0.1:8445
-          proxy.tcpForwards = [
-            {
-              listenPort = 8445;
-              address = "192.168.3.203";
-              port = 445;
-            }
-          ];
+          # Finder SMB to 203 is now direct over the tailnet — no local forward:
+          #   Finder > Cmd+K > smb://100.64.0.3
+          # (203's samba `hosts allow` includes 100.64.0.0/10; see 203-media.nix.)
           # 10.9.0.1 = observability (Hetzner). Its sshd is on :5432 and
           # authorizes the id_rsa key; the generic proxy block only supplies the
           # SOCKS proxyCommand, so without this ssh -- and deploy-rs, which

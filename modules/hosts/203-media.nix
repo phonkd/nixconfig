@@ -154,8 +154,12 @@
             "server string" = "baaaalright";
             "netbios name" = "smbnix";
             "security" = "user";
+            # 100.64.0.0/10 = the headscale tailnet — clients mount smb://100.64.0.3
+            # directly over the mesh (the Mac's old sing-box 127.0.0.1:8445 forward
+            # is retired). Without this, samba's `hosts deny 0.0.0.0/0` refuses the
+            # tailnet even though port 445 is reachable.
             "hosts allow" =
-              "192.168.3.0/24 192.168.2.0/24 192.168.1.0/24 10.89.0.0/24 127.0.0.1 localhost 10.8.0.1/24";
+              "100.64.0.0/10 192.168.3.0/24 192.168.2.0/24 192.168.1.0/24 10.89.0.0/24 127.0.0.1 localhost 10.8.0.1/24";
             "hosts deny" = "0.0.0.0/0";
             "guest account" = "smbpublic";
             "map to guest" = "bad user";
