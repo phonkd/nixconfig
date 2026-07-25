@@ -40,13 +40,15 @@
             linkApps.enable = true;
           };
           # sing-box now carries ONLY work + Spotify (user directive): the bedag
-          # work VPN (additionalConfigFile) plus the `domains` list in the
-          # sing-box wrapper (`.w.phonkd.net` + the Spotify suffixes). Nothing
-          # else routes through it — every homelab host, and now observability
-          # too, is reached over the headscale tailnet (Tailscale SSH by
-          # identity). Hence proxy.ipRanges is empty: no IP-CIDR splits, and no
-          # generated ProxyCommand matchBlocks. Non-enrolled LAN boxes (Proxmox
-          # 192.168.3.47) are reached by ssh-jump through 203 — see below.
+          # work VPN (additionalConfigFile) and the Spotify suffixes (the
+          # `domains` list in the sing-box wrapper). Everything HOMELAB rides the
+          # headscale tailnet instead — hosts for ssh/deploy (Tailscale SSH by
+          # identity), observability, SMB, AND homelab web: `.w.phonkd.net` is
+          # out of the sing-box `domains` list and resolved to 201's tailnet IP
+          # (100.64.0.5) by the Mac's scoped dnsmasq (modules/dns.nix), reaching
+          # traefik over the mesh. Hence proxy.ipRanges is empty: no IP-CIDR
+          # splits, no generated ProxyCommand matchBlocks. Non-enrolled LAN boxes
+          # (Proxmox 192.168.3.47) are reached by ssh-jump through 203 — below.
           proxy.ipRanges = [ ];
           # Finder SMB to 203 is now direct over the tailnet — no local forward:
           #   Finder > Cmd+K > smb://100.64.0.3

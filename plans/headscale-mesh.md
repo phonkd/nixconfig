@@ -133,17 +133,39 @@ Phase 3 — later, optional: move metrics/log ingestion onto the tailnet and ret
 wg-obs + the home-router VPN-client route. Biggest simplification, but it touches
 the observability pipeline, so it's its own effort.
 
-_Update (2026-07-25) — sing-box reduced to work + Spotify only (user directive):_
-On the Mac, `proxy.ipRanges` is now empty. sing-box carries **only** the bedag
-work VPN (additionalConfigFile) + the `domains` list (`.w.phonkd.net` + Spotify
-suffixes). The last non-work/non-spotify user of sing-box — the obs `10.9.0.0/24`
-range + the `10.9.0.1` :5432/id_rsa ssh block — is gone; **obs management (deploy
-+ ssh) now rides the tailnet** like every other host: `deploy observability`
-targets 100.64.0.4 (registry), interactive ssh via the `observability`/`obs`
-alias. wg-obs still exists purely as the metrics/log **data plane** (senders push
-to obs's own 10.9.0.1) — that's what Phase 3 retires; nothing on the Mac touches
-it. Pending the Mac `darwin-rebuild` (user-run) to apply + verify `deploy
-observability` and `ssh observability` over the tailnet.
+_Update (2026-07-25) — everything homelab off sing-box; only work + Spotify left
+(user directive: "route homelab through tailnet and work through sing-box"):_
+
+1. **obs management → tailnet.** `proxy.ipRanges` is now empty; the obs
+   `10.9.0.0/24` range + the `10.9.0.1` :5432/id_rsa ssh block are gone. `deploy
+   observability` targets 100.64.0.4 (registry), interactive ssh via the
+   `observability`/`obs` alias. wg-obs survives only as the metrics/log **data
+   plane** (senders push to obs's own 10.9.0.1) — Phase 3's job; the Mac doesn't
+   touch it.
+2. **homelab web → tailnet.** `.w.phonkd.net` is removed from the sing-box
+   `domains` list (sing-box `domains` = Spotify only now). Instead the Mac's
+   previously-dead `darwinModules.dns` is wired into builder.nix
+   `alwaysImportDarwin` and repointed at **201's tailnet IP 100.64.0.5** (was
+   192.168.3.201). nix-darwin's dnsmasq writes `/etc/resolver/<domain>` per
+   `addresses` entry, so ONLY `*.w.phonkd.net` / `*.int.phonkd.net` /
+   `grafana.phonkd.net` resolve via local dnsmasq → 100.64.0.5; work + general
+   DNS keep their normal resolvers (compatible with accept-dns=false). 201 opens
+   :443 on all interfaces (incl. tailscale0) and traefik binds `:443`, so
+   `*.w.phonkd.net` reaches traefik over the mesh from anywhere. `no_proxy` also
+   gains `.phonkd.net,100.64.0.0/10` so env-proxy CLI clients go direct.
+
+Net: sing-box carries **only** the bedag work VPN (additionalConfigFile) +
+Spotify. Everything homelab (ssh/deploy, obs, SMB, web) is on the tailnet.
+
+**Pending the Mac `darwin-rebuild` (user-run) to apply + verify.** Check:
+`deploy observability` + `ssh observability` over the tailnet; a homelab web app
+in the browser (e.g. `https://dashboard.w.phonkd.net`) and `curl -I
+https://immich.w.phonkd.net` resolve to 100.64.0.5 and load; work DNS/ssh + a
+Spotify play still go via sing-box unchanged. Watch the browser path specifically
+— if a browser is configured to use sing-box as a system proxy (rather than the
+env vars), it may need a proxy bypass for `.phonkd.net`; the `/etc/resolver`
+scoping covers the resolver side but not a hard system-proxy setting. Roll back
+the darwin generation if anything's off.
 
 ## Open decisions
 
