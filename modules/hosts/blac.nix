@@ -104,5 +104,9 @@
         MatchName=*COMPANY*USB*Device*
         ModelBouncingKeys=1
       '';
+
+      # blac has no IPMI hardware; the openipmi service is pulled in as a
+      # dependency and always fails on this machine.
+      systemd.services.openipmi.enable = false;
     };
 }
