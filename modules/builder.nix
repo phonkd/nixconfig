@@ -91,6 +91,7 @@ let
   alwaysImportDarwin = with self.darwinModules; [
     gui-darwin # gated on host.is.darwinDesktop
     aerospace # gated on host.is.darwinDesktop
+    dns # scoped /etc/resolver for *.w.phonkd.net → 201 over the tailnet
   ];
 
   # Always-on Home Manager wiring. Safe on hosts with no HM users

@@ -40,7 +40,11 @@
         home.sessionVariables = {
           http_proxy = "http://localhost:2080";
           https_proxy = "http://localhost:2080";
-          no_proxy = "localhost,127.0.0.1";
+          # `.phonkd.net` (all homelab web) + the tailnet range bypass sing-box
+          # so env-proxy CLI clients reach them direct over the mesh, not via the
+          # SOCKS proxy. Spotify (.spotify.com/.scdn.co/...) still routes through
+          # sing-box. Work domains are unaffected (not under phonkd.net).
+          no_proxy = "localhost,127.0.0.1,.phonkd.net,100.64.0.0/10";
         };
       };
     };
@@ -66,8 +70,11 @@
         domains = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [
-            ".w.phonkd.net"
-            # Spotify: route through wg (homelab) instead of direct.
+            # Spotify only — routed through the homelab wg outbound instead of
+            # direct. Homelab web (.w.phonkd.net) is deliberately NOT here: it's
+            # reached over the tailnet now (201's traefik at 100.64.0.5, resolved
+            # by the Mac's scoped dnsmasq in modules/dns.nix). sing-box is left
+            # with just Spotify + the bedag work VPN (additionalConfigFile).
             ".spotify.com"
             ".scdn.co"
             ".spotifycdn.com"

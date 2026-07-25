@@ -133,6 +133,80 @@ Phase 3 — later, optional: move metrics/log ingestion onto the tailnet and ret
 wg-obs + the home-router VPN-client route. Biggest simplification, but it touches
 the observability pipeline, so it's its own effort.
 
+_Update (2026-07-25) — everything homelab off sing-box; only work + Spotify left
+(user directive: "route homelab through tailnet and work through sing-box"):_
+
+1. **obs management → tailnet.** `proxy.ipRanges` is now empty; the obs
+   `10.9.0.0/24` range + the `10.9.0.1` :5432/id_rsa ssh block are gone. `deploy
+   observability` targets 100.64.0.4 (registry), interactive ssh via the
+   `observability`/`obs` alias. wg-obs survives only as the metrics/log **data
+   plane** (senders push to obs's own 10.9.0.1) — Phase 3's job; the Mac doesn't
+   touch it.
+2. **homelab web → tailnet.** `.w.phonkd.net` is removed from the sing-box
+   `domains` list (sing-box `domains` = Spotify only now). Instead the Mac's
+   previously-dead `darwinModules.dns` is wired into builder.nix
+   `alwaysImportDarwin` and repointed at **201's tailnet IP 100.64.0.5** (was
+   192.168.3.201). nix-darwin's dnsmasq writes `/etc/resolver/<domain>` per
+   `addresses` entry, so ONLY `*.w.phonkd.net` / `*.int.phonkd.net` /
+   `grafana.phonkd.net` resolve via local dnsmasq → 100.64.0.5; work + general
+   DNS keep their normal resolvers (compatible with accept-dns=false). 201 opens
+   :443 on all interfaces (incl. tailscale0) and traefik binds `:443`, so
+   `*.w.phonkd.net` reaches traefik over the mesh from anywhere. `no_proxy` also
+   gains `.phonkd.net,100.64.0.0/10` so env-proxy CLI clients go direct.
+
+Net: sing-box carries **only** the bedag work VPN (additionalConfigFile) +
+Spotify. Everything homelab (ssh/deploy, obs, SMB, web) is on the tailnet.
+
+**Pending the Mac `darwin-rebuild` (user-run) to apply + verify.** Check:
+`deploy observability` + `ssh observability` over the tailnet; a homelab web app
+in the browser (e.g. `https://dashboard.w.phonkd.net`) and `curl -I
+https://immich.w.phonkd.net` resolve to 100.64.0.5 and load; work DNS/ssh + a
+Spotify play still go via sing-box unchanged. Watch the browser path specifically
+— if a browser is configured to use sing-box as a system proxy (rather than the
+env vars), it may need a proxy bypass for `.phonkd.net`; the `/etc/resolver`
+scoping covers the resolver side but not a hard system-proxy setting. Roll back
+the darwin generation if anything's off.
+
+## P2P / DERP-relay debugging (2026-07-26)
+
+_Symptom:_ every homelab peer stayed on `DERP(headscale)` relay instead of direct
+P2P (`tailscale ping` → "direct connection not established"; `205-builder` build
+offload pushing ~350 MB through the relay). `tailscale netcheck` on 201/203 showed
+`IPv4: 10.3.0.0:<port>` — a **private** reflexive address — while the Mac showed
+its real public IP (`85.5.57.44`).
+
+_Two root causes:_
+1. **Hetzner cloud firewall blocked UDP/3478 (STUN)** — the embedded DERP's STUN
+   port. Opened at the Hetzner level → obs (public IP) can reflect. NB the NixOS
+   firewall already allowed it (`headscale.nix`), but the cloud firewall is a
+   separate layer. **Also open UDP/41641** (Tailscale data port) there, or even
+   Mac↔obs stays on DERP — 3478 is only STUN, direct data uses 41641.
+2. **DNS leak poisoning STUN (the `10.3.0.0`).** 201 pins `10.9.0.1 hs.phonkd.net`
+   in /etc/hosts (needed — its uplink can't reach obs's public IP, so it reaches
+   the coordinator over wg-obs). But 201 also runs `homelab-dns` (dnsmasq), which
+   served that /etc/hosts pin to **every** homelab client. So all VMs resolved
+   `hs.phonkd.net → 10.9.0.1` and sent their STUN through the wg-obs tunnel →
+   reflected as the tunnel's SNAT source `10.3.0.0` → no usable public endpoint →
+   permanent relay. The Mac doesn't use 201 for DNS, so it resolved the public IP
+   and STUN'd cleanly — that's the only reason the Mac differed.
+
+_Fix (this branch):_ `modules/dns.nix` homelab-dns gains `no-hosts = true` (stop
+serving 201's /etc/hosts pin to the network) + an authoritative
+`address=/hs.phonkd.net/89.167.83.90` (hand clients the coordinator's real public
+IP, without depending on 201's flapping uplink to forward upstream). 201 itself
+still resolves the tunnel pin via nsswitch `files` (before dns), so its own
+control path is unchanged. Needs `deploy 201` (deploy-rs magic-rollback covers a
+bad activation). **Verify after deploy:** on 201 `tailscale status` still shows
+connected; on 203 `getent hosts hs.phonkd.net` → 89.167.83.90 and `tailscale
+netcheck` shows the real public IP; then `tailscale ping` Mac↔203 goes direct.
+
+_Residual limits (inherent, not bugs):_ 201 itself stays on relay until its real
+uplink is fixed (its STUN over the tunnel is always 10.3.0.0). And Mac↔hosts on
+the `192.168.3.x` VLAN (204/205) may still relay even after the fix: they share
+the home public IP with the Mac but sit on a different subnet, so direct needs NAT
+hairpin or inter-VLAN routing of the LAN endpoints. Mac↔203 (same /24) should go
+direct. The build-offload path (Mac→205) is the main casualty of that VLAN split.
+
 ## Open decisions
 
 - ~~DERP relay~~ **RESOLVED: embedded DERP** (`derp.server.enabled`, `urls = []`) —
