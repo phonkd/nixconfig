@@ -12,20 +12,6 @@
         description = "IP ranges to route through WireGuard proxy and generate SSH ProxyCommand entries for.";
       };
 
-      options.proxy.tcpForwards = lib.mkOption {
-        type = lib.types.listOf (
-          lib.types.submodule {
-            options = {
-              listenPort = lib.mkOption { type = lib.types.port; };
-              address = lib.mkOption { type = lib.types.str; };
-              port = lib.mkOption { type = lib.types.port; };
-            };
-          }
-        );
-        default = [ ];
-        description = "Local 127.0.0.1 listeners forwarded to a fixed destination through the wg outbound, for proxy-unaware clients (e.g. Finder SMB).";
-      };
-
       config = {
         # sops.age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
 
@@ -45,7 +31,6 @@
           (self.wrappers.sing-box-sel.wrap {
             inherit pkgs;
             ipRanges = config.proxy.ipRanges;
-            tcpForwards = config.proxy.tcpForwards;
             # secretsFile = config.sops.secrets.wg-endpoint.path;
             secretsFile = "${config.home.homeDirectory}/.config/wg-endpoint.json";
             additionalConfigFile = "${config.home.homeDirectory}/git/bedag-setup/singbox.json";
@@ -92,18 +77,6 @@
           type = lib.types.listOf lib.types.str;
           default = [ ];
         };
-        tcpForwards = lib.mkOption {
-          type = lib.types.listOf (
-            lib.types.submodule {
-              options = {
-                listenPort = lib.mkOption { type = lib.types.port; };
-                address = lib.mkOption { type = lib.types.str; };
-                port = lib.mkOption { type = lib.types.port; };
-              };
-            }
-          );
-          default = [ ];
-        };
         listenPort = lib.mkOption {
           type = lib.types.int;
           default = 2080;
@@ -120,33 +93,18 @@
               listen = "127.0.0.1";
               listen_port = config.listenPort;
             }
-          ]
-          # Plain TCP forwards for proxy-unaware clients (Finder SMB etc.):
-          # each listener dials its fixed destination through the wg outbound.
-          ++ map (f: {
-            type = "direct";
-            tag = "fwd-${toString f.listenPort}";
-            listen = "127.0.0.1";
-            listen_port = f.listenPort;
-            override_address = f.address;
-            override_port = f.port;
-          }) config.tcpForwards;
+          ];
           outbounds = [
             { type = "direct"; tag = "direct"; }
           ];
           route = {
-            rules =
-              lib.optional (config.tcpForwards != [ ]) {
-                inbound = map (f: "fwd-${toString f.listenPort}") config.tcpForwards;
-                outbound = "wg";
-              }
-              ++ [
-                (
-                  { outbound = "wg"; }
-                  // lib.optionalAttrs (config.domains != [ ]) { domain_suffix = config.domains; }
-                  // lib.optionalAttrs (config.ipRanges != [ ]) { ip_cidr = config.ipRanges; }
-                )
-              ];
+            rules = [
+              (
+                { outbound = "wg"; }
+                // lib.optionalAttrs (config.domains != [ ]) { domain_suffix = config.domains; }
+                // lib.optionalAttrs (config.ipRanges != [ ]) { ip_cidr = config.ipRanges; }
+              )
+            ];
             final = "direct";
           };
         };
