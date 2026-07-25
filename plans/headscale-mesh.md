@@ -133,6 +133,18 @@ Phase 3 — later, optional: move metrics/log ingestion onto the tailnet and ret
 wg-obs + the home-router VPN-client route. Biggest simplification, but it touches
 the observability pipeline, so it's its own effort.
 
+_Update (2026-07-25) — sing-box reduced to work + Spotify only (user directive):_
+On the Mac, `proxy.ipRanges` is now empty. sing-box carries **only** the bedag
+work VPN (additionalConfigFile) + the `domains` list (`.w.phonkd.net` + Spotify
+suffixes). The last non-work/non-spotify user of sing-box — the obs `10.9.0.0/24`
+range + the `10.9.0.1` :5432/id_rsa ssh block — is gone; **obs management (deploy
++ ssh) now rides the tailnet** like every other host: `deploy observability`
+targets 100.64.0.4 (registry), interactive ssh via the `observability`/`obs`
+alias. wg-obs still exists purely as the metrics/log **data plane** (senders push
+to obs's own 10.9.0.1) — that's what Phase 3 retires; nothing on the Mac touches
+it. Pending the Mac `darwin-rebuild` (user-run) to apply + verify `deploy
+observability` and `ssh observability` over the tailnet.
+
 ## Open decisions
 
 - ~~DERP relay~~ **RESOLVED: embedded DERP** (`derp.server.enabled`, `urls = []`) —

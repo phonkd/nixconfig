@@ -39,29 +39,21 @@
             copyApps.enable = false;
             linkApps.enable = true;
           };
-          # Homelab hosts are reached over the headscale tailnet now (Phase 2 of
-          # plans/headscale-mesh.md), NOT sing-box — so the 192.168.x ranges are
-          # gone. sing-box keeps only its non-homelab roles: the obs wg range
-          # (10.9.0.1 = Loki/Mimir + `deploy observability`, until Phase 3), plus
-          # Spotify + `.w.phonkd.net` (the `domains` list in the sing-box wrapper)
-          # and the bedag work VPN. Non-enrolled LAN boxes (Proxmox 192.168.3.47)
-          # are reached by ssh-jump through 203 — see the ssh matchBlocks below.
-          proxy.ipRanges = [
-            "10.9.0.0/24" # observability over wg-obs (Phase 3 moves this too)
-          ];
+          # sing-box now carries ONLY work + Spotify (user directive): the bedag
+          # work VPN (additionalConfigFile) plus the `domains` list in the
+          # sing-box wrapper (`.w.phonkd.net` + the Spotify suffixes). Nothing
+          # else routes through it — every homelab host, and now observability
+          # too, is reached over the headscale tailnet (Tailscale SSH by
+          # identity). Hence proxy.ipRanges is empty: no IP-CIDR splits, and no
+          # generated ProxyCommand matchBlocks. Non-enrolled LAN boxes (Proxmox
+          # 192.168.3.47) are reached by ssh-jump through 203 — see below.
+          proxy.ipRanges = [ ];
           # Finder SMB to 203 is now direct over the tailnet — no local forward:
           #   Finder > Cmd+K > smb://100.64.0.3
           # (203's samba `hosts allow` includes 100.64.0.0/10; see 203-media.nix.)
-          # 10.9.0.1 = observability (Hetzner). Its sshd is on :5432 and
-          # authorizes the id_rsa key; the generic proxy block only supplies the
-          # SOCKS proxyCommand, so without this ssh -- and deploy-rs, which
-          # honors ~/.ssh/config -- default to :22 + id_ed25519 and time out.
-          # Rendered before `Host *`, so this port/key win.
-          programs.ssh.matchBlocks."10.9.0.1" = {
-            port = 5432;
-            identityFile = "~/.ssh/id_rsa";
-            identitiesOnly = true;
-          };
+          # (observability no longer needs a wg-obs :5432/id_rsa ssh block here —
+          # it's reached over the tailnet via the `observability` alias below,
+          # and `deploy observability` targets 100.64.0.4; see lib/registry.nix.)
           # ext-mail — same Hetzner :5432 + id_rsa. NB: 10.0.0.2 is the Hetzner
           # private range and is NOT in proxy.ipRanges above, so sing-box only
           # reaches it if the wg outbound already carries 10.0.0.0/8; if not,
@@ -109,9 +101,10 @@
             user = "phonkd";
             proxyCommand = "none";
           };
-          # obs is dual-homed: `deploy observability` + Loki/Mimir still ride
-          # wg-obs (the "10.9.0.1" block above, until Phase 3), but interactive
-          # `ssh observability`/`obs` goes over the tailnet like every other host.
+          # obs is reached over the tailnet like every other host now:
+          # `ssh observability`/`obs` and `deploy observability` (100.64.0.4).
+          # Only the metrics/log DATA plane still rides wg-obs (senders push to
+          # obs's own 10.9.0.1) until Phase 3 — nothing on the Mac touches that.
           programs.ssh.matchBlocks."observability" = {
             host = "observability obs";
             hostname = "100.64.0.4";
