@@ -48,6 +48,19 @@
           bind-dynamic = true;
           except-interface = "podman*";
 
+          # Do NOT serve this host's /etc/hosts as DNS answers. 201 pins
+          # `10.9.0.1 hs.phonkd.net` in /etc/hosts (modules/tailnet.nix) because
+          # its own uplink to Hetzner is broken, so it must reach the headscale
+          # coordinator over the wg-obs tunnel (10.9.0.1). Without no-hosts,
+          # dnsmasq re-served that private pin to EVERY homelab client, so their
+          # Tailscale STUN went through the tunnel and got reflected as a private
+          # address (10.3.0.0) instead of the home's real public IP — which meant
+          # no direct P2P and permanent DERP relaying for all VMs. 201 itself
+          # still resolves the pin via nsswitch `files` (checked before dns), so
+          # its own coordinator path over the tunnel is unaffected; only what
+          # dnsmasq hands to the network changes. See plans/headscale-mesh.md.
+          no-hosts = true;
+
           # wildcard DNS
           address = [
             "/.int.phonkd.net/192.168.3.201"
@@ -56,6 +69,14 @@
             "/.segglaecloud.phonkd.net/::"
             "/.w.phonkd.net/192.168.3.201"
             "/.w.phonkd.net/::"
+            # Serve the coordinator's PUBLIC IP authoritatively to homelab
+            # clients (89.167.83.90 = hs.phonkd.net's real A record). This is
+            # what un-poisons STUN: VMs now resolve the public IP and STUN over
+            # their real uplink, reflecting a usable public endpoint → direct
+            # P2P instead of relay. Authoritative (not forwarded upstream) so it
+            # keeps working even while 201's own uplink is flapping. 201 does not
+            # use this answer for itself (files-first → 10.9.0.1 tunnel pin).
+            "/hs.phonkd.net/89.167.83.90"
           ];
           #filter-aaaa = true;
           # optional: refuse invalid domains (like domain-needed)
