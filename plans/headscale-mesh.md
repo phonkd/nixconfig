@@ -207,6 +207,26 @@ the home public IP with the Mac but sit on a different subnet, so direct needs N
 hairpin or inter-VLAN routing of the LAN endpoints. Mac↔203 (same /24) should go
 direct. The build-offload path (Mac→205) is the main casualty of that VLAN split.
 
+_Update (2026-07-26) — CAUSE 2 found, a UniFi policy-based route (203-specific)._
+Even with the DNS fix, 203 stayed relayed. `tracepath` from 203 to obs's PUBLIC
+IP (89.167.83.90) goes INTO a wg tunnel at the UniFi gateway — hop `10.2.0.1`,
+`pmtu 1420` (wg MTU), egressing Hetzner-Frankfurt (`159.26.104.x`, cdn77); 203's
+apparent public IP is `159.26.104.84`, not the home `85.5.57.44`. Cause: a UniFi
+**policy-based route** `203` = `source MAC bc:24:11:ea:b3:3d (=203 ens18) → dest
+Any → gateway observability-hetzner`, i.e. ALL of 203's traffic (incl. Tailscale
+STUN) is forced through the Hetzner wg tunnel. obs is both the STUN server and the
+tunnel far-end, so it reflects the tunnel address (10.3.0.0) → no usable public
+endpoint → permanent relay. This is INDEPENDENT of the DNS leak and dominant for
+203; the DNS fix alone won't free 203. _Fix (UniFi console, not in repo):_ if 203
+doesn't need datacenter egress, delete the `203` PBR (the `10.9.0.0/24 →
+observability-hetzner` static route still carries metrics to obs); if it does, add
+a higher-priority PBR `203 → 89.167.83.90/32 → default WAN` so only the DERP/STUN
+path bypasses the tunnel. NB the DNS fix (commit on this branch) must be actually
+`deploy`ed to 201 — a wholesale git revert (dc4d98b, later un-reverted) meant an
+earlier 201 rebuild didn't carry it; verify `getent hosts hs.phonkd.net` → the
+public IP on 201 after deploy. Also open UDP/41641 (not just 3478) at the Hetzner
+cloud firewall for obs, or even Mac↔obs stays on DERP.
+
 ## Open decisions
 
 - ~~DERP relay~~ **RESOLVED: embedded DERP** (`derp.server.enabled`, `urls = []`) —
