@@ -37,19 +37,9 @@
             ipfilter = true;
           };
         };
-        s3-webui = {
-          ip = "127.0.0.1";
-          port = 3909;
-          traefik = {
-            enable = true;
-            domain = "webui.s3.w.phonkd.net";
-            ipfilter = true;
-          };
-          dashboard = {
-            enable = true;
-            icon = "sh-garage";
-          };
-        };
+        # garage-webui removed: upstream is unmaintained and it was dropped from
+        # nixpkgs (2026-06-23). Its only clean build path pulled an insecure
+        # pnpm, so we no longer run the web UI.
       };
 
       users.users.garage = {
@@ -125,38 +115,6 @@
         User = "garage";
         Group = "garage";
       };
-      ## webui
-      systemd.services.garage-webui = {
-        description = "Garage Web UI";
-        wantedBy = [ "multi-user.target" ];
-        after = [ "garage.service" ];
-
-        # We use 'script' to read the secret into a variable before the app starts
-        script = ''
-          # 1. Read the secret token from SOPS
-          export API_ADMIN_KEY=$(cat ${config.sops.secrets."garage-admin".path})
-
-          # 2. Configure the connection to Garage
-          #    (The WebUI backend talks to these ports on localhost)
-          export API_BASE_URL="http://127.0.0.1:3903"
-          export S3_ENDPOINT_URL="http://localhost:3900"
-          export S3_REGION="us-east-1"
-
-          # 3. Start the WebUI
-          exec ${pkgs.garage-webui}/bin/garage-webui
-        '';
-
-        serviceConfig = {
-          User = "garage";
-          Group = "garage";
-          Restart = "always";
-          RestartSec = "10s";
-
-          # Optional: Clean up environment
-          Environment = "PORT=3909";
-        };
-      };
-
       fileSystems."/mnt/s3" = {
         device = "/dev/disk/by-id/virtio-vm-202-disk-2";
         fsType = "xfs";
