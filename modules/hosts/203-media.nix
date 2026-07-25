@@ -72,7 +72,7 @@
       # directly reachable on ens19 regardless of address-assignment timing.
       networking.localCommands = ''
         ip route flush table 203 2>/dev/null || true
-        ip route add default via 192.168.3.1 dev ens19 table 203 onlink
+        ip route add default via 192.168.3.1 onlink dev ens19 table 203
         ip rule del from 192.168.3.203 lookup 203 2>/dev/null || true
         ip rule add from 192.168.3.203 lookup 203
       '';
