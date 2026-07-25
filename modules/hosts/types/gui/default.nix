@@ -86,6 +86,7 @@
     homebrew.casks = [
       "zen"
       "firefox"
+      "android-platform-tools"
       "obsidian"
       "spotify"
       "claude-code@latest"
@@ -117,6 +118,7 @@
       "handy"
       "tidal"
       "tailscale"
+      "kde-connect"
     ];
     homebrew.brews = [
       "yt-dlp"
