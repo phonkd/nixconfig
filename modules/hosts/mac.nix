@@ -109,6 +109,15 @@
             user = "phonkd";
             proxyCommand = "none";
           };
+          # obs is dual-homed: `deploy observability` + Loki/Mimir still ride
+          # wg-obs (the "10.9.0.1" block above, until Phase 3), but interactive
+          # `ssh observability`/`obs` goes over the tailnet like every other host.
+          programs.ssh.matchBlocks."observability" = {
+            host = "observability obs";
+            hostname = "100.64.0.4";
+            user = "phonkd";
+            proxyCommand = "none";
+          };
           # Raw tailnet IPs (deploy targets, MagicDNS FQDNs) go direct too.
           programs.ssh.matchBlocks."tailnet-cgnat" = {
             host = "100.64.0.*";
