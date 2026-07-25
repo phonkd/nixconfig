@@ -225,11 +225,9 @@
       "observability-sender"
     ];
     username = "phonkd";
-    # Management (deploy + ssh) now rides the headscale tailnet like every other
-    # host — Tailscale SSH by identity, no wg-obs, no sing-box. wg-obs still
-    # exists purely as the metrics/log DATA plane (senders push to this host's
-    # own 10.9.0.1) until Phase 3 retires it. Was 10.9.0.1 via WireGuard.
-    deploy.hostname = "100.64.0.4";
+    # Reachable only at 10.9.0.1 over WireGuard (direct, not via the SOCKS
+    # proxy) — `deploy observability` needs the wg-obs tunnel up.
+    deploy.hostname = "10.9.0.1";
 
     extraModules =
       { self, inputs }:
