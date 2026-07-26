@@ -256,6 +256,28 @@ tunnel. Module evaluated clean (`nix eval` of wg0 peers + sops path).
    "direct". No kill-switch yet (a naive one would drop Tailscale); add a
    Tailscale-aware one later if wanted.
 
+_Update (2026-07-26, later) — the wg/Tailscale ip-rule PRIORITY collision._
+After deploying 203-vpn, 203 lost the tailnet (`ping 100.64.0.4` 100% loss,
+`netcheck` → `UDP: false / IPv4: (no addr found)`), though `tailscale ping` still
+answered via 10.9.0.1. Cause: wg-quick adds its two policy rules with NO explicit
+priority, and iproute2 assigns "lowest existing pref − 1". tailscaled was already
+up with fixed prefs 5210..5270, so wg-quick's rules landed at **5208/5209 — above
+Tailscale's** — and `not fwmark 0xca6c lookup 51820` then swallowed BOTH
+Tailscale's marked underlay (0x80000, meant to bypass at 5210) and all
+tailnet-destined traffic (meant for table 52 at 5270) into the Proton tunnel.
+(Had wg-quick come up before tailscaled it would have got 32764/32765 and worked
+— so this is boot-order dependent, i.e. it would fail intermittently.)
+
+_Fix:_ `postUp` now deletes those auto-priority rules and re-adds them at fixed
+prefs **32763** (suppress_prefixlength) and **32764** (not-fwmark catch-all),
+below Tailscale's; 32765 is taken by the ens19 `from 192.168.3.203` rule. Loops +
+add/delete keep it idempotent. Verified LIVE on 203 before codifying: ping obs
+0% loss (30ms), netcheck `UDP: true` reflecting the real WAN IP 85.195.231.133,
+general egress = Proton exit 146.70.86.118, metrics conns to 10.9.0.1 intact.
+The live change is runtime-only — **`deploy 203-media` is still required** to make
+it survive a reboot (and the deploy restarts tailscaled, which republishes 203's
+endpoints — needed for direct P2P, since 203 had none while STUN was broken).
+
 ## Open decisions
 
 - ~~DERP relay~~ **RESOLVED: embedded DERP** (`derp.server.enabled`, `urls = []`) —
