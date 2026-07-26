@@ -240,4 +240,66 @@
         ];
       };
     };
+
+  # ProtonVPN WireGuard full-tunnel egress for 203, run on the HOST (not the
+  # UniFi gateway) so Tailscale can coexist. wg-quick's routing for a full
+  # tunnel (AllowedIPs 0.0.0.0/0 with no explicit `table` -> wg-quick "auto")
+  # uses fwmark + `ip rule ... suppress_prefixlength 0`, NOT a plain
+  # `default dev wg0` in the main table. Tailscale independently installs its
+  # own higher-priority ip-rules for its fwmark (0x80000, pref ~5210 << the
+  # ~32764 wg-quick rules), so Tailscale's underlay bypasses wg0 and goes out
+  # the real WAN (direct P2P), while everything else on 203 egresses via Proton.
+  #
+  # This replaces the UniFi policy-based route that used to force ALL of 203
+  # through a gateway-level tunnel — which also captured Tailscale's STUN and
+  # pinned 203 to DERP relay. That UniFi `203` PBR MUST be removed at cutover:
+  # the fwmark split is local to 203, so if the gateway still policy-routes 203
+  # by MAC it re-captures everything (incl. Tailscale) and defeats this.
+  #
+  # Only the client PrivateKey is secret (sops, server defaultSopsFile); the
+  # server pubkey / endpoint / tunnel address are public config. The Proton
+  # profile's `DNS = 10.2.0.1` is deliberately OMITTED: letting it rewrite
+  # resolv.conf would fight Tailscale MagicDNS (100.100.100.100) + homelab-dns
+  # and break 203's internal name resolution — external names still resolve via
+  # homelab-dns (through 201), not leaked from 203. IPv6 is dropped for now (203
+  # has no native v6; the Proton IPv4 endpoint is enough). No kill-switch yet: a
+  # naive one would DROP Tailscale (its traffic leaves via the real WAN, not
+  # wg0) — a Tailscale-aware kill-switch can be added later if wanted.
+  flake.nixosModules."203-vpn" =
+    {
+      config,
+      pkgs,
+      lib,
+      ...
+    }:
+    lib.mkIf (config.noughty.host.name == "203-media") {
+      sops.secrets.proton_wg_privatekey = { };
+
+      networking.wg-quick.interfaces.wg0 = {
+        address = [ "10.2.0.2/32" ];
+        privateKeyFile = config.sops.secrets.proton_wg_privatekey.path;
+
+        # Keep the observability push (loki/mimir at 10.9.0.1) OFF the tunnel.
+        # wg-quick's `suppress_prefixlength 0` honors main-table routes more
+        # specific than the default, so an explicit /24 via the LAN gateway
+        # keeps 10.9.0.0/24 on the router path (which has the static route to
+        # obs). Without it the full tunnel swallows the metrics push.
+        # 192.168.1.1 = 203's default gateway (verified live: `ip route get`).
+        postUp = ''
+          ${pkgs.iproute2}/bin/ip route replace 10.9.0.0/24 via 192.168.1.1 dev ens18
+        '';
+        preDown = ''
+          ${pkgs.iproute2}/bin/ip route del 10.9.0.0/24 via 192.168.1.1 dev ens18 || true
+        '';
+
+        peers = [
+          {
+            publicKey = "/i7jCNpcqVBUkY07gVlILN4nFdvZHmxvreAOgLGoZGg=";
+            allowedIPs = [ "0.0.0.0/0" ];
+            endpoint = "146.70.86.114:51820";
+            persistentKeepalive = 25;
+          }
+        ];
+      };
+    };
 }

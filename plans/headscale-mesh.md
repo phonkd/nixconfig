@@ -227,6 +227,35 @@ earlier 201 rebuild didn't carry it; verify `getent hosts hs.phonkd.net` → the
 public IP on 201 after deploy. Also open UDP/41641 (not just 3478) at the Hetzner
 cloud firewall for obs, or even Mac↔obs stays on DERP.
 
+_Update (2026-07-26) — host-level ProtonVPN wg on 203 (the "both" fix)._ Moves
+203's VPN egress off the UniFi gateway onto 203 itself so Tailscale coexists.
+`modules/hosts/203-media.nix` gains `flake.nixosModules."203-vpn"` (wired into
+203's `extraModules` in lib/registry.nix): `networking.wg-quick.interfaces.wg0`
+full-tunnel (AllowedIPs 0.0.0.0/0, no explicit `table` → wg-quick "auto" =
+fwmark + suppress_prefixlength routing). Tailscale's own fwmark rules (0x80000,
+pref ~5210) sit above wg-quick's (~32764), so Tailscale underlay bypasses wg0 →
+direct P2P, while all other 203 traffic egresses Proton. Client PrivateKey in
+sops (`proton_wg_privatekey`, added to global-secrets/secret.yaml via `sops set`,
+verified encrypted + decryptable). Proton `DNS = 10.2.0.1` OMITTED (would fight
+Tailscale MagicDNS + homelab-dns); IPv6 dropped (no native v6); a `postUp` route
+keeps `10.9.0.0/24` (loki/mimir metrics push) on the LAN/router path off the
+tunnel. Module evaluated clean (`nix eval` of wg0 peers + sops path).
+
+**Cutover (order matters — the fwmark split is LOCAL to 203):**
+1. UniFi: **remove the `203` PBR** (source MAC → Any → gateway tunnel) and the
+   `203-reach-tailnet` `/32` — both now redundant, and leaving the `203` PBR
+   defeats everything (the gateway re-captures 203's traffic incl. Tailscale by
+   MAC regardless of the host fwmark). Keep the `203-observability` static route
+   (10.9.0.0/24 → obs) for metrics.
+2. `deploy 203-media` (deploy-rs magic-rollback covers a bad activation; the
+   management SSH rides Tailscale, which is fwmark-bypassed, so it survives wg0
+   coming up).
+3. Verify on 203: `tailscale netcheck` → real home public IP (not 10.3.0.0);
+   `curl ifconfig.me` → the Proton exit IP for general traffic; metrics still
+   ESTAB to 10.9.0.1:9009/:3100; and from the Mac `tailscale ping 100.64.0.3` →
+   "direct". No kill-switch yet (a naive one would drop Tailscale); add a
+   Tailscale-aware one later if wanted.
+
 ## Open decisions
 
 - ~~DERP relay~~ **RESOLVED: embedded DERP** (`derp.server.enabled`, `urls = []`) —

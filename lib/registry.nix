@@ -129,6 +129,7 @@
         self.nixosModules.oldblac-vm
         self.nixosModules."203-media"
         self.nixosModules."203-shares"
+        self.nixosModules."203-vpn"
       ];
   };
 
