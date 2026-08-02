@@ -19,7 +19,8 @@
 #      201` deploys 201-mono from the current checkout; `deploy 201 somebranch`
 #      builds+deploys that git branch; `deploy --all` does every node;
 #      `deploy <host> --remote-build` builds on the target itself instead of
-#      offloading to 205 (fallback when the builder VM is offline). Wired onto
+#      offloading to 205 (fallback when the builder VM is offline); any other
+#      -flag (e.g. `--hostname`, `--ssh-opts`) is handed to deploy-rs. Wired onto
 #      the Mac in modules/hosts/mac.nix. The package attr is deploy-cli, NOT
 #      deploy, so it doesn't collide with the flake.deploy output (deploy-rs
 #      evaluates `<flake>#deploy` and must get the schema, not this derivation).
@@ -116,7 +117,7 @@ in
 
           usage() {
             cat >&2 <<EOF
-          usage: deploy <host> [branch] [--remote-build]
+          usage: deploy <host> [branch] [--remote-build] [--hostname <addr>]
                                              deploy one host (branch optional)
                  deploy --all [branch]       deploy every node
                  deploy --list               list deployable hosts
@@ -127,18 +128,38 @@ in
           --remote-build (-r): build on the target host instead of offloading
           to 205 -- use when the builder is down (the target is x86_64-linux and
           can build its own closure natively).
+          --hostname <addr>: connect over <addr> instead of the node's registry
+          hostname (a tailnet IP). Needed when the deploy carries a tailscale
+          update: activation restarts tailscaled and kills the deploy's own ssh
+          session mid-activation. E.g. deploy 203 --hostname 192.168.1.203.
+          --ssh-opts "<opts>": replace the ssh options, for a rescue path on a
+          non-default port/key. Any other -flag is passed on to deploy-rs.
           EOF
           }
 
-          # Pull the --remote-build/-r flag out of the args; the rest are
-          # positional (host, branch).
+          # Pull our own --remote-build/-r out of the args; --hostname and
+          # --ssh-opts each swallow a value and go to deploy-rs, as does any
+          # other -flag we don't know. The rest are positional (host, branch),
+          # so flags may sit anywhere on the line.
           remote_build=0
+          passthru=()
           positional=()
-          for arg in "$@"; do
-            case "$arg" in
+          while [ "$#" -gt 0 ]; do
+            case "$1" in
               -r | --remote-build) remote_build=1 ;;
-              *) positional+=("$arg") ;;
+              --hostname | --ssh-opts)
+                if [ "$#" -lt 2 ]; then
+                  echo "deploy: $1 needs a value" >&2
+                  exit 1
+                fi
+                passthru+=( "$1" "$2" )
+                shift
+                ;;
+              -h | --help | -l | --list | --all) positional+=("$1") ;;
+              -*) passthru+=("$1") ;;
+              *) positional+=("$1") ;;
             esac
+            shift
           done
           if [ "''${#positional[@]}" -gt 0 ]; then
             set -- "''${positional[@]}"
@@ -187,9 +208,14 @@ in
           else
             where="offloaded to 205-builder"
           fi
+          extra=""
+          if [ "''${#passthru[@]}" -gt 0 ]; then
+            args+=( "''${passthru[@]}" )
+            extra=" [deploy-rs: ''${passthru[*]}]"
+          fi
           args+=( "$ref" )
 
-          echo ">> deploy: ''${node:-ALL nodes} from ''${branch:-current checkout} (build $where)" >&2
+          echo ">> deploy: ''${node:-ALL nodes} from ''${branch:-current checkout} (build $where)$extra" >&2
           exec "$deploybin" "''${args[@]}"
         '';
       };

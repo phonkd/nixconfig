@@ -17,6 +17,7 @@ NixOS hosts are rebuilt with one command (deploy-rs, defined in
 deploy 201            # rebuild 201-mono from the current checkout's committed HEAD
 deploy 203 mybranch   # build + deploy 203-media from git branch `mybranch`
 deploy observability -r  # build ON the target, not on 205 (see below)
+deploy 203 --hostname 192.168.1.203   # connect over the LAN, not the tailnet
 deploy --all          # every node
 deploy --list         # show deployable hosts
 ```
@@ -35,6 +36,18 @@ deploy --list         # show deployable hosts
   its own store (fine for incremental rebuilds; watch it on tight-disk hosts
   like observability's 20 GB Hetzner root). Default (no flag) still offloads to
   205, which is faster and spares the target.
+- **`--hostname <addr>` — mandatory when the deploy updates tailscale.**
+  `deploy.hostname` points at tailnet IPs, so deploy-rs's own ssh session
+  rides tailscaled on the target; activating a tailscale package bump restarts
+  `tailscaled.service` and **kills that session mid-activation**. Seen twice:
+  203 aborted and magic-rolled back; observability stopped its units and never
+  reached "start units", leaving headscale/grafana/loki/mimir/alloy down. So
+  when `git diff` on the lock/inputs touches tailscale, deploy over a
+  non-tailnet path: `deploy 203 --hostname 192.168.1.203`,
+  `deploy observability --hostname 10.9.0.1` (wg-obs). Any other unrecognised
+  flag is forwarded to deploy-rs too — notably `--ssh-opts` for the obs rescue
+  path: `--ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"`
+  (spell the key path out — `~` does not expand inside the quotes).
 - **Magic rollback is on**: if a host drops off the network after activating
   (e.g. you break its networking or the reverse proxy), it auto-reverts to the
   previous generation. This is the safety net for 201, which fronts everything.
