@@ -1,6 +1,6 @@
 ---
 name: nixconfig-ops
-description: Runbook for operating the running homelab from this Mac — the `deploy <host> [branch]` command (deploy-rs) that rebuilds any NixOS host, the sing-box SOCKS proxy every homelab connection depends on, checking service status and logs over ssh, querying Loki/Mimir, and sops secret hygiene. Use when deploying/rebuilding a host, restarting or debugging a live service, or when ssh/curl to 192.168.x.x or 10.9.0.1 hangs. Architecture and module-wiring questions belong to the `nixconfig` skill, not this one.
+description: Runbook for operating the running homelab from this Mac — the `deploy <host> [branch]` command (deploy-rs) that rebuilds any NixOS host, the headscale/Tailscale mesh every homelab connection now rides (NOT the old sing-box proxy), checking service status and logs over ssh, querying Loki/Mimir, and sops secret hygiene. Use when deploying/rebuilding a host, restarting or debugging a live service, or when ssh to a homelab host hangs. Architecture and module-wiring questions belong to the `nixconfig` skill, not this one.
 ---
 
 # Operating the homelab
@@ -65,31 +65,68 @@ on `201-mono` (magic rollback won't catch that — it only reverts on lost
 connectivity), and (2) anything that would drop multiple hosts at once. When in
 doubt on 201, deploy but watch the result and be ready to roll back.
 
-## Connectivity: everything rides the sing-box SOCKS proxy
+## Connectivity: everything rides the headscale tailnet
 
-The Mac reaches all homelab LAN targets through a local SOCKS5 proxy at
-`127.0.0.1:2080` (sing-box, `modules/hosts/mac.nix`). `~/.ssh/config` routes
-`192.168.1.x` / `192.168.3.x` through it, so `ssh 192.168.3.203` and deploy-rs
-work — but only while sing-box is up. `observability` (10.9.0.1) is reached
-directly over WireGuard (wg-obs), not the proxy.
+**The sing-box SOCKS proxy is NO LONGER the homelab path** — do not reach for
+`127.0.0.1:2080`, `socks5://`, or `192.168.x.x` addresses. Every homelab host is
+an enrolled Tailscale node on a self-hosted headscale mesh (coordinator on
+observability at `hs.phonkd.net`; see `plans/headscale-mesh.md`). Reach hosts
+**by name** — `~/.ssh/config` maps each alias to its tailnet IP with
+`ProxyCommand none`:
 
-- **First move when anything hangs**: `nc -z 127.0.0.1 2080` — if that fails the
-  proxy is down and nothing below (or `deploy`) will work.
-- Non-ssh traffic needs the proxy explicitly:
-  `curl -sx socks5://127.0.0.1:2080 http://10.9.0.1:3100/ready` (that one is
-  WireGuard-direct and works without the proxy too).
-- In scripts use `ssh -o ConnectTimeout=6 -o BatchMode=yes` so a dead proxy
+```
+ssh 203-media 'systemctl status jellyfin'   # just works, from any network
+ssh observability                            # alias `obs` too
+```
+
+Auth is **Tailscale SSH** — by tailnet identity + headscale ACL. There is no
+port, key, or known_hosts entry to get right over the tailnet.
+
+Host → tailnet IP: `204-agent=100.64.0.1`, `205-builder=100.64.0.2`,
+`203-media=100.64.0.3`, `observability=100.64.0.4`, `201-mono=100.64.0.5`,
+this Mac`=100.64.0.6`. `deploy.hostname` in `lib/registry.nix` points at these,
+so `deploy` rides the tailnet too.
+
+- **First move when a host hangs**: `tailscale status` — an `offline` peer is
+  the host being down/unenrolled, not a proxy problem. `tailscale ping <ip>`
+  checks peer reachability, but note it uses **disco**, which travels *outside*
+  the WireGuard data session: a working `tailscale ping` with dead `ping`/ssh
+  means a stale session — fix with `sudo systemctl restart tailscaled` on the
+  far host (has happened live on obs).
+- Non-ssh traffic goes **direct, no proxy**: `curl http://10.9.0.1:3100/ready`.
+- In scripts use `ssh -o ConnectTimeout=8 -o BatchMode=yes` so an offline host
   fails fast instead of hanging.
-- SMB to 203 can't use SOCKS; sing-box forwards `smb://127.0.0.1:8445` instead.
+- **SMB**: `smb://100.64.0.3` directly (203's samba `hosts allow` includes
+  `100.64.0.0/10`). The old `smb://127.0.0.1:8445` sing-box forward is gone.
+- **Non-enrolled LAN boxes** (Proxmox `192.168.3.47`, etc.) are reached by
+  ssh-jump through 203 — `~/.ssh/config` has a `192.168.1.* 192.168.3.*` block
+  with `ProxyCommand ssh phonkd@100.64.0.3 nc %h %p`. So they need 203 up.
+- **sing-box still runs, but only for work + Spotify** (the bedag work VPN and
+  the `domains` list in `modules/proxy.nix`). It is irrelevant to homelab ops —
+  if it's down, homelab access is unaffected.
+- **Break-glass when the tailnet is broken**: obs's real sshd is on **:5432**
+  over wg-obs — `ssh -p 5432 -i ~/.ssh/id_ed25519_priv phonkd@10.9.0.1`. Homelab
+  VMs are reachable on the LAN when you're on the home network, bypassing the
+  jump block: `ssh -o ProxyCommand=none -i ~/.ssh/id_ed25519_priv phonkd@192.168.1.203`.
 
-Host → address: 201-mono=192.168.3.201, 203-media=192.168.3.203 (also .1.203),
-204-agent=192.168.3.204, 205-builder=192.168.3.205, observability=10.9.0.1 (wg).
+### 203 runs a ProtonVPN full tunnel — mind the ip rules
+
+203 egresses all *general* traffic through a host-level ProtonVPN `wg-quick`
+tunnel (`203-vpn` in `modules/hosts/203-media.nix`), while Tailscale bypasses it
+via its fwmark. This only works if wg-quick's policy rules sit **below**
+Tailscale's (5210/5270). wg-quick adds them with no explicit priority and
+iproute2 picks "lowest existing − 1", so with tailscaled already up they land at
+**5208/5209 — above Tailscale's — and blackhole the tailnet**. `postUp` re-pins
+them to 32763/32764; check with `ip rule` if 203 loses the tailnet after a boot.
+Symptom: `ping 100.64.0.x` 100% loss, `tailscale netcheck` → `UDP: false`,
+`tailscale status` → `NoState`, and `tailscaled-autoconnect.service` timed out.
+Recovery: pin the rules, then `systemctl restart tailscaled-autoconnect`.
 
 ## Inspecting a live service
 
 ```
-ssh 192.168.3.203 'systemctl status jellyfin --no-pager -l'
-ssh 192.168.3.203 'journalctl -u jellyfin --since -1h --no-pager | tail -50'
+ssh 203-media 'systemctl status jellyfin --no-pager -l'
+ssh 203-media 'journalctl -u jellyfin --since -1h --no-pager | tail -50'
 ```
 
 Status/journal reads work unprivileged for most units. All servers have
@@ -99,10 +136,13 @@ that's what lets deploy-rs and `systemctl restart` work non-interactively.
 Prefer Loki over ssh-journalctl when comparing across hosts or time ranges:
 
 ```
-curl -sx socks5://127.0.0.1:2080 'http://10.9.0.1:3100/loki/api/v1/query_range' \
+curl -s 'http://10.9.0.1:3100/loki/api/v1/query_range' \
   --data-urlencode 'query={host="203-media", unit="jellyfin.service"}' \
   --data-urlencode 'since=1h'
 ```
+
+(No proxy — 10.9.0.1 is the wg-obs tunnel and is reachable directly from the
+Mac. Mimir is `:9009` on the same host.)
 
 (Label names unverified — check with `.../loki/api/v1/labels` first.)
 

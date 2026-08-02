@@ -6,8 +6,9 @@ description: How this NixOS/nix-darwin homelab flake is wired — module auto-im
 # Working in this nixconfig repo
 
 This skill covers how the config is *wired*. Operating the running systems —
-rebuilding a host with `deploy <host>`, the sing-box SOCKS proxy, live service
-debugging, Loki/Mimir queries, sops ops — is the companion `nixconfig-ops` skill.
+rebuilding a host with `deploy <host>`, reaching hosts over the headscale/Tailscale
+mesh (the sing-box proxy is no longer the homelab path), live service debugging,
+Loki/Mimir queries, sops ops — is the companion `nixconfig-ops` skill.
 
 ## Architecture: three wiring layers
 
@@ -34,10 +35,10 @@ carry `kind`, `platform`, `tags`, `extraModules`.
 
 | Host | Tags (relevant) | Notes |
 |---|---|---|
-| 201-mono | reverse-proxy, homelab-server, observability-sender | 192.168.3.201. Traefik :443 (api :8080, metrics :8083), homepage :8082, authelia :9091, vaultwarden :8000, paperless :28981, open-webui :11111, syncthing, garage, DNS |
-| 203-media | media-server, gigaplayer-server, observability-sender | 192.168.1.203 (ens18, default gw) + 192.168.3.203 (ens19, policy-routed table 203). nixflix *arr stack, jellyfin :8096 (NVENC, RTX 3060 Ti passthrough), sabnzbd :8080, slskd :5030, ollama :11434, oCIS :9200, samba shares. nftables firewall: everything open to 192.168.3.201 only |
-| 204-agent | observability-sender | slop-trove; reaches 203's ollama over 192.168.3.0/24 |
-| observability (Hetzner) | observability-server | Loki :3100, Mimir :9009, Grafana :3000 — reachable ONLY at 10.9.0.1 over WireGuard (wg-obs, site-to-site via home router) |
+| 201-mono | reverse-proxy, homelab-server, observability-sender | tailnet 100.64.0.5; LAN 192.168.3.201. Traefik :443 (api :8080, metrics :8083), homepage :8082, authelia :9091, vaultwarden :8000, paperless :28981, open-webui :11111, syncthing, garage, DNS |
+| 203-media | media-server, gigaplayer-server, observability-sender | tailnet 100.64.0.3; LAN 192.168.1.203 (ens18, default gw) + 192.168.3.203 (ens19, policy-routed table 203). nixflix *arr stack, jellyfin :8096 (NVENC, RTX 3060 Ti passthrough), sabnzbd :8080, slskd :5030, ollama :11434, oCIS :9200, samba shares. nftables firewall: everything open to 192.168.3.201 only |
+| 204-agent | observability-sender | tailnet 100.64.0.1. slop-trove; reaches 203's ollama over 192.168.3.0/24 |
+| observability (Hetzner) | observability-server, headscale coordinator (`hs.phonkd.net`) | tailnet 100.64.0.4 (ssh/deploy ride this). Loki :3100, Mimir :9009, Grafana :3000 still served on 10.9.0.1 over wg-obs (site-to-site via home router), which remains the metrics/log DATA plane |
 
 ## Exposing an app: the phonkds.modules registry
 
