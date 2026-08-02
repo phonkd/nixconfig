@@ -117,10 +117,19 @@ so `deploy` rides the tailnet too.
 - **sing-box still runs, but only for work + Spotify** (the bedag work VPN and
   the `domains` list in `modules/proxy.nix`). It is irrelevant to homelab ops —
   if it's down, homelab access is unaffected.
-- **Break-glass when the tailnet is broken**: obs's real sshd is on **:5432**
-  over wg-obs — `ssh -p 5432 -i ~/.ssh/id_ed25519_priv phonkd@10.9.0.1`. Homelab
-  VMs are reachable on the LAN when you're on the home network, bypassing the
-  jump block: `ssh -o ProxyCommand=none -i ~/.ssh/id_ed25519_priv phonkd@192.168.1.203`.
+- **Break-glass when the tailnet is broken**: obs's real sshd is on **:5432**,
+  reachable two non-tailnet ways, both wired up as aliases in `mac.nix` —
+  `ssh obs-rescue` (over wg-obs, `10.9.0.1`) and `ssh obs-rescue-public`
+  (obs's public IP `89.167.83.90`, works with wg-obs down too). The raw IPs
+  match the same blocks, so `ssh 10.9.0.1` / `ssh 89.167.83.90` work as well.
+  The blocks exist because those addresses otherwise fall through to the bedag
+  `Host *` **socat SOCKS catch-all** (work repo, `modules/work/external.nix`)
+  and fail as `peer might not be a socks4 server` / `Connection closed by
+  UNKNOWN port 65535` — hence `ProxyCommand none`, plus the key obs actually
+  accepts (`id_ed25519_priv`, not the catch-all's global `id_ed25519`).
+  Homelab VMs are reachable on the LAN when you're on the home network,
+  bypassing the jump block:
+  `ssh -o ProxyCommand=none -i ~/.ssh/id_ed25519_priv phonkd@192.168.1.203`.
 
 ### 203 runs a ProtonVPN full tunnel — mind the ip rules
 

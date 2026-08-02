@@ -53,9 +53,10 @@
           # Finder SMB to 203 is now direct over the tailnet — no local forward:
           #   Finder > Cmd+K > smb://100.64.0.3
           # (203's samba `hosts allow` includes 100.64.0.0/10; see 203-media.nix.)
-          # (observability no longer needs a wg-obs :5432/id_rsa ssh block here —
-          # it's reached over the tailnet via the `observability` alias below,
-          # and `deploy observability` targets 100.64.0.4; see lib/registry.nix.)
+          # (day-to-day, observability is reached over the tailnet via the
+          # `observability` alias below, and `deploy observability` targets
+          # 100.64.0.4; see lib/registry.nix. Its non-tailnet break-glass
+          # blocks are further down.)
           # ext-mail — same Hetzner :5432 + id_rsa. NB: 10.0.0.2 is the Hetzner
           # private range and is NOT in proxy.ipRanges above, so sing-box only
           # reaches it if the wg outbound already carries 10.0.0.0/8; if not,
@@ -113,6 +114,40 @@
             user = "phonkd";
             proxyCommand = "none";
           };
+
+          # --- obs break-glass (tailnet is DOWN) ----------------------------
+          # When the mesh is broken the `observability` alias above is useless,
+          # so keep the two non-tailnet routes to obs's real sshd (:5432)
+          # spelled out. Without a block here these addresses fall through to
+          # the bedag `Host *` socat SOCKS catch-all (work repo, imported via
+          # modules/work/external.nix) and die with a misleading
+          # "peer might not be a socks4 server" / "Connection closed by UNKNOWN
+          # port 65535" — hence proxyCommand none. The catch-all also forces
+          # `IdentityFile ~/.ssh/id_ed25519` globally, which obs rejects; the
+          # key it accepts is id_ed25519_priv, and first-match-wins in
+          # ssh_config only works because these render above the catch-all.
+          # Route 1 — over the wg-obs tunnel (needs the site-to-site link up).
+          programs.ssh.matchBlocks."obs-rescue" = {
+            host = "obs-rescue 10.9.0.1";
+            hostname = "10.9.0.1";
+            port = 5432;
+            user = "phonkd";
+            identityFile = "~/.ssh/id_ed25519_priv";
+            identitiesOnly = true;
+            proxyCommand = "none";
+          };
+          # Route 2 — obs's public IP, the last resort: works from any network
+          # with neither the tailnet nor wg-obs.
+          programs.ssh.matchBlocks."obs-rescue-public" = {
+            host = "obs-rescue-public 89.167.83.90";
+            hostname = "89.167.83.90";
+            port = 5432;
+            user = "phonkd";
+            identityFile = "~/.ssh/id_ed25519_priv";
+            identitiesOnly = true;
+            proxyCommand = "none";
+          };
+
           # Raw tailnet IPs (deploy targets, MagicDNS FQDNs) go direct too.
           programs.ssh.matchBlocks."tailnet-cgnat" = {
             host = "100.64.0.*";
