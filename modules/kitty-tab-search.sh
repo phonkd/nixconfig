@@ -102,6 +102,23 @@ fi
 
 self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
+# Layout follows the size of the window it was opened in. Full screen is right
+# for a small window, but on a maximised one it is mostly blank and drags your
+# eye to the top of the display — so past a threshold, dock to the bottom
+# instead and put the preview beside the list rather than under it.
+# Thresholds are in cells, so they track font size rather than pixels.
+# stdin here is the tab list, hence reading the size from /dev/tty.
+read -r term_rows term_cols < <(stty size </dev/tty 2>/dev/null || printf '24 80\n')
+layout=()
+if ((term_rows > ${KITTY_TAB_SEARCH_DOCK_ROWS:-40})); then
+	layout+=(--height="${KITTY_TAB_SEARCH_DOCK_HEIGHT:-45%}" --min-height=15)
+fi
+if ((term_cols > ${KITTY_TAB_SEARCH_WIDE_COLS:-120})); then
+	layout+=(--preview-window='right,55%,wrap')
+else
+	layout+=(--preview-window='down,60%,wrap')
+fi
+
 selection=$(
 	"$self" --list | fzf \
 		--delimiter="$SEP" --with-nth=5.. --nth=5.. \
@@ -109,7 +126,7 @@ selection=$(
 		--prompt='tab > ' \
 		--header=$'enter: focus  │  ctrl-r: search scrollback  │  ctrl-t: back to tabs' \
 		--preview="$KITTEN @ --to unix:{1} get-text --extent all --match id:{4} 2>/dev/null | tail -n 60" \
-		--preview-window='down,60%,wrap' \
+		"${layout[@]}" \
 		--bind="ctrl-r:change-prompt(cmd > )+reload($self --deep)" \
 		--bind="ctrl-t:change-prompt(tab > )+reload($self --list)"
 )
