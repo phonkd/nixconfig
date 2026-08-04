@@ -106,7 +106,6 @@
       "caffeine"
       "linearmouse"
       "blackhole-2ch"
-      "bitwarden"
       # Signed/notarized kitty. The nixpkgs kitty is ad-hoc signed and can't
       # hold a TCC Microphone grant, which cava (reading BlackHole, an input
       # device) needs. Run cava from this build and the mic permission sticks.
