@@ -579,8 +579,8 @@
 
       # Expose the running config's git revision as a metric via the textfile
       # collector above. `nixos_configuration_revision{revision="<sha>"} 1`
-      # per host is what cc-sync (on 204-agent) compares against origin/main
-      # to spot merged-but-not-deployed hosts -- no ssh needed. The file is a
+      # per host shows which rev each host actually runs, so comparing it to
+      # origin/main spots merged-but-not-deployed hosts -- no ssh. The file is a
       # store symlink, which the textfile collector reads fine; it changes
       # exactly when a new generation is activated.
       environment.etc."prometheus-textfiles/nixos-configuration-revision.prom".text =
