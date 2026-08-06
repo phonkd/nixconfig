@@ -72,6 +72,15 @@
                 "192.168.1.0/24"
                 "192.168.2.0/24"
                 "10.8.0.0/16"
+                # The headscale tailnet. Without it every `ipfilter = true`
+                # service 403s whenever you're away from home, since a remote
+                # client arrives as 100.64.0.x rather than a LAN address —
+                # verified live: notes.int over the tailnet returned 403 while
+                # an ipfilter = false route on the same host returned 302.
+                # Trust-equivalent to the LAN: the tailnet is authenticated by
+                # headscale and holds only our own devices. Same reasoning as
+                # samba's `hosts allow` on 203.
+                "100.64.0.0/10"
               ];
             };
             forward-auth = {
