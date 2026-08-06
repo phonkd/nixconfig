@@ -30,10 +30,23 @@
         ];
 
         # 201-mono tailnet IP (was 192.168.3.201 over the LAN/sing-box).
+        #
+        # NO leading dot on these keys. nix-darwin names each scoped resolver
+        # file after the key verbatim, and macOS reads the *filename* as the
+        # domain — so ".w.phonkd.net" produced /etc/resolver/.w.phonkd.net,
+        # a dotfile matching nothing, and every *.w.phonkd.net name silently
+        # fell through to public DNS (which answers 192.168.3.201, unroutable
+        # when away from home). Only "grafana.phonkd.net" worked, because it
+        # was the one key without a dot. Verified live: dnsmasq itself
+        # answered 100.64.0.5 for notes.int.w.phonkd.net while the system
+        # resolver still handed apps 192.168.3.201.
+        #
+        # dnsmasq matches a bare domain and all its subdomains, so dropping
+        # the dot keeps `address=/w.phonkd.net/…` covering *.w.phonkd.net.
         addresses = {
-          ".int.phonkd.net" = "100.64.0.5";
-          ".w.int.phonkd.net" = "100.64.0.5";
-          ".w.phonkd.net" = "100.64.0.5";
+          "int.phonkd.net" = "100.64.0.5";
+          "w.int.phonkd.net" = "100.64.0.5";
+          "w.phonkd.net" = "100.64.0.5";
           "grafana.phonkd.net" = "100.64.0.5";
         };
       };
