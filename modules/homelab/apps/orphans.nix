@@ -114,6 +114,24 @@
             ipfilter = false;
           };
         };
+        # llm-NOOBservability: natural-language -> LogQL/PromQL querier (chat
+        # UI + graphs) against Loki/Mimir. The workload half is declared on
+        # 204-agent (services.noobservability in modules/hosts/204-agent.nix);
+        # only the routing lives here, because phonkds.modules is consumed on
+        # the reverse-proxy host and that host module never applies to 201.
+        # A single /api/ask can run for minutes (the 9B model on 203's GPU) --
+        # fine through the proxy, since the websecure entrypoint already
+        # raises readTimeout to 12h for the oCIS upload workload.
+        noobservability = {
+          ip = "192.168.3.204";
+          port = 8095;
+          traefik = {
+            enable = true;
+            domain = "noobservability.int.w.phonkd.net";
+            auth = false;
+            ipfilter = true;
+          };
+        };
       };
     };
 }
