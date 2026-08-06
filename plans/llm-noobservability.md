@@ -2,8 +2,9 @@
 
 **Repo(s):** new repo `llm-noobservability` (service code, package, NixOS module,
 flake) + `nixconfig` (flake input, host wiring on `204-agent`, traefik/dashboard
-entries). **Status:** in-progress — phase 1 (API + CLI, steps 1–4, 6, 8) is
-deployed on 204 and verified live; phase 2 (chat UI + graph, steps 5, 7) is next.
+entries). **Status:** in-progress — phase 1 and the phase-2 UI are deployed;
+0.2.2 is repairing the UI startup/stream UX and query normalization after live
+browser testing found a fatal JavaScript initialization-order bug.
 Code: github.com/phonkd/llm-NOOBservability.
 
 ## Goal
@@ -84,6 +85,14 @@ for hard questions later — off by default, this is a local-first project.
    workload gated on the 204 host, routing/dashboard gated on `reverse-proxy`
    (`noob.int.w.phonkd.net`, `ipfilter = true`). Phase 2, once the UI exists.
 8. `deploy 204-agent`, verify with real questions end-to-end.
+
+**0.2.2 repair:**
+9. Fix the UI startup crash, expose pre-LLM progress phases, and surface HTTP /
+   malformed-stream failures instead of silently finishing.
+10. Normalize common model leakage (Grafana request wrappers and trailing
+    `since 24h` prose) before sending generated queries to Loki/Mimir.
+11. Add automated UI-startup and query-normalization regression tests, bump the
+    nixconfig input, deploy 204-agent, and verify through Traefik in a browser.
 
 ## Open decisions
 
