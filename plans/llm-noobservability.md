@@ -3,8 +3,9 @@
 **Repo(s):** new repo `llm-noobservability` (service code, package, NixOS module,
 flake) + `nixconfig` (flake input, host wiring on `204-agent`, traefik/dashboard
 entries). **Status:** in-progress — phase 1 and the phase-2 UI are deployed;
-0.2.2 is repairing the UI startup/stream UX and query normalization after live
-browser testing found a fatal JavaScript initialization-order bug.
+0.2.3 is repairing the UI startup/stream UX, query normalization, and stale
+asset delivery after live browser testing found a fatal JavaScript
+initialization-order bug and then reproduced the old script surviving deploy.
 Code: github.com/phonkd/llm-NOOBservability.
 
 ## Goal
@@ -93,6 +94,8 @@ for hard questions later — off by default, this is a local-first project.
     `since 24h` prose) before sending generated queries to Loki/Mimir.
 11. Add automated UI-startup and query-normalization regression tests, bump the
     nixconfig input, deploy 204-agent, and verify through Traefik in a browser.
+12. Version static asset URLs and send `Cache-Control: no-store` so a browser
+    cannot keep executing a known-broken app.js after a successful deployment.
 
 ## Open decisions
 
