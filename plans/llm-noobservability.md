@@ -3,9 +3,9 @@
 **Repo(s):** new repo `llm-noobservability` (service code, package, NixOS module,
 flake) + `nixconfig` (flake input, host wiring on `204-agent`, traefik/dashboard
 entries). **Status:** in-progress — phase 1 and the phase-2 UI are deployed;
-0.2.3 is repairing the UI startup/stream UX, query normalization, and stale
-asset delivery after live browser testing found a fatal JavaScript
-initialization-order bug and then reproduced the old script surviving deploy.
+0.2.5 repairs UI startup/rendering, stream UX, query normalization, stale
+asset delivery, and the first live PromQL quality failure found during browser
+testing (an empty CPU ratio caused by mismatched vector labels).
 Code: github.com/phonkd/llm-NOOBservability.
 
 ## Goal
@@ -96,6 +96,11 @@ for hard questions later — off by default, this is a local-first project.
     nixconfig input, deploy 204-agent, and verify through Traefik in a browser.
 12. Version static asset URLs and send `Cache-Control: no-store` so a browser
     cannot keep executing a known-broken app.js after a successful deployment.
+13. Render the text passed to progress/result rows; the stream was healthy but
+    the DOM helper call discarded every row's text.
+14. Tune CPU-percent prompting and retry empty compound PromQL expressions
+    when their underlying series exist but vector-label matching erased the
+    result.
 
 ## Open decisions
 
