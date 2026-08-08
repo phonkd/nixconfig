@@ -1,0 +1,517 @@
+{
+  "uid": "service-usage",
+  "title": "Service usage & removal candidates",
+  "tags": ["homelab", "usage", "cleanup"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "time": { "from": "now-30d", "to": "now" },
+  "refresh": "15m",
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "mimir",
+        "label": "Metrics",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 0,
+        "current": {}
+      },
+      {
+        "name": "loki",
+        "label": "Logs",
+        "type": "datasource",
+        "query": "loki",
+        "hide": 0,
+        "current": {}
+      },
+      {
+        "name": "service",
+        "label": "Routed service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${mimir}" },
+        "query": "label_values(traefik_service_requests_total, service)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "host",
+        "label": "Process host",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${mimir}" },
+        "query": "label_values(namedprocess_namegroup_num_procs, hostname)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "process",
+        "label": "Process regex",
+        "type": "textbox",
+        "query": ".*",
+        "current": { "text": ".*", "value": ".*" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "## What can probably go?\nStart with services that have **few requests**, **few active hours**, and an **old last request** over the selected time range. Select one above to inspect its daily pattern and raw requests. Automated health checks, Homepage widgets, APIs, and background jobs still count as traffic, so verify the request paths and clients before removing anything. Process CPU/RAM is a **cost signal**, not proof of human use; process names do not always map one-to-one to services. Infrastructure such as Traefik, Authelia, Grafana, Loki, Mimir, Alloy, DNS, databases, and storage can be essential despite low direct traffic."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Routed services tracked",
+      "description": "Services with a Traefik request counter in Mimir.",
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(count by (service) (traefik_service_requests_total{service=~\"$service\"}))",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Requests in selected range",
+      "description": "All HTTP and WebSocket requests routed to the selected services.",
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "area",
+        "colorMode": "value"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(traefik_service_requests_total{service=~\"$service\"}[$__range]))",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Last request over 7 days ago",
+      "description": "Only meaningful when the selected time range is longer than seven days. A service with no request in the range is treated as quiet for the full range.",
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "graphMode": "none",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "count(((((time() - max_over_time(timestamp((sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[1h])) > 0))[$__range:1h])) / 86400) or (0 * sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[$__range])) + $__range_s / 86400)) > 7)) or vector(0)",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Fewest routed requests",
+      "description": "Lowest volume first. Counter interpolation can produce fractional values, so values are displayed rounded.",
+      "gridPos": { "h": 14, "w": 8, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Requests" },
+            "properties": [
+              { "id": "unit", "value": "short" },
+              { "id": "decimals", "value": 0 },
+              { "id": "custom.width", "value": 110 },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "orange", "value": 100 },
+                    { "color": "yellow", "value": 1000 },
+                    { "color": "green", "value": 10000 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sort(sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[$__range])))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "service": 0, "Value": 1 },
+            "renameByName": { "service": "Service", "Value": "Requests" }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Fewest active hours",
+      "description": "Number of one-hour buckets containing at least one request. This separates a one-off burst from regular use.",
+      "gridPos": { "h": 14, "w": 8, "x": 8, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Active hours" },
+            "properties": [
+              { "id": "unit", "value": "h" },
+              { "id": "decimals", "value": 0 },
+              { "id": "custom.width", "value": 120 },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "orange", "value": 8 },
+                    { "color": "yellow", "value": 48 },
+                    { "color": "green", "value": 168 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sort(count_over_time((sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[1h])) > 0)[$__range:1h]) or 0 * sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[$__range])))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "service": 0, "Value": 1 },
+            "renameByName": { "service": "Service", "Value": "Active hours" }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "table",
+      "title": "Oldest last request",
+      "description": "Oldest first, with one-hour precision. If there was no request in the selected range, the value equals the length of that range.",
+      "gridPos": { "h": 14, "w": 8, "x": 16, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Days ago" },
+            "properties": [
+              { "id": "unit", "value": "d" },
+              { "id": "decimals", "value": 1 },
+              { "id": "custom.width", "value": 110 },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 3 },
+                    { "color": "orange", "value": 7 },
+                    { "color": "red", "value": 14 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sort_desc(((time() - max_over_time(timestamp((sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[1h])) > 0))[$__range:1h])) / 86400) or (0 * sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[$__range])) + $__range_s / 86400))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "service": 0, "Value": 1 },
+            "renameByName": { "service": "Service", "Value": "Days ago" }
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Daily routed requests",
+      "description": "Use the Routed service filter to compare candidates or isolate one service.",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineInterpolation": "linear",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 35,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "stacking": { "mode": "none", "group": "A" },
+            "axisPlacement": "auto",
+            "axisLabel": "",
+            "scaleDistribution": { "type": "linear" }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service) (increase(traefik_service_requests_total{service=~\"$service\"}[1d]))",
+          "legendFormat": "{{service}}",
+          "interval": "1d"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "logs",
+      "title": "Raw routed requests",
+      "description": "Inspect client, path, and status to decide whether traffic is human, automated, a health check, or an internet scan. Expand a row for Traefik's structured metadata.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 32 },
+      "datasource": { "type": "loki", "uid": "${loki}" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": false,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{service_name=\"traefik\"} | ServiceName=~\"$service\"",
+          "queryType": "range",
+          "direction": "backward",
+          "maxLines": 200
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "text",
+      "title": "Resource cost",
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 44 },
+      "options": {
+        "mode": "markdown",
+        "content": "### What costs resources while it sits there?\nThese panels rank executable groups from process-exporter. They include infrastructure and short-lived commands, and a service may appear as several executables. Use the host and process-regex filters to narrow the list; confirm the owning systemd unit before removing a package or module."
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "CPU time in selected range — top 40",
+      "description": "Accumulated CPU hours, not wall-clock runtime. High CPU with little routed traffic can reveal expensive background work.",
+      "gridPos": { "h": 16, "w": 12, "x": 0, "y": 47 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "CPU hours" },
+            "properties": [
+              { "id": "unit", "value": "h" },
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 110 },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 1 },
+                    { "color": "orange", "value": 10 },
+                    { "color": "red", "value": 24 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(40, sum by (hostname, groupname) (increase(namedprocess_namegroup_cpu_seconds_total{hostname=~\"$host\",groupname=~\"$process\"}[$__range])) / 3600)",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "hostname": 0, "groupname": 1, "Value": 2 },
+            "renameByName": { "hostname": "Host", "groupname": "Process", "Value": "CPU hours" }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": { "sort": [{ "field": "CPU hours", "desc": true }] }
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "table",
+      "title": "Average resident memory — top 40",
+      "description": "Average resident bytes over the selected range. Values can include processes that only existed for part of the range.",
+      "gridPos": { "h": 16, "w": 12, "x": 12, "y": 47 },
+      "datasource": { "type": "prometheus", "uid": "${mimir}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "left" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Average RAM" },
+            "properties": [
+              { "id": "unit", "value": "bytes" },
+              { "id": "decimals", "value": 1 },
+              { "id": "custom.width", "value": 120 },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "green", "value": null },
+                    { "color": "yellow", "value": 268435456 },
+                    { "color": "orange", "value": 536870912 },
+                    { "color": "red", "value": 1073741824 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": { "showHeader": true, "cellHeight": "sm", "footer": { "show": false } },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(40, sum by (hostname, groupname) (avg_over_time(namedprocess_namegroup_memory_bytes{hostname=~\"$host\",groupname=~\"$process\",memtype=\"resident\"}[$__range])))",
+          "instant": true,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "hostname": 0, "groupname": 1, "Value": 2 },
+            "renameByName": { "hostname": "Host", "groupname": "Process", "Value": "Average RAM" }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": { "sort": [{ "field": "Average RAM", "desc": true }] }
+        }
+      ]
+    }
+  ]
+}
