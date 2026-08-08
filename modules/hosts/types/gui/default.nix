@@ -118,6 +118,7 @@
       "tidal"
       "tailscale"
       "kde-connect"
+      "bitwarden"
     ];
     homebrew.brews = [
       "yt-dlp"
