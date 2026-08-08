@@ -45,6 +45,8 @@
           repaint_delay = 6;
           input_delay = 1;
           sync_to_monitor = "yes";
+          # Close tabs, OS windows, and the app without a confirmation prompt.
+          confirm_os_window_close = 0;
           # Translucent background with strong macOS blur behind it.
           background_opacity = "0.6";
           background_blur = 64;
