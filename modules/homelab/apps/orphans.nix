@@ -32,7 +32,7 @@
           port = 8085;
           dashboard = {
             enable = true;
-            icon = "https://public.s3.w.phonkd.net/icons/ezfx.svg";
+            icon = "https://s3.phonkd.net/icons/ezfx.svg";
           };
           traefik = {
             enable = true;

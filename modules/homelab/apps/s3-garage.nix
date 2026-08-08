@@ -12,8 +12,9 @@
           port = 3902;
           traefik = {
             enable = true;
-            domain = "public.s3.w.phonkd.net";
+            domain = "s3.phonkd.net";
             ipfilter = false;
+            # `s3.phonkd.net` is a second global alias for the `public` bucket.
           };
         };
         s3-priv = {

@@ -54,7 +54,7 @@
         openFirewall = false; # Expose the dashboard port (default 8082)
         settings = {
           background = {
-            image = "https://public.s3.w.phonkd.net/walls/20251117_071020.jpg";
+            image = "https://s3.phonkd.net/walls/20251117_071020.jpg";
             blur = "sm";
             saturate = "30";
             brightness = "30";
