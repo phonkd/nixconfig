@@ -296,7 +296,17 @@ endpoints — needed for direct P2P, since 203 had none while STUN was broken).
   zero, guaranteed work-DNS isolation, but no MagicDNS on the Mac (reach hosts by
   tailnet IP); (b) keep MagicDNS and verify work split-DNS still resolves. *Rec:*
   (a) for the Mac given the hard work constraint. Servers are unaffected either way.
-- **Enrollment scope.** Servers + Mac now; laptops (blac, g14) and phone later.
+- **Enrollment scope.** Servers + Mac done. **Laptops (g14, blac) WRITTEN
+  (2026-08-09), pending rebuild.** `tailnet.nix` + `server-sops` gates widened to
+  `is.server || is.nixosDesktop`, so the NixOS desktops enrol headless via the sops
+  `headscale_authkey` (verified the shared age key at
+  `/home/phonkd/.config/sops/age/keys.txt` decrypts it on g14 — only the keyfile
+  needs to be present, no re-encryption). Same move retired the desktops' broken
+  sing-box leftover: the HM `proxy` module (http_proxy→localhost:2080 SOCKS with no
+  daemon behind it) moved out of the cross-platform `gui` base into `gui-darwin`
+  only; g14's stale `proxy.ipRanges` dropped. After rebuild verify on each laptop:
+  `tailscale status` connected, `ssh 201-mono` over the mesh, and no `http_proxy`
+  in a fresh shell. Phone still later.
 
 ## Risks / rollout
 
