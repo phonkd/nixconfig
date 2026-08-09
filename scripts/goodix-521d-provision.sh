@@ -33,8 +33,10 @@
 #
 # HOW TO RUN
 #
-#   sudo systemctl stop fprintd          # release the USB device first
 #   ./scripts/goodix-521d-provision.sh   # NOT under sudo -- it re-execs itself
+#
+# It stops fprintd and USB-resets the sensor itself before starting, so a
+# previous failed enrol attempt doesn't leave the sensor desynced.
 #
 # Run it as yourself: it builds the python environment with nix first (sudo
 # would clear NIX_PATH), then re-execs under sudo so only the resolved
@@ -123,12 +125,32 @@ for required in "$pyenv/bin/python" "$sslpkg/bin/openssl" "$workdir/tool/run_521
   fi
 done
 
-if [ -e /run/current-system/sw/bin/systemctl ] \
-  && /run/current-system/sw/bin/systemctl is-active --quiet fprintd; then
-  echo "error: fprintd is running and will hold the device." >&2
-  echo "       run: sudo systemctl stop fprintd" >&2
-  exit 1
+systemctl=/run/current-system/sw/bin/systemctl
+if [ -x "$systemctl" ] && "$systemctl" is-active --quiet fprintd; then
+  echo ">> stopping fprintd (it holds the device)"
+  "$systemctl" stop fprintd
 fi
+
+# A failed fprintd activation leaves the sensor mid-conversation: its next reply
+# no longer lines up with what the tool expects, and goodix-fp-dump dies with
+# "Invalid message protocol" on the very first firmware_version() call. A USB
+# port reset puts it back to a clean state -- same effect as replugging, which
+# is not an option for an internal device.
+echo ">> resetting the sensor over USB to clear stale state"
+"$pyenv/bin/python" - <<'PY'
+import sys
+import usb.core
+
+dev = usb.core.find(idVendor=0x27C6, idProduct=0x521D)
+if dev is None:
+    sys.exit("error: 27c6:521d disappeared from USB")
+try:
+    dev.reset()
+except Exception as exc:
+    sys.exit(f"error: USB reset failed: {type(exc).__name__}: {exc}")
+print("   usb reset ok")
+PY
+sleep 2
 
 cd "$workdir/tool"
 echo ">> handing over to goodix-fp-dump"
