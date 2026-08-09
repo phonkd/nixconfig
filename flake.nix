@@ -41,6 +41,12 @@
       url = "github:phonkd/kubectl-aliases";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Zen Browser (Firefox fork). Follows our nixpkgs so the desktops get
+    # native GPU acceleration -- nixGL is only needed off NixOS.
+    zen-browser = {
+      url = "github:youwen5/zen-browser-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     try-rs = {
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";

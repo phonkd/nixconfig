@@ -78,6 +78,7 @@
       pkgs,
       lib,
       config,
+      inputs,
       ...
     }:
     let
@@ -123,6 +124,9 @@
 
       programs.dconf.enable = true;
       users.users.phonkd.packages = with pkgs; [
+        # Zen Browser (Firefox fork) from the zen-browser-flake input. Native
+        # GPU accel since the flake follows our nixpkgs (no nixGL needed on NixOS).
+        inputs.zen-browser.packages.${pkgs.system}.default
         gst_all_1.gstreamer
         gst_all_1.gst-plugins-base
         gst_all_1.gst-plugins-good
