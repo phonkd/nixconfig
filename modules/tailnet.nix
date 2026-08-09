@@ -1,11 +1,13 @@
 # Tailscale client for the headscale mesh (control plane:
 # modules/homelab/apps/headscale.nix on observability).
 #
-# Enrols every server into the tailnet and enables Tailscale SSH — over the
-# tailnet, access is authorised by tailnet identity + the headscale ACL, so
-# there is no sshd port/key/known_hosts to manage (the host's real sshd on :5432
-# stays only as off-tailnet break-glass). Headless: registers with a headscale
-# pre-auth key delivered by sops.
+# Enrols every server AND NixOS desktop (g14/blac) into the tailnet and enables
+# Tailscale SSH — over the tailnet, access is authorised by tailnet identity +
+# the headscale ACL, so there is no sshd port/key/known_hosts to manage (a
+# host's real sshd on :5432 stays only as off-tailnet break-glass). Headless:
+# registers with a headscale pre-auth key delivered by sops. This is what lets
+# the laptops reach the homelab directly over the mesh — replacing the old
+# per-desktop sing-box SOCKS proxy (HM `proxy` module, now Mac-only).
 #
 # Wired into modules/builder.nix `alwaysImport`. It references
 # sops.secrets.headscale_authkey, a reusable pre-auth key (headscale user
@@ -16,7 +18,7 @@
 {
   flake.nixosModules.tailnet =
     { config, lib, ... }:
-    lib.mkIf config.noughty.host.is.server {
+    lib.mkIf (config.noughty.host.is.server || config.noughty.host.is.nixosDesktop) {
       sops.secrets.headscale_authkey = { };
 
       services.tailscale = {

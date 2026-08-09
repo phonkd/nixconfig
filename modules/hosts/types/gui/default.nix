@@ -4,6 +4,11 @@
   ...
 }:
 {
+  # Cross-platform GUI base. NOTE: the sing-box `proxy` HM module is
+  # deliberately NOT here -- it's Mac-only (work VPN + Spotify) and is
+  # imported from gui-darwin. NixOS desktops reach the homelab over the
+  # headscale tailnet (modules/tailnet.nix) instead, so forcing http_proxy
+  # at localhost:2080 there just pointed at a dead SOCKS port.
   flake.homeModules.gui =
     {
       config,
@@ -16,7 +21,6 @@
         self.homeModules.base
         self.homeModules.terminal
         self.homeModules.desktop
-        self.homeModules.proxy
       ];
     };
   flake.homeModules.gui-nixos =
@@ -65,6 +69,9 @@
     lib.mkIf config.noughty.host.is.darwinDesktop {
       home-manager.users.${config.noughty.user.name}.imports = [
         self.homeModules.gui
+        # sing-box SOCKS proxy: Mac-only (bedag work VPN + Spotify). NixOS
+        # desktops don't import this -- they ride the tailnet.
+        self.homeModules.proxy
         {
           # cava on macOS: portaudio can only read *input* devices, so system
           # audio is captured through the BlackHole loopback driver (cask

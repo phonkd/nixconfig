@@ -24,15 +24,10 @@
         # Shared desktop baseline (DE selection, steam, bluetooth, wheel,
         # networkmanager, nameservers, bolt, libinput quirks) now lives in
         # modules/desktop.nix, gated on noughty.host.is.nixosDesktop.
-        home-manager.users.phonkd.proxy.ipRanges = [
-          "192.168.1.47/32"
-          "192.168.3.201/32"
-          "192.168.1.46/32"
-          "192.168.3.200/32"
-          "192.168.1.150/32"
-          "192.168.3.203"
-          "10.9.0.0/24"
-        ];
+        #
+        # The old sing-box proxy.ipRanges block is gone: g14 now reaches the
+        # homelab over the headscale tailnet (modules/tailnet.nix), not a
+        # local SOCKS proxy. The HM `proxy` module is Mac-only now.
         networking.hostName = "g14";
 
         boot.loader.systemd-boot.enable = false;
