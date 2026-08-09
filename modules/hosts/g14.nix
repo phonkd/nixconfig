@@ -16,6 +16,110 @@
       lib,
       ...
     }:
+    let
+      # The GA401's fingerprint reader is a Goodix 27c6:521d. Mainline libfprint
+      # does NOT support it -- the pid only appears in libfprint's autosuspend
+      # hwdb whitelist (a power-management list, not a driver list), so fprintd
+      # alone finds no device. Goodix ships no Linux driver and won't.
+      #
+      # The only working driver is the reverse-engineered `goodixtls` set from
+      # infinytum's libfprint fork (the same code the AUR `libfprint-goodix-521d`
+      # package uses). That fork is abandoned at libfprint 1.94.1 (Nov 2021), and
+      # the AUR route is to run the whole stale 1.94.1 library -- which nixpkgs'
+      # fprintd (>= 1.94.9 required) will not build against.
+      #
+      # Instead we graft just the driver onto nixpkgs' current libfprint: the
+      # fork's addition is entirely self-contained (a new drivers/goodixtls/
+      # directory plus meson wiring), so it ports cleanly and we keep an
+      # up-to-date libfprint. Upstream's own test suite still passes.
+      goodixtlsSrc = pkgs.fetchFromGitHub {
+        owner = "infinytum";
+        repo = "libfprint";
+        rev = "5e14af7f136265383ca27756455f00954eef5db1"; # branch `unstable`
+        hash = "sha256-MFhPsTF0oLUMJ9BIRZnSHj9VRwtHJxvWv0WT5zz7vDY=";
+      };
+
+      libfprint-goodixtls = pkgs.libfprint.overrideAttrs (old: {
+        pname = "libfprint-goodixtls";
+
+        postPatch = (old.postPatch or "") + ''
+          cp -r ${goodixtlsSrc}/libfprint/drivers/goodixtls libfprint/drivers/
+          chmod -R u+w libfprint/drivers/goodixtls
+
+          substituteInPlace meson.build \
+            --replace-fail "    'goodixmoc',
+    'nb1010'," "    'goodixmoc',
+    'goodixtls511',
+    'goodixtls52xd',
+    'goodixtls53xd',
+    'nb1010'," \
+            --replace-fail "    'uru4000' : [ 'openssl' ]," "    'uru4000' : [ 'openssl' ],
+    'goodixtls511' : [ 'openssl', 'goodixtls' ],
+    'goodixtls52xd' : [ 'openssl', 'goodixtls' ],
+    'goodixtls53xd' : [ 'openssl', 'goodixtls' ],"
+
+          substituteInPlace libfprint/meson.build \
+            --replace-fail "    'focaltech_moc' :
+        [ 'drivers/focaltech_moc/focaltech_moc.c' ],
+}" "    'focaltech_moc' :
+        [ 'drivers/focaltech_moc/focaltech_moc.c' ],
+    'goodixtls511' :
+        [ 'drivers/goodixtls/goodix511.c' ],
+    'goodixtls52xd' :
+        [ 'drivers/goodixtls/goodix52xd.c' ],
+    'goodixtls53xd' :
+        [ 'drivers/goodixtls/goodix53xd.c' ],
+}" \
+            --replace-fail "    'openssl' :
+        [ ]," "    'openssl' :
+        [ ],
+    'goodixtls' :
+        [ 'drivers/goodixtls/goodix_proto.c', 'drivers/goodixtls/goodix.c', 'drivers/goodixtls/goodixtls.c' ],"
+
+          # These three pids are now claimed by real drivers, so they must leave
+          # the "no driver, just autosuspend" whitelist and gain driver sections
+          # in the shipped hwdb. libfprint's own `udev-hwdb` test diffs the
+          # checked-in file against the generated one, so it verifies this edit.
+          substituteInPlace libfprint/fprint-list-udev-hwdb.c \
+            --replace-fail "  { .vid = 0x27c6, .pid = 0x5110 },
+" "" \
+            --replace-fail "  { .vid = 0x27c6, .pid = 0x521d },
+" "" \
+            --replace-fail "  { .vid = 0x27c6, .pid = 0x538d },
+" ""
+
+          substituteInPlace data/autosuspend.hwdb \
+            --replace-fail "usb:v27C6p5110*
+" "" \
+            --replace-fail "usb:v27C6p521D*
+" "" \
+            --replace-fail "usb:v27C6p538D*
+" "" \
+            --replace-fail "# Supported by libfprint driver nb1010" "# Supported by libfprint driver goodixtls511
+usb:v27C6p5110*
+ ID_AUTOSUSPEND=1
+ ID_PERSIST=0
+
+# Supported by libfprint driver goodixtls52xd
+usb:v27C6p521D*
+ ID_AUTOSUSPEND=1
+ ID_PERSIST=0
+
+# Supported by libfprint driver goodixtls53xd
+usb:v27C6p538D*
+ ID_AUTOSUSPEND=1
+ ID_PERSIST=0
+
+# Supported by libfprint driver nb1010"
+        '';
+
+        # The driver passes `&payload` (guint8 (*)[N]) where a guint8* is wanted.
+        # Same address, but GCC 14 makes this an error by default.
+        env = (old.env or { }) // {
+          NIX_CFLAGS_COMPILE = "-Wno-incompatible-pointer-types";
+        };
+      });
+    in
     {
       imports = [
         "${builtins.fetchGit { url = "https://github.com/NixOS/nixos-hardware.git"; }}/asus/zephyrus/ga401"
@@ -58,6 +162,16 @@
           wantedBy = lib.mkForce [ ];
         };
         services.upower.enable = true;
+
+        # Fingerprint reader (Goodix 27c6:521d) -- see libfprint-goodixtls above.
+        # services.fprintd doesn't touch PAM itself, but security.pam's per-service
+        # `fprintAuth` defaults to services.fprintd.enable, so enabling this is
+        # enough for sddm/login/sudo to offer the reader once a finger is enrolled
+        # (`fprintd-enroll`). Enrol as your own user, not via sudo.
+        services.fprintd = {
+          enable = true;
+          package = pkgs.fprintd.override { libfprint = libfprint-goodixtls; };
+        };
       };
     };
 }
