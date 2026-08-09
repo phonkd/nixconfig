@@ -44,8 +44,21 @@
 #
 # The tool asks you to type a random number to confirm. Once it prints
 # "Valid PSK: True" and the firmware is back to GFUSB_GM168SEC_APP_10019, the
-# provisioning is done -- it then moves on to capturing a test image, which you
-# can Ctrl-C. Afterwards:
+# provisioning is done -- that is the whole point of this script.
+#
+# It then moves on to capturing a test image, which you can Ctrl-C. Letting it
+# run instead ends in:
+#
+#   read_otp()
+#   ValueError: Invalid OTP
+#
+# That is EXPECTED and harmless. It happens inside run_driver(), the tool's
+# image-capture demo, long after the PSK has been written -- the sensor is
+# already provisioned at that point. It does not mean the run failed, and
+# fprintd enrols fine afterwards. Don't re-run the script chasing it: that
+# would erase and reflash the sensor again for nothing.
+#
+# Afterwards:
 #
 #   sudo systemctl start fprintd
 #   fprintd-enroll                       # as your own user, NOT under sudo
