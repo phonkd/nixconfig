@@ -1,5 +1,6 @@
 {
   self,
+  inputs,
   config,
   pkgs,
   ...
@@ -40,7 +41,9 @@
         dracula-theme
         librewolf
         yt-dlp
-        #claude-code
+        # Latest Claude Code from the claude-code-nix flake, not the lagging
+        # nixpkgs claude-code (see the input comment in flake.nix).
+        inputs.claude-code-nix.packages.${pkgs.system}.default
       ];
       qt = {
         enable = false;

@@ -45,6 +45,14 @@
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Claude Code CLI, tracked at the latest npm release (rebuilt daily upstream)
+    # instead of nixpkgs' claude-code, which lags well behind. This is the NixOS
+    # analogue of the Mac's `claude-code@latest` Homebrew cask. Wired into the
+    # NixOS-desktop HM module in modules/desktop.nix.
+    claude-code-nix = {
+      url = "github:sadjow/claude-code-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nixflix = {
       url = "github:kiriwalawren/nixflix";
       inputs.nixpkgs.follows = "nixpkgs";
