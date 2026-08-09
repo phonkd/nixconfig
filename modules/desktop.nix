@@ -39,7 +39,6 @@
       services.easyeffects.enable = true;
       home.packages = with pkgs; [
         dracula-theme
-        librewolf
         yt-dlp
         # Latest Claude Code from the claude-code-nix flake, not the lagging
         # nixpkgs claude-code (see the input comment in flake.nix).
@@ -57,6 +56,13 @@
       # GTK configuration
       gtk = {
         enable = true;
+        # Plasma rewrites ~/.gtkrc-2.0 at runtime (KDE's GTK bridge), so every
+        # rebuild HM found an unmanaged file and tried to back it up -- failing
+        # the moment a .hm-backup from an earlier rebuild was already there
+        # ("Existing file '.gtkrc-2.0.hm-backup' would be clobbered"). The
+        # content is generated from the settings below, so there is nothing
+        # worth preserving: overwrite it and skip the backup entirely.
+        gtk2.force = true;
         theme = {
           package = pkgs.nordic;
           name = "Nordic-darker";
