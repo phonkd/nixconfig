@@ -21,15 +21,9 @@
         "${builtins.fetchGit { url = "https://github.com/NixOS/nixos-hardware.git"; }}/asus/zephyrus/ga401"
       ];
       config = lib.mkIf (config.noughty.host.name == "g14") {
-        programs.steam.enable = true;
-        hardware.bluetooth.enable = true;
-        system.stateVersion = "26.05";
-        # "wheel" must be declared (see blac.nix) or sudo is lost on rebuild.
-        users.users.phonkd.extraGroups = [
-          "dialout"
-          "wheel"
-        ];
-        networking.networkmanager.enable = true;
+        # Shared desktop baseline (DE selection, steam, bluetooth, wheel,
+        # networkmanager, nameservers, bolt, libinput quirks) now lives in
+        # modules/desktop.nix, gated on noughty.host.is.nixosDesktop.
         home-manager.users.phonkd.proxy.ipRanges = [
           "192.168.1.47/32"
           "192.168.3.201/32"
@@ -40,27 +34,13 @@
           "10.9.0.0/24"
         ];
         networking.hostName = "g14";
-        networking.nameservers = [
-          "192.168.3.201"
-          "1.1.1.1"
-        ];
 
         boot.loader.systemd-boot.enable = false;
         boot.loader.limine = {
           enable = true;
         };
         boot.loader.efi.canTouchEfiVariables = true;
-        services.hardware.bolt.enable = true;
 
-        services.xserver.enable = true;
-
-        services.displayManager.gdm.enable = true;
-        services.desktopManager.gnome.enable = true;
-        environment.etc."libinput/local-overrides.quirks".text = ''
-          [Company Mouse Debounce Override]
-          MatchName=*COMPANY*USB*Device*
-          ModelBouncingKeys=1
-        '';
         systemd.tmpfiles.rules = [
           "w /sys/devices/system/cpu/cpufreq/boost - - - - 0"
         ];

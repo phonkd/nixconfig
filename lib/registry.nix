@@ -27,7 +27,7 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "desktop";
-    desktop = "gnome";
+    desktop = "kde";
     tags = [
       "gaming"
       "gigaplayer-client"
@@ -54,7 +54,7 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "laptop";
-    desktop = "gnome";
+    desktop = "kde";
     tags = [ "gigaplayer-client" ];
     username = "phonkd";
 

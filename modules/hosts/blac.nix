@@ -14,16 +14,9 @@
       ...
     }:
     lib.mkIf (config.noughty.host.name == "blac") {
-      programs.steam.enable = true;
-      hardware.bluetooth.enable = true;
-      system.stateVersion = "26.05";
-      # "wheel" must be declared: NixOS resets a declarative user's group
-      # membership to exactly extraGroups on rebuild, so the installer-era
-      # manual wheel membership got wiped by the first rebuild (sudo lost).
-      users.users.phonkd.extraGroups = [
-        "dialout"
-        "wheel"
-      ];
+      # Shared desktop baseline (DE selection, steam, bluetooth, wheel,
+      # networkmanager, nameservers, bolt, gvfs, libinput quirks) now lives
+      # in modules/desktop.nix, gated on noughty.host.is.nixosDesktop.
 
       # SSH access (e.g. from the Mac). openssh opens port 22 itself.
       services.openssh = {
@@ -36,12 +29,7 @@
         "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDg0PjpVeFevKuUq7ZVAhL0fySgOomRT/SZ6jWFxfv0q06KgwLSInwXFZDIUNN9c2Uz6qgJvh/xZ9UQfuoYwBMwUDt89hhplZDeFG+0kTxPRyjKrtcOXefM2ne4eI93kvJfU5+SaxXs3GF5oChoml4Wwub74CVLWIlKTvA7YLEKzBffEJ4ypO97YTR734Cd1vHsIOVFylftIpe0n/oA7o3Bu+GSRwfW4cM9nbYcumydwyrA9osrQ6dLNFCJ6DSvBY65j9eU/wGEObmch645f+hAm1ROZxoUYtVBQjSNheYNIUAxjXDbHd/eA3TjG6qGfUSbFu1gitQBLY4M+YUmT+r/IjD3XBFwFCED3G/TKKBjKubCMk0yxegCa+JZt+HzSbRTILgFv0eC+DvZBgMHMx0RjefvOJY6mCWtwwYRULp+2ulls6RTX2F3aEEKO0+/9YxTfzvwE1zFLAVxNpCg25f35eWuBdIJD/2K42Krbe2xrGDJdFhRtpT1uoq0qGHreIk= phonkd@Eliss-MacBook-Pro.local"
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPrr8owgaJr+6wpTafMrp7j2wALLAOAuzalPuFJrgV7m"
       ];
-      networking.networkmanager.enable = true;
       networking.hostName = "blac";
-      networking.nameservers = [
-        "192.168.3.201"
-        "1.1.1.1"
-      ];
 
       networking.enableIPv6 = false;
       networking.nat.externalInterface = lib.mkForce "enp9s0";
@@ -52,13 +40,6 @@
         secureBoot.enable = true;
       };
       boot.loader.efi.canTouchEfiVariables = true;
-      services.hardware.bolt.enable = true;
-      services.gvfs.enable = true;
-
-      services.xserver.enable = true;
-
-      services.displayManager.gdm.enable = true;
-      services.desktopManager.gnome.enable = true;
 
       boot.kernelParams = [
         "pci=noaer"
@@ -98,11 +79,5 @@
       # Ollama has no auth; only open it on the trusted LAN. Tighten to 204
       # only if blac ever gets nftables (see services.hermes for the pattern).
       networking.firewall.allowedTCPPorts = [ 11434 ];
-
-      environment.etc."libinput/local-overrides.quirks".text = ''
-        [Company Mouse Debounce Override]
-        MatchName=*COMPANY*USB*Device*
-        ModelBouncingKeys=1
-      '';
     };
 }

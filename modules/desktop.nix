@@ -77,7 +77,47 @@
       config,
       ...
     }:
+    let
+      # Desktop environment name comes from the registry via
+      # noughty.host.desktop. This module is the single place that maps
+      # that string onto an actual display-manager + desktop-manager, so
+      # hosts never hand-wire GDM/SDDM again -- flip the registry field.
+      de = config.noughty.host.desktop;
+    in
     lib.mkIf config.noughty.host.is.nixosDesktop {
+      # --- Desktop environment selection (driven by registry) ----------
+      services.xserver.enable = true;
+      services.displayManager.sddm = lib.mkIf (de == "kde") {
+        enable = true;
+        wayland.enable = true;
+      };
+      services.desktopManager.plasma6.enable = lib.mkIf (de == "kde") true;
+      services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
+      services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
+
+      # --- Shared Linux-desktop baseline (was duplicated per host) ------
+      networking.networkmanager.enable = true;
+      networking.nameservers = [
+        "192.168.3.201"
+        "1.1.1.1"
+      ];
+      hardware.bluetooth.enable = true;
+      programs.steam.enable = true;
+      services.hardware.bolt.enable = true;
+      services.gvfs.enable = true;
+      users.users.phonkd.extraGroups = [
+        "dialout"
+        # "wheel" must stay declared: NixOS resets a declarative user's
+        # groups to exactly extraGroups on rebuild, so dropping it loses sudo.
+        "wheel"
+      ];
+      # Debounce quirk for the shared USB mouse used on both machines.
+      environment.etc."libinput/local-overrides.quirks".text = ''
+        [Company Mouse Debounce Override]
+        MatchName=*COMPANY*USB*Device*
+        ModelBouncingKeys=1
+      '';
+
       programs.dconf.enable = true;
       users.users.phonkd.packages = with pkgs; [
         gst_all_1.gstreamer
