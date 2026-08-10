@@ -1,0 +1,106 @@
+--- a/libfprint/drivers/goodixtls/goodix52xd.c
++++ b/libfprint/drivers/goodixtls/goodix52xd.c
+@@ -503,6 +503,42 @@
+     self->frames = g_slist_append(self->frames, frame);
+ }
+ 
++/**
++ * @brief Writes a captured image out as a PGM, for debugging.
++ *
++ * @details Off unless GOODIX52XD_DUMP is set to a path prefix, e.g.
++ * GOODIX52XD_DUMP=/tmp/goodix writes /tmp/goodix-0.pgm, -1.pgm, ... This is
++ * the only way to see what this sensor is actually handing to the minutiae
++ * extractor, rather than inferring it from match scores.
++ */
++static void dump_image_pgm(FpImage* img)
++{
++    static guint seq = 0;
++    const gchar* prefix = g_getenv("GOODIX52XD_DUMP");
++
++    if (prefix == NULL) {
++        return;
++    }
++
++    g_autofree gchar* path = g_strdup_printf("%s-%u.pgm", prefix, seq++);
++    g_autofree gchar* header =
++        g_strdup_printf("P5\n%u %u\n255\n", img->width, img->height);
++    g_autoptr(GError) error = NULL;
++    g_autofree gchar* blob = g_malloc(strlen(header) + img->width * img->height);
++    const gsize header_len = strlen(header);
++
++    memcpy(blob, header, header_len);
++    memcpy(blob + header_len, img->data, img->width * img->height);
++
++    if (!g_file_set_contents(path, blob, header_len + img->width * img->height,
++                             &error)) {
++        fp_warn("Failed to dump image to %s: %s", path, error->message);
++    }
++    else {
++        fp_dbg("Dumped capture to %s", path);
++    }
++}
++
+ static void scan_on_read_img(FpDevice* dev, guint8* data, guint16 len,
+                              gpointer ssm, GError* err)
+ {
+@@ -521,22 +557,47 @@
+         GSList* raw_frames = g_slist_nth(self->frames, 1);
+ 
+         FpImageDevice* img_dev = FP_IMAGE_DEVICE(dev);
+-        struct fpi_frame_asmbl_ctx assembly_ctx;
+-        assembly_ctx.frame_width = GOODIX52XD_WIDTH;
+-        assembly_ctx.frame_height = GOODIX52XD_HEIGHT;
+-        assembly_ctx.image_width = GOODIX52XD_WIDTH*3;
+-        assembly_ctx.get_pixel = get_pix;
+-
+-        GSList* frames = NULL;
+-        frame_processing_info pinfo = {.dev = self, .frames = &frames};
+ 
+-        g_slist_foreach(raw_frames, (GFunc) process_frame, &pinfo);
+-        frames = g_slist_reverse(frames);
++        /* This is a press sensor (scan_type is FP_SCAN_TYPE_PRESS): the finger
++         * does not move between frames, so the captures are repeated reads of
++         * the same area rather than successive slices of a swipe.
++         *
++         * Averaging them is therefore the correct reduction -- it cancels
++         * per-frame sensor noise and keeps the geometry intact. Running them
++         * through fpi_do_movement_estimation()/fpi_assemble_frames(), as this
++         * driver originally did, treats a stationary finger as a swipe and
++         * smears the frames into an image three times wider than the sensor
++         * (image_width was GOODIX52XD_WIDTH*3), which the NBIS extractor
++         * cannot pull coherent minutiae out of.
++         */
++        guint32 accumulator[GOODIX52XD_FRAME_SIZE] = {0};
++        guint frame_count = 0;
++
++        for (GSList* elem = raw_frames; elem != NULL; elem = elem->next) {
++            const Goodix52xdPix* raw = elem->data;
++
++            for (int i = 0; i != GOODIX52XD_FRAME_SIZE; ++i) {
++                accumulator[i] += raw[i];
++            }
++            frame_count++;
++        }
++
++        FpImage* img = fp_image_new(GOODIX52XD_WIDTH, GOODIX52XD_HEIGHT);
++
++        if (frame_count != 0) {
++            Goodix52xdPix averaged[GOODIX52XD_FRAME_SIZE];
++
++            for (int i = 0; i != GOODIX52XD_FRAME_SIZE; ++i) {
++                averaged[i] = accumulator[i] / frame_count;
++            }
++            squash_frame_linear(averaged, img->data);
++        }
++        else {
++            fp_warn("No frames captured for this scan");
++        }
+ 
+-        fpi_do_movement_estimation(&assembly_ctx, frames);
+-        FpImage* img = fpi_assemble_frames(&assembly_ctx, frames);
++        dump_image_pgm(img);
+ 
+-        g_slist_free_full(frames, g_free);
+         g_slist_free_full(self->frames, g_free);
+         self->frames = g_slist_alloc();
+ 

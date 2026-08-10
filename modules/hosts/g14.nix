@@ -46,6 +46,10 @@
           cp -r ${goodixtlsSrc}/libfprint/drivers/goodixtls libfprint/drivers/
           chmod -R u+w libfprint/drivers/goodixtls
 
+          # The fork treats this press sensor as a swipe sensor. See the patch
+          # header; without it the sensor enrols but never matches.
+          patch -p1 < ${./goodixtls-52xd-press-capture.patch}
+
           substituteInPlace meson.build \
             --replace-fail "    'goodixmoc',
     'nb1010'," "    'goodixmoc',
