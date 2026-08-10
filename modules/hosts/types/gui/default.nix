@@ -21,6 +21,9 @@
         self.homeModules.base
         self.homeModules.terminal
         self.homeModules.desktop
+        # secretspec + the Bitwarden CLI, pointed at our Vaultwarden. Lives on
+        # `gui` rather than `desktop-nixos-specific` so the Mac gets it too.
+        self.homeModules.secretspec
       ];
     };
   flake.homeModules.gui-nixos =

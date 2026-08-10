@@ -65,3 +65,42 @@ automatically. The same registry feeds Traefik routing.
 
 The net effect: enabling an app with `dashboard.enable = true` makes it appear on the
 dashboard (and get proxied) with **no edits to the dashboard module**.
+
+## Secrets
+
+Two mechanisms, for two different consumers:
+
+| | consumer | mechanism |
+|---|---|---|
+| `modules/homelab/global-secrets/` | **services** on homelab hosts | sops-nix, decrypted at activation into `/run/secrets` |
+| `secretspec.toml` | **a human at a terminal** | [secretspec](https://github.com/cachix/secretspec), read on demand from Vaultwarden |
+
+`secretspec.toml` at the repo root declares *which* secrets exist and where they
+live, never their values, so it is checked in. `modules/secretspec.nix` installs
+the `secretspec` and `bw` CLIs on every desktop and writes
+`~/.config/secretspec/config.toml` pointing at our own Vaultwarden
+(`vw.w.phonkd.net`).
+
+### One-time setup per machine
+
+The `bw` CLI keeps its own state in `~/.config/Bitwarden CLI/` and its server can
+only be set while logged out, so this part is interactive rather than declarative:
+
+```bash
+bw config server https://vw.w.phonkd.net
+bw login
+```
+
+### Daily use
+
+```bash
+bwu                                  # unlock, exports BW_SESSION into this shell
+secretspec check                     # are all declared secrets resolvable?
+secretspec get S3_ACCESS_KEY_ID
+secretspec run -- aws s3 ls          # inject them into a command's environment
+```
+
+The provider URI pins `?server=https://vw.w.phonkd.net`. That does not configure
+the `bw` CLI — it is an assertion secretspec checks before every operation, so a
+CLI accidentally pointed at bitwarden.com fails loudly instead of quietly
+answering from the wrong vault.
