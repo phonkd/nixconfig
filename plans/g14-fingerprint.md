@@ -1,77 +1,80 @@
 # g14 fingerprint (Goodix 27c6:521d)
 
-**Repo(s):** nixconfig   **Status:** blocked on one measurement
+**Repo(s):** nixconfig   **Status:** closed — won't work, disabled deliberately
 
-_Status (2026-08-10):_ Sensor is driven, provisioned, and **enrols**; it does
-**not verify**. Everything below the matcher works. The open question is whether
-the capture is good enough for NBIS at 64x80, and that is decided by one test
-run described under "What I need next".
+_Conclusion (2026-08-10):_ The driver works. The **sensor is too small to
+authenticate with**, and no software change fixes that. `services.fprintd` is
+left `enable = false` in `modules/hosts/g14.nix`; the driver graft, the patch
+and the provisioning script all stay in place so re-enabling is one boolean if
+a non-minutiae matcher ever appears.
 
-_Decisions locked:_ graft the driver onto **current** nixpkgs libfprint rather
-than downgrading the whole library (the AUR approach); sensor **has been
-reflashed** and its factory PSK is permanently gone; do **not** lower
-`bz3_threshold` to force matches.
-
-## Where this stands
+## What was built, and it does work
 
 | Stage | State |
 |---|---|
 | Driver claims device | works — `/net/reactivated/Fprint/Device/0` |
 | Sensor PSK provisioned | done, irreversible (factory PSK overwritten) |
+| Capture | works — clean 64x80 images, clear ridges |
+| NBIS binarization | works — correctly thresholded parallel ridges |
 | `fprintd-enroll` | completes, 5 stages |
-| `fprintd-verify` | **`verify-no-match`, always** |
-| bozorth3 score | **0, occasionally 11**, threshold 24 |
+| `fprintd-verify` | **never matches — and never can** |
 
-## What I need next
+Getting here took: grafting the abandoned `goodixtls` driver onto current
+nixpkgs libfprint, reflashing the sensor's PSK, and fixing the driver's capture
+path (it ran libfprint's *swipe* stitching on a *press* sensor, which smeared
+every capture into an image three times too wide). All three were real problems
+and all three are fixed. The captures at the end are genuinely good.
 
-The last commit (`82edbd1`) rewrote the capture path but is **untested against
-hardware**. The new `fprintd` is already built and in the store, so this needs
-no system rebuild.
+## Why it still cannot authenticate
 
-Terminal 1 — new daemon, debug + image dump on:
+libfprint matches with NBIS: `mindtct` extracts **minutiae** (ridge endings and
+bifurcations), `bozorth3` scores how many two impressions share, and the driver
+demands 24. Minutiae are the only thing that matters — a picture of ridges with
+no endings or forks in it carries no identity.
 
-```
-sudo systemctl stop fprintd
-sudo env G_MESSAGES_DEBUG=all GOODIX52XD_DUMP=/tmp/goodix \
-  /nix/store/08cvyfn1cdq875kz7rzw6dx472v6mmy0-fprintd-1.94.5/libexec/fprintd -t
-```
-
-(If that store path has been GC'd, rebuild it with
-`nix build --impure .#nixosConfigurations.g14.config.services.fprintd.package`.)
-
-Terminal 2 — the old template came from the broken pipeline and must go:
+Measured directly with `scripts/goodix-521d-minutiae-check.c` over 13 real
+captures:
 
 ```
-fprintd-delete $USER
-fprintd-enroll
-fprintd-verify
+minutiae per capture: 0,0,1,0,0,1,2,2,2,2,2,0,2      (median 2)
 ```
 
-**Report back two things:**
+That is not a capture-quality failure. The binarized images the tool dumps
+alongside show clean, well-separated, correctly-thresholded ridges — detection
+is working fine, there is simply almost nothing there to detect. The ridges run
+edge to edge; they essentially never end or fork inside the window.
 
-1. The `score N/24` lines from terminal 1.
-2. That `/tmp/goodix-*.pgm` exist — those are the raw captures, and reading them
-   directly is the whole point. Everything so far has been inferred from match
-   scores; nobody has actually looked at what this sensor produces.
+The geometry says this is exactly what should happen. Measuring the ridge period
+in those binarized captures (perpendicular period **12.8 px**, ~5 ridges across
+the 64 px width, consistent to within ±0.8 px across all captures) and taking
+the human ridge period as 0.45 mm:
 
-## How to read the result
+- effective resolution ≈ **28.5 px/mm (~720 dpi)**
+- physical window ≈ **2.3 x 2.8 mm = 6.3 mm²**
+- at a normal minutia density of 0.2–0.3 /mm², that window should contain
+  **1.3–1.9 minutiae**
 
-- **Recognisable ridges + scores at/near 24** → done, set the threshold with
-  evidence and re-enable normally.
-- **Recognisable ridges + scores still ~0** → the images are fine but 64x80 is
-  too small for NBIS. This is the sensor's real limit and the honest end of the
-  road; upstream libfprint rejected this sensor for exactly this reason. Stop and
-  disable rather than tune.
-- **Noise / blank / smeared PGMs** → capture is still wrong. Next suspects, in
-  order: ridge polarity (try `img->flags |= FPI_IMAGE_COLORS_INVERTED`), the
-  commented-out `postprocess_frame()` background subtraction (the driver captures
-  an empty background frame into `self->empty_img` and then never uses it), and
-  `squash_frame_linear()`'s min/max normalisation being thrown off by a few
-  outlier pixels.
+Predicted 1–2, observed 0–2. The model and the measurement agree, which is what
+makes this a conclusion rather than a guess: **the features needed to
+authenticate are not physically inside the sensor's window.** bozorth3 needs
+roughly an order of magnitude more to reach 24. Hence the observed scores of 0,
+occasionally 11 — that 11 is coincidence, not partial recognition.
 
-**Do not lower `bz3_threshold` to make verification pass.** At a noise floor of
-0 and occasional 11, a threshold that admits those is authenticating on noise —
-and `fprintAuth` puts this in front of sudo and sddm.
+This is why upstream libfprint declined the sensor. Windows Hello works on it
+because Goodix's proprietary matcher is not minutiae-based; that algorithm is
+not available to us and cannot be reimplemented from the captures.
+
+**Do not lower `bz3_threshold` to make verification pass.** It is the one change
+that would appear to work. With a noise floor of 0 and stray 11s, a threshold
+admitting those authenticates on noise — and `fprintAuth` defaults to
+`services.fprintd.enable`, so this sits in front of **sudo and sddm**.
+
+## Reproducing the verdict
+
+Captures come from the driver's `GOODIX52XD_DUMP` escape hatch; the analysis
+tool is `scripts/goodix-521d-minutiae-check.c`. Both are documented in that
+file's header, including the exact build command. It compiles clean with `-Wall`
+against the patched libfprint and needs no hardware — only the `.pgm` dumps.
 
 ## Key facts worth not rediscovering
 
@@ -90,14 +93,21 @@ and `fprintAuth` puts this in front of sudo and sddm.
   after a nixpkgs bump, that is what it is complaining about.
 - `ppmm` is **never assigned anywhere in libfprint** — it is 0 for every image
   driver, passed into NBIS. Upstream behaviour, not our bug. Already chased; do
-  not chase again.
+  not chase again. (It is also not the cause here: the ridge period shows the
+  images are already at a sane scale for NBIS.)
 - `rotate_frame()` in the driver is dead code (never called).
+- The driver captures an empty background frame into `self->empty_img` and never
+  uses it (`postprocess_frame()` is commented out). Irrelevant now — binarization
+  is already clean, so background subtraction has nothing left to fix.
 - The sensor keeps state across warm reboots. A failed activation leaves it
   desynced, and the next tool run dies with `Invalid message protocol`; the
   provisioning script USB-resets it first for this reason.
 - `scripts/goodix-521d-provision.sh` ends in `ValueError: Invalid OTP` **even on
   success** — that is its image-capture demo running after the PSK is written.
   Re-running it means erasing and reflashing the sensor again for nothing.
+- The sensor's **factory PSK is permanently gone**. It was never readable and
+  has been overwritten. If this machine ever dual-boots Windows, Hello's
+  fingerprint is broken there.
 
 ## Commits
 
@@ -106,13 +116,12 @@ and `fprintAuth` puts this in front of sudo and sddm.
 - `94ce7d4` USB-reset the sensor before provisioning
 - `2db2ec5` note the harmless trailing OTP error
 - `82edbd1` press-capture fix (average frames, drop swipe stitching) + PGM dump
-  — **untested against hardware**
+- `HEAD` disable fprintd with the minutiae measurement that settles it
 
-## If this is abandoned
+## If someone wants to reopen this
 
-Set `services.fprintd.enable = false` in `modules/hosts/g14.nix` with a comment.
-Leave the libfprint graft and the provisioning script in place — they are
-correct and the sensor is already provisioned, so re-enabling is one boolean if
-the driver ever improves. Do not leave it enabled-but-broken: `fprintAuth`
-defaults to `services.fprintd.enable`, so every sudo and every login would wait
-on a finger that cannot match before falling back to the password.
+The only thing that would change the answer is a matcher that does not rely on
+minutiae — correlation or ridge-pattern based — since the images themselves are
+fine and are reproducibly distinguishable to the eye. libfprint has no such
+matcher and adding one is a research project, not a config change. Do not
+reopen this by re-examining the driver; that part is finished and measured.

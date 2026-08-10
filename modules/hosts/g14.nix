@@ -168,13 +168,32 @@ usb:v27C6p538D*
         };
         services.upower.enable = true;
 
-        # Fingerprint reader (Goodix 27c6:521d) -- see libfprint-goodixtls above.
-        # services.fprintd doesn't touch PAM itself, but security.pam's per-service
-        # `fprintAuth` defaults to services.fprintd.enable, so enabling this is
-        # enough for sddm/login/sudo to offer the reader once a finger is enrolled
-        # (`fprintd-enroll`). Enrol as your own user, not via sudo.
+        # Fingerprint reader (Goodix 27c6:521d): driven, provisioned, enrols --
+        # and left DISABLED, because it cannot authenticate. See
+        # plans/g14-fingerprint.md for the full write-up.
+        #
+        # The short version: the driver works. Captures are clean 64x80 images
+        # with well-defined ridges, and NBIS binarizes them correctly. But the
+        # sensor window is only ~2.3 x 2.8 mm (measured from the ridge period in
+        # those captures), and a window that small physically contains 1-2
+        # minutiae. NBIS finds exactly that -- 0 to 2 per capture. bozorth3's
+        # threshold of 24 needs an order of magnitude more, so verification
+        # scores 0. No driver change can create minutiae that are not inside the
+        # window; this is the sensor's size, not a bug. It is also why upstream
+        # libfprint declined to support it. Windows works only via Goodix's
+        # proprietary non-minutiae matcher, which is not available here.
+        #
+        # Do NOT "fix" this by lowering bz3_threshold. `fprintAuth` defaults to
+        # services.fprintd.enable, so this sits in front of sudo and sddm, and a
+        # threshold low enough to admit these scores authenticates on noise.
+        #
+        # Everything above (the libfprint graft, the driver patch,
+        # scripts/goodix-521d-provision.sh) is correct and stays: the sensor is
+        # already provisioned, so if a non-minutiae matcher ever lands this is
+        # one boolean. Leaving it enabled-but-broken would make every sudo and
+        # every login wait on a finger that can never match.
         services.fprintd = {
-          enable = true;
+          enable = false;
           package = pkgs.fprintd.override { libfprint = libfprint-goodixtls; };
         };
       };
