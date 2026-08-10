@@ -155,6 +155,7 @@ usb:v27C6p538D*
         hardware.nvidia = {
           open = false;
           powerManagement.enable = false;
+          modesetting.enable = true;
         };
         systemd.services.nvidia-powerd = {
           unitConfig.StartLimitAction = "none";
