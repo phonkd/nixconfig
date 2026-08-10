@@ -1,6 +1,12 @@
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
+    # Sole consumer: modules/secretspec.nix, which needs secretspec >= 0.18 --
+    # that is the release that added the `bw://` (Bitwarden) provider, and
+    # nixos-26.05 is still on 0.10.1. Note the *locked rev* is what matters,
+    # not the branch name: this input sat on a 2026-08-01 rev carrying 0.17.0,
+    # which fails at runtime with "Provider backend 'bw' not found". Keep it
+    # ahead of that, and re-check `secretspec --version` if you ever re-pin.
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-fork.url = "github:phonkd/nixpkgs/master";
     # Pinned ahead of nixpkgs-unstable purely to get Immich 3.0.2 (not yet

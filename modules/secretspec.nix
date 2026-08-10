@@ -25,6 +25,10 @@ in
         # provider entirely -- Bitwarden Password Manager support landed in
         # 0.18. Pull just this one package from the unstable input, the same
         # single-package-newer-pin trick as Immich in homelab/apps/immich.nix.
+        #
+        # This needs >= 0.18 specifically. 0.17 builds and runs fine but has
+        # no `bw` backend at all, so it fails only at *use* time with
+        # "Provider backend 'bw' not found" -- see the flake.nix input comment.
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.secretspec
         pkgs.bitwarden-cli
       ];
