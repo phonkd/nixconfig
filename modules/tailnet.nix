@@ -98,7 +98,14 @@
       # tailscaled itself, so the moment a host loses its tailnet session it
       # can no longer resolve hs.phonkd.net -- which is exactly what it needs
       # to resolve in order to reconnect. That deadlock stranded 203 on
-      # 2026-08-11 and needed a hand-edited /etc/hosts over LAN ssh to break.
+      # 2026-08-11.
+      #
+      # NB there is no hand-edit escape hatch on NixOS: /etc/hosts is a symlink
+      # into the store. The only ways out are `systemctl restart tailscaled`
+      # (stopping it releases its resolv.conf takeover, so the base resolvers
+      # return and the control URL resolves on start), overwriting the writable
+      # /etc/resolv.conf while it is stopped, or a rebuild carrying this pin --
+      # which is the point of declaring it here.
       #
       # /etc/hosts is consulted before DNS (nsswitch files->dns), so this makes
       # reconnection independent of whether tailscaled is currently healthy.
