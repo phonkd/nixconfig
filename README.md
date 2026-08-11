@@ -91,25 +91,10 @@ bw config server https://vw.w.phonkd.net
 bw login
 ```
 
-### S3 clients
-
-`aws` needs **no** setup — `modules/secretspec.nix` configures it through
-home-manager's `programs.awscli`, pointing `~/.aws/config` at Garage and
-`~/.aws/credentials` at a `credential_process` that calls secretspec. The
-credentials file holds a *command*, not a key, so nothing secret lands on disk;
-`aws` just asks the vault each time it needs credentials.
-
-`mc` is the exception and stays manual. There is no home-manager module for
-minio-client (`programs.mc` is Midnight Commander — a different tool), and mc
-has no equivalent of `credential_process`, so its key can only be stored
-literally. Set the remote up once; after that mc works without an unlocked
-vault:
-
-```bash
-bwu
-mc alias set garage https://api.s3.w.phonkd.net \
-  "$(secretspec get S3_ACCESS_KEY_ID)" "$(secretspec get S3_SECRET_ACCESS_KEY)"
-```
+S3 clients are deliberately left alone. `mc` and `aws` keep their own config
+(`mc alias set …`, `aws configure`), set up by hand once per machine; feeding
+them from secretspec was tried and reverted as more machinery than it was
+worth. Pull the values with `secretspec get` when you need them.
 
 ### Daily use
 
@@ -117,10 +102,7 @@ mc alias set garage https://api.s3.w.phonkd.net \
 bwu                                  # unlock, exports BW_SESSION into this shell
 secretspec check                     # are all declared secrets resolvable?
 secretspec get S3_ACCESS_KEY_ID
-secretspec run -- cmd                # inject them into a command's environment
-
-aws s3 ls                            # Garage, credentials fetched per call
-mc ls garage/                        # Garage, via mc's own stored remote
+secretspec run -- <cmd>              # inject them into a command's environment
 ```
 
 The provider URI pins `?server=https://vw.w.phonkd.net`. That does not configure
