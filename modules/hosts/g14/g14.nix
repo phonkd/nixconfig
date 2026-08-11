@@ -168,6 +168,25 @@ usb:v27C6p538D*
         };
         services.upower.enable = true;
 
+        # EasyEffects preset. The daemon is enabled for every NixOS desktop
+        # (services.easyeffects in modules/desktop.nix), but this preset is
+        # tuned for the GA401's own speakers, so it is host-scoped and lives
+        # next to this module rather than in the shared desktop one.
+        #
+        # HM writes extraPresets into $XDG_DATA_HOME/easyeffects/<folder>/,
+        # picking the folder from the JSON's top-level key -- ours is "output",
+        # so this lands as ~/.local/share/easyeffects/output/g14.json. `preset`
+        # is what actually applies it: it becomes `--load-preset g14` on the
+        # daemon's ExecStart, so it is in effect on a fresh home directory too.
+        #
+        # The file is a store symlink, so the EasyEffects GUI cannot save over
+        # it. To change the tuning: tweak it in the GUI, save it under another
+        # name, and copy that JSON over ./g14.json.
+        home-manager.users.phonkd.services.easyeffects = {
+          extraPresets.g14 = builtins.fromJSON (builtins.readFile ./g14.json);
+          preset = "g14";
+        };
+
         # Fingerprint reader (Goodix 27c6:521d): driven, provisioned, enrols --
         # and left DISABLED, because it cannot authenticate. See
         # plans/g14-fingerprint.md for the full write-up.
