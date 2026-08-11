@@ -91,10 +91,19 @@ bw config server https://vw.w.phonkd.net
 bw login
 ```
 
-`mc` (installed from `modules/shell.nix`) keeps its own state in
-`~/.mc/config.json`, likewise not declarative. Set the Garage remote up once,
-reading the keys straight out of the vault — this is the one call that needs an
-unlocked vault, after which `mc` works on its own:
+### S3 clients
+
+`aws` needs **no** setup — `modules/secretspec.nix` configures it through
+home-manager's `programs.awscli`, pointing `~/.aws/config` at Garage and
+`~/.aws/credentials` at a `credential_process` that calls secretspec. The
+credentials file holds a *command*, not a key, so nothing secret lands on disk;
+`aws` just asks the vault each time it needs credentials.
+
+`mc` is the exception and stays manual. There is no home-manager module for
+minio-client (`programs.mc` is Midnight Commander — a different tool), and mc
+has no equivalent of `credential_process`, so its key can only be stored
+literally. Set the remote up once; after that mc works without an unlocked
+vault:
 
 ```bash
 bwu
@@ -108,8 +117,9 @@ mc alias set garage https://api.s3.w.phonkd.net \
 bwu                                  # unlock, exports BW_SESSION into this shell
 secretspec check                     # are all declared secrets resolvable?
 secretspec get S3_ACCESS_KEY_ID
-secretspec run -- aws s3 ls          # inject them into a command's environment
+secretspec run -- cmd                # inject them into a command's environment
 
+aws s3 ls                            # Garage, credentials fetched per call
 mc ls garage/                        # Garage, via mc's own stored remote
 ```
 
