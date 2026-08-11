@@ -238,7 +238,20 @@
       #   # add a line:  grafana-secret-key: <openssl rand -base64 32>
       sops.secrets."grafana-secret-key".owner = "grafana";
 
-      # Expose the stack ONLY on the WireGuard interface — never publicly.
+      # Expose the stack on the TAILNET only — never publicly. Senders push
+      # to 100.64.0.4 (see obsHost below); Grafana is reached the same way.
+      # Access is bounded by the headscale ACL, which is a tighter boundary
+      # than the wg-obs tunnel it replaces: that carried every home RFC1918
+      # range (10/8, 172.16/12, 192.168/16), so any host on any home subnet
+      # could reach these ports. See plans/retire-wg-obs.md.
+      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
+        grafanaPort
+        lokiHttpPort
+        mimirHttpPort
+      ];
+
+      # Kept during the cutover so senders still on 10.9.0.1 keep working
+      # until each has been redeployed. Removed with the tunnel in Phase 2.
       networking.firewall.interfaces.wg-obs.allowedTCPPorts = [
         grafanaPort
         lokiHttpPort
@@ -611,12 +624,17 @@
         text =
           let
             hostname = config.networking.hostName;
-            # Most senders reach the observability server through the
-            # home-router WireGuard tunnel (10.9.0.1). ext-mail is an external
-            # Hetzner VM with no route into the home LAN — it uses the Hetzner
-            # private network instead (obs server = 10.0.0.3, see the matching
-            # firewall rule in observability-server above).
-            obsHost = if hostname == "ext-mail" then "10.0.0.3" else "10.9.0.1";
+            # Senders reach the observability server over the TAILNET
+            # (100.64.0.4). This replaced the home-router WireGuard tunnel
+            # (10.9.0.1) — see plans/retire-wg-obs.md. Every sender is already
+            # an enrolled tailnet node, so this needs no new trust or routing;
+            # it just stops the telemetry path depending on a site-to-site
+            # tunnel that exists for nothing else.
+            #
+            # ext-mail stays on the Hetzner private network (obs = 10.0.0.3):
+            # it is in the same datacenter, so that path is shorter than the
+            # tailnet and does not depend on the mesh being up.
+            obsHost = if hostname == "ext-mail" then "10.0.0.3" else "100.64.0.4";
             lokiendpoint = "http://${obsHost}:3100/loki/api/v1/push";
             mimirendpoint = "http://${obsHost}:9009/api/v1/push";
           in

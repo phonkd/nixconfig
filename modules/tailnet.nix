@@ -81,17 +81,26 @@
             [ ];
       };
 
-      # 201-mono can't reach obs's *public* IP: its default gateway
-      # (192.168.3.1) diverts Hetzner-bound traffic into the wg-obs tunnel, so
-      # hs.phonkd.net (89.167.83.90) is unreachable and enrolment hangs. It does
-      # reach obs at the tunnel IP 10.9.0.1 (verified: HTTPS 200), so pin the
-      # control-server name there for this host only. The cert is valid over
-      # that path (SNI is unchanged) and headscale listens on 0.0.0.0. Every
-      # other host reaches the public IP via its own uplink and is unaffected.
-      # (201's inability to route to Hetzner is a separate, pre-existing uplink
-      # fault — this just keeps mesh control/DERP on the tunnel it can use.)
-      # Everywhere else, pin the same name to obs's PUBLIC address. This is a
-      # bootstrap fix, not routing: tailscaled takes over resolv.conf and
+      # Pin the coordinator to obs's PUBLIC address on EVERY host.
+      #
+      # 201-mono used to be special-cased to the tunnel IP (10.9.0.1) on the
+      # belief that it could not reach obs's public IP. That was wrong, and the
+      # evidence for it was a bad test: `curl https://89.167.83.90/` returns
+      # rc=000 from *any* host, because headscale serves a Let's Encrypt cert
+      # via autocert and the TLS handshake fails without matching SNI. Retested
+      # 2026-08-11 with `curl --resolve hs.phonkd.net:443:89.167.83.90`, 201
+      # answers **rc=200** — it reaches the coordinator over its ordinary
+      # uplink perfectly well.
+      #
+      # The pin was therefore not a workaround but the *cause* of 201 never
+      # getting a direct path: it sent 201's DERP and STUN into the tunnel, and
+      # since obs is both the STUN server and the tunnel far end, obs reflected
+      # the tunnel source back. 201 advertised `10.3.0.0:45281` — an address no
+      # peer can route to — and was pinned to DERP forever. Removing the
+      # special case is what lets it advertise a real endpoint.
+      #
+      # The pin itself stays, for a different reason: it is a bootstrap fix,
+      # not routing. tailscaled takes over resolv.conf and
       # leaves MagicDNS as the ONLY nameserver (verified on 203:
       # `nameserver 100.100.100.100` and nothing else, despite
       # networking.nameservers being set). 100.100.100.100 is answered by
@@ -109,13 +118,11 @@
       #
       # /etc/hosts is consulted before DNS (nsswitch files->dns), so this makes
       # reconnection independent of whether tailscaled is currently healthy.
-      # Hardcoding the IP is acceptable here: it is already hardcoded in the
-      # 201 pin above and in modules/dns.nix, and headscale's cert is valid on
-      # this path (SNI unchanged).
-      networking.hosts =
-        if config.noughty.host.name == "201-mono" then
-          { "10.9.0.1" = [ "hs.phonkd.net" ]; }
-        else
-          { "89.167.83.90" = [ "hs.phonkd.net" ]; };
+      # Hardcoding the IP is acceptable here: it is already hardcoded in
+      # modules/dns.nix, which serves the same answer authoritatively to
+      # homelab clients.
+      networking.hosts = {
+        "89.167.83.90" = [ "hs.phonkd.net" ];
+      };
     };
 }

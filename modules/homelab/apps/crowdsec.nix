@@ -34,13 +34,13 @@
           {
             # Traefik logs come from Loki rather than the local journal:
             # traefik already ships app+access logs to Loki via OTLP (see
-            # traefik.nix), and 201 reaches Loki over wg-obs as an
+            # traefik.nix), and 201 reaches Loki over the tailnet as an
             # observability-sender. crowdsec tails the query below via
             # Loki's websocket API. labels.type feeds the s00-raw
             # non-syslog parser, which sets program="traefik" — the hub
             # traefik parser's filter matches on that.
             source = "loki";
-            url = "http://10.9.0.1:3100";
+            url = "http://100.64.0.4:3100";
             query = ''{service_name="traefik"}'';
             labels.type = "traefik";
           }

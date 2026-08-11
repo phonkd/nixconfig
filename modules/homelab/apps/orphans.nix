@@ -104,7 +104,9 @@
           };
         };
         grafana = {
-          ip = "10.9.0.1";
+          # Reached over the tailnet now, not the wg-obs tunnel — traefik on
+          # 201 is itself an enrolled node. See plans/retire-wg-obs.md.
+          ip = "100.64.0.4";
           port = 3000;
           dashboard.enable = true;
           traefik = {

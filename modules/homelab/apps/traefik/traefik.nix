@@ -169,12 +169,12 @@
             format = "json";
             otlp = {
               resourceAttributes."host.name" = config.networking.hostName;
-              http.endpoint = "http://10.9.0.1:3100/otlp/v1/logs";
+              http.endpoint = "http://100.64.0.4:3100/otlp/v1/logs";
             };
           };
           accessLog.otlp = {
             resourceAttributes."host.name" = config.networking.hostName;
-            http.endpoint = "http://10.9.0.1:3100/otlp/v1/logs";
+            http.endpoint = "http://100.64.0.4:3100/otlp/v1/logs";
           };
 
           certificatesResolvers = {
