@@ -61,17 +61,18 @@
           bind-dynamic = true;
           except-interface = "podman*";
 
-          # Do NOT serve this host's /etc/hosts as DNS answers. 201 pins
-          # `10.9.0.1 hs.phonkd.net` in /etc/hosts (modules/tailnet.nix) because
-          # its own uplink to Hetzner is broken, so it must reach the headscale
-          # coordinator over the wg-obs tunnel (10.9.0.1). Without no-hosts,
-          # dnsmasq re-served that private pin to EVERY homelab client, so their
-          # Tailscale STUN went through the tunnel and got reflected as a private
-          # address (10.3.0.0) instead of the home's real public IP — which meant
-          # no direct P2P and permanent DERP relaying for all VMs. 201 itself
-          # still resolves the pin via nsswitch `files` (checked before dns), so
-          # its own coordinator path over the tunnel is unaffected; only what
-          # dnsmasq hands to the network changes. See plans/headscale-mesh.md.
+          # Do NOT serve this host's /etc/hosts as DNS answers. This mattered
+          # acutely when 201 pinned `10.9.0.1 hs.phonkd.net` (the wg-obs
+          # tunnel): without no-hosts, dnsmasq re-served that private pin to
+          # every homelab client. Both the pin and the tunnel are gone now —
+          # tailnet.nix pins the PUBLIC IP on every host, the same answer the
+          # `address=` line below serves — so the hazard is historical. Kept
+          # because serving a resolver's own /etc/hosts to the network is a bad
+          # default regardless. The original failure, for the record: clients
+          # inherited the private pin, so their Tailscale STUN went through the
+          # tunnel and was reflected as 10.3.0.0 instead of the home's real
+          # public IP — no direct P2P, permanent DERP relaying for every VM.
+          # See plans/headscale-mesh.md and plans/retire-wg-obs.md.
           no-hosts = true;
 
           # wildcard DNS
@@ -87,8 +88,10 @@
             # what un-poisons STUN: VMs now resolve the public IP and STUN over
             # their real uplink, reflecting a usable public endpoint → direct
             # P2P instead of relay. Authoritative (not forwarded upstream) so it
-            # keeps working even while 201's own uplink is flapping. 201 does not
-            # use this answer for itself (files-first → 10.9.0.1 tunnel pin).
+            # keeps working even while 201's own uplink is flapping. 201 now
+            # resolves the same public IP for itself, via the /etc/hosts pin in
+            # tailnet.nix (files before dns) — which is what finally let 201
+            # advertise a real endpoint instead of the tunnel address.
             "/hs.phonkd.net/89.167.83.90"
           ];
           #filter-aaaa = true;

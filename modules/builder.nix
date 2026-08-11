@@ -76,7 +76,6 @@ let
     # Observability stack (server + VPN gated on "observability-server",
     # sender gated on "observability-sender").
     observability-server
-    observability-vpn
     observability-sender
 
     # Headscale mesh control plane (gated on "observability-server") + the

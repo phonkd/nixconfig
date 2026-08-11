@@ -12,9 +12,10 @@
   #   Grafana   — dashboards / explore (HTTP 3000)
   #
   # Reachability: services bind on all interfaces but the firewall only opens
-  # their ports on the WireGuard interface (see observability-vpn below). Home
-  # VMs reach Loki/Mimir over a site-to-site VPN terminated on the user's
-  # router, so nothing here is exposed on the public internet.
+  # their ports on tailscale0. Senders push over the tailnet (100.64.0.4), so
+  # nothing here is exposed on the public internet. This replaced a
+  # site-to-site WireGuard tunnel terminated on the home router — see
+  # plans/retire-wg-obs.md for why it went.
   # ───────────────────────────────────────────────────────────────────────────
   flake.nixosModules.observability-server =
     {
@@ -250,13 +251,6 @@
         mimirHttpPort
       ];
 
-      # Kept during the cutover so senders still on 10.9.0.1 keep working
-      # until each has been redeployed. Removed with the tunnel in Phase 2.
-      networking.firewall.interfaces.wg-obs.allowedTCPPorts = [
-        grafanaPort
-        lokiHttpPort
-        mimirHttpPort
-      ];
 
       # Loki/Mimir ingestion (not Grafana) is also reachable over the Hetzner
       # private network (this host = 10.0.0.3 on enp7s0): ext-mail has no
@@ -489,57 +483,6 @@
             exit 1
           '';
         };
-    };
-
-  # ───────────────────────────────────────────────────────────────────────────
-  # WireGuard endpoint for the observability server (tag "observability-server")
-  #
-  # The user's home router holds the other end of a site-to-site tunnel, so the
-  # single peer below is the *router*, and its allowedIPs cover the whole home
-  # LAN. Every home VM then routes its Loki/Mimir traffic through the router and
-  # over this tunnel — no per-VM WireGuard config required.
-  #
-  #   Server (this host): 10.9.0.1/24
-  #   Router peer:        10.9.0.2/32  + home subnet(s) in allowedIPs
-  #
-  # Key bootstrap (run once on the server):
-  #   mkdir -p /etc/wireguard
-  #   (umask 077; wg genkey > /etc/wireguard/obs-private.key)
-  #   wg pubkey < /etc/wireguard/obs-private.key   # → server pubkey for the router
-  # ───────────────────────────────────────────────────────────────────────────
-  flake.nixosModules.observability-vpn =
-    {
-      pkgs,
-      lib,
-      noughtyLib,
-      config,
-      ...
-    }:
-    lib.mkIf (noughtyLib.hostHasTag "observability-server") {
-      networking.wireguard.interfaces.wg-obs = {
-        privateKeyFile = "/etc/wireguard/obs-private.key";
-        listenPort = 51821;
-        ips = [ "10.9.0.1/24" ];
-
-        peers = [
-          # The home router (10.3.0.0 is its VPN-client "tunnel IP"). allowedIPs
-          # carries every RFC1918 range so any home VM, on any private subnet,
-          # can reach the stack and have replies routed back through the tunnel.
-          # NB: 172.16.0.0/12 overlaps Docker's default 172.17.0.0/16 bridge, but
-          # Docker's more-specific route wins so container networking is fine.
-          {
-            publicKey = "REU5RaPQY5YyPyfVNDpnRzqZ8vy2kNTQVBKN9++bm18=";
-            allowedIPs = [
-              "10.0.0.0/8"
-              "172.16.0.0/12"
-              "192.168.0.0/16"
-            ];
-          }
-        ];
-      };
-
-      # Only the WireGuard handshake port is reachable publicly.
-      networking.firewall.allowedUDPPorts = [ 51821 ];
     };
 
   # ───────────────────────────────────────────────────────────────────────────

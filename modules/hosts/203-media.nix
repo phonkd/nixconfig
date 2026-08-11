@@ -326,14 +326,14 @@
         address = [ "10.2.0.2/32" ];
         privateKeyFile = config.sops.secrets.proton_wg_privatekey.path;
 
-        # Keep the observability push (loki/mimir at 10.9.0.1) OFF the tunnel.
-        # wg-quick's `suppress_prefixlength 0` honors main-table routes more
-        # specific than the default, so an explicit /24 via the LAN gateway
-        # keeps 10.9.0.0/24 on the router path (which has the static route to
-        # obs). Without it the full tunnel swallows the metrics push.
-        # 192.168.1.1 = 203's default gateway (verified live: `ip route get`).
+        # The observability push no longer needs rescuing from this tunnel: it
+        # goes to 100.64.0.4 over the tailnet, and Tailscale's own ip-rules
+        # (pref 5270 -> table 52) sit above wg-quick's, so tailnet-destined
+        # traffic never enters wg0 in the first place. The explicit
+        # `10.9.0.0/24 via 192.168.1.1` route that used to keep the metrics
+        # push on the router path went with wg-obs — see plans/retire-wg-obs.md.
         #
-        # Then re-pin wg-quick's two policy rules BELOW Tailscale's. This is
+        # Re-pin wg-quick's two policy rules BELOW Tailscale's. This is
         # REQUIRED, not cosmetic: wg-quick adds them with no explicit priority,
         # and iproute2 assigns "lowest existing pref - 1". Since tailscaled is
         # already up (fixed prefs 5210..5270), wg-quick's rules land at 5209 and
@@ -350,8 +350,6 @@
         # 32765 is taken by the ens19 `from 192.168.3.203` rule, so use 32763/64.
         # Add-then-delete order + the `while` loops keep this idempotent.
         postUp = ''
-          ${pkgs.iproute2}/bin/ip route replace 10.9.0.0/24 via 192.168.1.1 dev ens18
-
           fwmark="$(${pkgs.wireguard-tools}/bin/wg show wg0 fwmark 2>/dev/null || true)"
           if [ -n "$fwmark" ] && [ "$fwmark" != "off" ]; then
             table=$(( fwmark ))
@@ -360,9 +358,6 @@
             ${pkgs.iproute2}/bin/ip -4 rule add table main suppress_prefixlength 0 pref 32763
             ${pkgs.iproute2}/bin/ip -4 rule add not fwmark "$fwmark" table "$table" pref 32764
           fi
-        '';
-        preDown = ''
-          ${pkgs.iproute2}/bin/ip route del 10.9.0.0/24 via 192.168.1.1 dev ens18 || true
         '';
 
         peers = [

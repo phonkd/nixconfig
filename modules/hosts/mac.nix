@@ -106,8 +106,8 @@
           };
           # obs is reached over the tailnet like every other host now:
           # `ssh observability`/`obs` and `deploy observability` (100.64.0.4).
-          # Only the metrics/log DATA plane still rides wg-obs (senders push to
-          # obs's own 10.9.0.1) until Phase 3 — nothing on the Mac touches that.
+          # The metrics/log data plane rides the tailnet too since
+          # plans/retire-wg-obs.md — wg-obs is gone entirely.
           programs.ssh.matchBlocks."observability" = {
             host = "observability obs";
             hostname = "100.64.0.4";
@@ -126,18 +126,10 @@
           # `IdentityFile ~/.ssh/id_ed25519` globally, which obs rejects; the
           # key it accepts is id_ed25519_priv, and first-match-wins in
           # ssh_config only works because these render above the catch-all.
-          # Route 1 — over the wg-obs tunnel (needs the site-to-site link up).
-          programs.ssh.matchBlocks."obs-rescue" = {
-            host = "obs-rescue 10.9.0.1";
-            hostname = "10.9.0.1";
-            port = 5432;
-            user = "phonkd";
-            identityFile = "~/.ssh/id_ed25519_priv";
-            identitiesOnly = true;
-            proxyCommand = "none";
-          };
-          # Route 2 — obs's public IP, the last resort: works from any network
-          # with neither the tailnet nor wg-obs.
+          # The wg-obs route that used to be here is gone with the tunnel
+          # (plans/retire-wg-obs.md). obs's public IP is now the only
+          # break-glass path, which is no loss: it works from any network,
+          # whereas the tunnel route only worked from home.
           programs.ssh.matchBlocks."obs-rescue-public" = {
             host = "obs-rescue-public 89.167.83.90";
             hostname = "89.167.83.90";

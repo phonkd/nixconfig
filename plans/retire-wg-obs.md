@@ -1,6 +1,27 @@
 # Retire wg-obs — move the observability data plane onto the tailnet
 
-**Repo(s):** nixconfig   **Status:** draft
+**Repo(s):** nixconfig   **Status:** in-progress — Phase 1 shipped and verified;
+Phase 2 written, deploy of the teardown gated on 203-media landing.
+
+## CORRECTION (2026-08-11) — the original premise was partly wrong
+
+This plan first claimed 201 *could not reach* obs's public IP, and that obs's
+`allowedIPs = [10/8, 172.16/12, 192.168/16]` black-holed the return path. The
+evidence was a bad test: `curl https://89.167.83.90/` returns `rc=000` from
+**any** host, because headscale serves a Let's Encrypt cert via autocert and the
+TLS handshake fails without matching SNI. Retested with
+`curl --resolve hs.phonkd.net:443:89.167.83.90`, **201 answers rc=200** — it
+reached obs perfectly well the whole time.
+
+The real cause was simpler and entirely ours: the `networking.hosts` pin in
+`modules/tailnet.nix` sent 201's DERP *and* STUN to `10.9.0.1`, and since obs is
+both the STUN server and the tunnel far end, obs reflected the tunnel source.
+201 advertised `10.3.0.0:45281` and was pinned to DERP forever.
+
+**Consequence: no router work is needed for 201.** Dropping the pin was enough —
+verified after deploy, 201 now reports `IPv4: yes, 85.195.231.133:37255`. The
+retirement is still worth doing (one less moving part, one less trust boundary),
+but it is cleanup, not a prerequisite.
 
 ## Goal
 
@@ -89,14 +110,29 @@ resolution), then tearing the tunnel down, then confirming 201 re-establishes to
 
 ## Steps
 
-- [ ] Phase 1 edits + `deploy` obs, 205, 204, 203, 201 (verify ingest per host)
-- [ ] Confirm Loki/Mimir are receiving from every sender over `100.64.0.4`
-- [ ] Phase 2 edits; deploy 201 (pin removal) with the tunnel still up
-- [ ] Router: delete the wg-obs peer + the three rules
-- [ ] `deploy observability` to drop the wg-obs interface
-- [ ] Verify: `tailscale netcheck` on 201 shows a **real public IP**, not
-      `10.3.0.0`; `tailscale ping` 201↔g14 goes direct; Grafana still loads;
-      Loki/Mimir still ingesting
+- [x] Phase 1 edits; deployed obs, 201, 204, 205 (203 pending, see below)
+- [x] **Verified ingest over `100.64.0.4`**: Loki `hostname` label lists all six
+      senders, and Mimir `count by (hostname) (up)` returns all six. Queried
+      from g14 over the tailnet.
+- [x] 201 pin removed and verified: `netcheck` → `IPv4: yes,
+      85.195.231.133:37255` (was `10.3.0.0:45281`); traefik/dnsmasq/alloy active.
+- [x] Phase 2 edits written: `observability-vpn` deleted, dropped from
+      `alwaysImport`, wg-obs firewall block gone, 203's `10.9.0.0/24`
+      postUp/preDown gone, Mac `obs-rescue` tunnel route gone, comments in
+      `dns.nix`/`mac.nix` corrected.
+- [ ] **`deploy 203-media`** — long (rebuilds CUDA, ~3 h). Until this lands 203
+      still pushes to `10.9.0.1`, so the teardown below must wait for it.
+- [ ] `deploy observability` to actually drop the wg-obs interface.
+- [ ] Router: delete the wg-obs peer, the `observability` PBR (dest 10.9.0.1),
+      the `203-observability` static route, and `203-reach-tailnet`.
+- [ ] Verify after teardown: Grafana still loads through traefik, Loki/Mimir
+      still ingesting from all senders, `tailscale ping` 201↔g14 direct.
+
+_Gotcha seen during Phase 1:_ 205's activation **stopped alloy and did not
+restart it** — the deploy exited 0 but never printed `Deployment confirmed`, and
+telemetry from that host was silently dead for ~25 min until it was started by
+hand. Check `systemctl is-active alloy` on each host after deploying, not just
+the deploy's exit code.
 
 ## Open decisions
 
