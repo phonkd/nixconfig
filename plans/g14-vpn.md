@@ -124,8 +124,26 @@ rule is narrowed, not dropped:
 - [x] `modules/homelab/apps/headscale-policy.hujson`: `autoApprovers.exitNode`
       for user `phonkd@`, so the approval survives a coordinator rebuild instead
       of living only as out-of-band DB state.
-- [ ] `deploy 201` (advertise), apply the policy, approve the route.
-- [ ] Rebuild g14, verify.
+- [x] Policy applied to the live coordinator (`policy check` → valid, then
+      `policy set` → "Policy updated").
+- [x] `deploy 201` — activation confirmed (magic rollback satisfied). Verified
+      after: `headscale nodes list-routes` shows 201-mono
+      `Approved 0.0.0.0/0, ::/0` and **Serving (Primary)**, so autoApprovers did
+      its job; `net.ipv4.conf.all.forwarding = 1`; traefik + tailscaled active;
+      and from g14 `tailscale exit-node list` now lists 201-mono.
+- [ ] **Rebuild g14** — needs a human, `sudo` prompts for a password here:
+      `sudo nixos-rebuild switch --flake <this worktree>#g14 --impure`
+      (`--impure` because g14 reads /etc/nixos/hardware-configuration.nix).
+      Then log out and back in once, so the `networkmanager` group applies.
+
+_Deploying from g14 rather than the Mac:_ `deploy-cli` resolves the repo as
+`${NIXCONFIG_DIR:-$HOME/git/nixconfig}`, so deploying a worktree needs
+`NIXCONFIG_DIR=<worktree> deploy 201` — otherwise it silently builds the main
+checkout instead (which happened once here, and looked like a clean success).
+And g14 has never accepted 201's Tailscale-SSH host key, so plain `ssh`/`nix
+copy` fail with "Host key verification failed" where `tailscale ssh` works; the
+deploy was run with `--ssh-opts "... -o StrictHostKeyChecking=accept-new -o
+UserKnownHostsFile=<tmp>"` to keep that trust out of the real known_hosts.
 
 ## Open decisions
 
