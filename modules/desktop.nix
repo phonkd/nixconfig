@@ -164,6 +164,12 @@
         # (it owns org.freedesktop.secrets — so no gnome-keyring, which
         # would only add a second keyring and a second unlock prompt).
         proton-vpn
+        # Tray applet for tailscale — its exit-node picker is how the 201-mono
+        # exit node gets toggled by hand, so there is no wrapper script for it.
+        # Equivalent to `tailscale set --exit-node=201-mono` / `--exit-node=`,
+        # which work just as well from a shell (--operator=phonkd in
+        # modules/tailnet.nix is what lets both do it without sudo).
+        trayscale
         exfat
         spotify
         ipcalc

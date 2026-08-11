@@ -48,10 +48,13 @@ NetShield are runtime state in the app — deliberately not modelled here.
 - **201-mono** advertises itself (`--advertise-exit-node`,
   `useRoutingFeatures = "server"`).
 - **g14** is merely *able* to use one (`useRoutingFeatures = "client"`).
-  Nothing selects an exit node declaratively — that would make it survive
-  reboots, which is the opposite of the ask.
+  Nothing in nix ever selects an exit node — that is what keeps every device on
+  its normal routing until a human asks otherwise.
 
-The toggle is plain tailscale, no wrapper script:
+**Enrolment is untouched.** Hosts still come up headless via the sops authkey,
+the same path the servers use; `tailscale up` is never run by hand. Selecting an
+exit node is the orthogonal `tailscale set`, which needs no re-enrolment and no
+wrapper script:
 
 ```
 tailscale set --exit-node=201-mono    # route everything via home
@@ -62,6 +65,14 @@ tailscale exit-node list              # who is offering
 `--operator=phonkd` (set on g14) is what makes those work without `sudo`. Add
 `--exit-node-allow-lan-access` if you want the local network reachable while the
 exit node is up; leaving it off is the safer default on public wifi.
+
+For a click instead of a command, `trayscale` (in the desktop baseline) is a GTK
+tray applet whose exit-node picker does exactly the same thing.
+
+**This setting persists across reboots.** `ExitNodeID` is a stored tailscaled
+pref — verified with `tailscale debug prefs`. So it is never on until you turn
+it on, and stays on until you turn it off. (An earlier draft of this plan
+claimed the opposite.)
 
 Both live in `modules/tailnet.nix`, the module that already owns per-host
 tailscale policy (it has a `201-mono` gate for the DNS pin).
@@ -108,8 +119,8 @@ rule is narrowed, not dropped:
 - [x] `modules/tailnet.nix`: 201 → `useRoutingFeatures = "server"` +
       `extraSetFlags = [ "--advertise-exit-node" ]`; g14 → `"client"` +
       `--operator=phonkd`.
-- [x] `modules/desktop.nix`: `pkgs.proton-vpn` + the `networkmanager` group, in
-      the shared `nixosDesktop` baseline (g14 and blac).
+- [x] `modules/desktop.nix`: `pkgs.proton-vpn` + `pkgs.trayscale` + the
+      `networkmanager` group, in the shared `nixosDesktop` baseline (g14, blac).
 - [x] `modules/homelab/apps/headscale-policy.hujson`: `autoApprovers.exitNode`
       for user `phonkd@`, so the approval survives a coordinator rebuild instead
       of living only as out-of-band DB state.

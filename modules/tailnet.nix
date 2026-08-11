@@ -38,9 +38,16 @@
         # Exit-node capability — see plans/g14-vpn.md. Nothing here ROUTES
         # anything: 201 offers itself as an exit, g14 is merely allowed to use
         # one. Selecting it stays a runtime act — `tailscale set
-        # --exit-node=201-mono`, and `--exit-node=` to stop — never declared, so
-        # it does not survive a reboot and no other device is affected. Every
-        # host not named below keeps the default "none".
+        # --exit-node=201-mono`, `--exit-node=` to stop, or the trayscale applet
+        # (modules/desktop.nix). Note this is a *persisted* tailscaled pref
+        # (ExitNodeID), so it survives reboots: it is never on until you turn it
+        # on, and stays on until you turn it off. Nothing in nix ever sets it,
+        # which is what keeps every other device unaffected. Every host not
+        # named below keeps the default "none".
+        #
+        # Enrolment is untouched by all of this — hosts still come up headless
+        # via the sops authkey, exactly as the servers do. `tailscale set` is
+        # orthogonal to `tailscale up`.
         #
         # "server" enables IP forwarding (already on via networking.nat for wg0
         # on 201 — nat sets the same sysctl at mkOverride 99 vs tailscale's 97,
