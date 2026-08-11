@@ -19,6 +19,22 @@
       "dst": ["*:*"],
     },
   ],
+  // Exit nodes advertised by our own nodes are approved automatically, so the
+  // approval is version-controlled here rather than surviving only as
+  // out-of-band `headscale nodes approve-routes` state in the coordinator DB.
+  //
+  // This does NOT route anything: an approved exit node is merely *offered*.
+  // Traffic only moves when a client explicitly runs
+  // `tailscale set --exit-node=...`, which nothing in nix ever does. Today only
+  // 201-mono advertises (modules/tailnet.nix). See plans/g14-vpn.md.
+  //
+  // NB "routes" is deliberately absent: auto-approving subnet routes is the
+  // thing that could hijack the Mac's work traffic (overlapping RFC1918) --
+  // that remains the hard rule in plans/headscale-mesh.md. Exit nodes are
+  // 0.0.0.0/0 and opt-in per client, which is why they are safe here.
+  "autoApprovers": {
+    "exitNode": ["phonkd@"],
+  },
   // ...and Tailscale SSH into any of them, as any non-root user or root.
   // `root` is listed explicitly (autogroup:nonroot excludes it) so deploy-rs
   // activation can use tailnet SSH in Phase 2.

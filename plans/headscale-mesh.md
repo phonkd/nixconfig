@@ -310,6 +310,13 @@ endpoints — needed for direct P2P, since 203 had none while STUN was broken).
 
 ## Risks / rollout
 
+- **NARROWED (2026-08-11, see plans/g14-vpn.md).** The rule below now reads
+  "no *subnet routers*". 201-mono advertises itself as an **exit node** so g14
+  can optionally egress via home; that is safe because an exit node is
+  `0.0.0.0/0`, used only when a client explicitly runs `tailscale set
+  --exit-node=...`. Nothing in nix ever sets that, and the Mac — the machine
+  with the work VPN — must never. The subnet-router half of the rule stands
+  unchanged and absolute:
 - **HARD RULE — never advertise `10.0.0.0/8` (or other work ranges) over the
   tailnet.** The Mac's work VPN uses overlapping RFC1918 space; a subnet router
   advertising it would hijack work traffic. Every host stays its own client; no

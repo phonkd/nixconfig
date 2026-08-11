@@ -120,6 +120,10 @@
         # "wheel" must stay declared: NixOS resets a declarative user's
         # groups to exactly extraGroups on rebuild, so dropping it loses sudo.
         "wheel"
+        # Required by the ProtonVPN app (below), which drives NetworkManager:
+        # NixOS' NM polkit rule grants control only to members of this group,
+        # so without it the app cannot bring its own connection up.
+        "networkmanager"
       ];
       # Debounce quirk for the shared USB mouse used on both machines.
       environment.etc."libinput/local-overrides.quirks".text = ''
@@ -147,6 +151,19 @@
         obs-studio
         vlc
         wireguard-tools
+        # ProtonVPN — for untrusted/public wifi. The official GTK client
+        # (tray icon, server picker, kill switch, NetShield), not a
+        # declarative wg-quick tunnel like 203's: here you want to pick a
+        # nearby country on the spot, which is runtime state, not config.
+        # 203 is headless with one fixed egress, so the declarative shape
+        # fits there and not here. Nothing connects until you click it.
+        #
+        # Needs two things beyond the package, both already true here: the
+        # "networkmanager" group above (the app drives NM), and a Secret
+        # Service for its login, which KDE's ksecretd already provides
+        # (it owns org.freedesktop.secrets — so no gnome-keyring, which
+        # would only add a second keyring and a second unlock prompt).
+        proton-vpn
         exfat
         spotify
         ipcalc
