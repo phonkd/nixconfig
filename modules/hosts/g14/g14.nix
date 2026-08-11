@@ -7,7 +7,7 @@
 #
 # Long-form pattern: `imports` is unconditional; `config` is gated as
 # defense-in-depth even though only ever loaded on g14.
-{ ... }:
+{ self, ... }:
 {
   flake.nixosModules.g14 =
     {
@@ -137,6 +137,17 @@ usb:v27C6p538D*
         # homelab over the headscale tailnet (modules/tailnet.nix), not a
         # local SOCKS proxy. The HM `proxy` module is Mac-only now.
         networking.hostName = "g14";
+
+        # `deploy <host> [branch]` — deploy-rs wrapper (modules/deploy.nix),
+        # same CLI the Mac carries (modules/hosts/mac.nix). g14 is already on
+        # the tailnet, so the node hostnames in lib/registry.nix resolve from
+        # here too and `deploy 201` works off this laptop.
+        #
+        # Unlike the Mac this builds LOCALLY: g14 is x86_64-linux, so it can
+        # build every homelab closure natively and needs no nix.buildMachines
+        # offload to 205 (which is a LAN-only 192.168.3.205 anyway, and this
+        # machine is often off-LAN).
+        environment.systemPackages = [ self.packages.${pkgs.system}.deploy-cli ];
 
         boot.loader.systemd-boot.enable = false;
         boot.loader.limine = {
