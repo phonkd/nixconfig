@@ -289,6 +289,39 @@
     lib.mkIf (config.noughty.host.name == "203-media") {
       sops.secrets.proton_wg_privatekey = { };
 
+      # REQUIRED for Tailscale to survive alongside the full tunnel. NixOS'
+      # default checkReversePath = true emits a STRICT nftables reverse-path
+      # filter in the nixos-fw table:
+      #
+      #   chain rpfilter { policy drop;
+      #     fib saddr . mark . iif check exists accept }
+      #
+      # Note it keys on **mark**. Tailscale's underlay is deliberately marked
+      # 0x80000 so ip-rule 5210 sends it out ens18 rather than through Proton
+      # (that is the whole fwmark split above). The replies, however, arrive on
+      # ens18 with mark 0 -- and the *unmarked* route back to any internet
+      # address is wg0, because wg0 is a 0.0.0.0/0 tunnel. So the fib check
+      # asks "is there a route to 8.8.8.8, mark 0, via ens18?", finds wg0
+      # instead, and DROPS every reply to Tailscale's traffic.
+      #
+      # Proton itself is unaffected only because wg-quick's own premangle chain
+      # (`meta l4proto udp meta mark set ct mark`) restores its 0xca6c ct mark
+      # on inbound UDP, so its reverse path resolves. Nothing does that for
+      # Tailscale.
+      #
+      # Symptoms this caused, all at once: netcheck `UDP: false / IPv4: (no
+      # addr found)`, no STUN, no direct paths, and finally tailscaled stuck in
+      # `NoState` unable to reach the coordinator at all -- while `curl` from
+      # the same host worked fine, because curl is unmarked and goes via
+      # Proton. Verified 2026-08-11 by pinging with the mark set: marked
+      # traffic reached 192.168.1.1 (same subnet, no rpfilter drop) but 100%
+      # loss to every internet address, unmarked 0% loss.
+      #
+      # "loose" drops the `iif` term, so a route existing via ANY interface is
+      # enough. This is the same setting services.tailscale's
+      # useRoutingFeatures = "client"/"both" turns on for exactly this reason.
+      networking.firewall.checkReversePath = "loose";
+
       networking.wg-quick.interfaces.wg0 = {
         address = [ "10.2.0.2/32" ];
         privateKeyFile = config.sops.secrets.proton_wg_privatekey.path;
