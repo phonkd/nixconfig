@@ -91,6 +91,17 @@ bw config server https://vw.w.phonkd.net
 bw login
 ```
 
+`mc` (installed from `modules/shell.nix`) keeps its own state in
+`~/.mc/config.json`, likewise not declarative. Set the Garage remote up once,
+reading the keys straight out of the vault — this is the one call that needs an
+unlocked vault, after which `mc` works on its own:
+
+```bash
+bwu
+mc alias set garage https://api.s3.w.phonkd.net \
+  "$(secretspec get S3_ACCESS_KEY_ID)" "$(secretspec get S3_SECRET_ACCESS_KEY)"
+```
+
 ### Daily use
 
 ```bash
@@ -99,14 +110,8 @@ secretspec check                     # are all declared secrets resolvable?
 secretspec get S3_ACCESS_KEY_ID
 secretspec run -- aws s3 ls          # inject them into a command's environment
 
-mcg ls garage/                       # mc against Garage, creds fetched per call
-mcg cp ./file garage/mybucket/
+mc ls garage/                        # Garage, via mc's own stored remote
 ```
-
-`mcg` is a thin wrapper around `mc` that reads the Garage keys from the vault and
-passes them through `MC_HOST_garage`. There is deliberately no `mc alias set
-garage …`: that would write the secret key in plaintext to `~/.mc/config.json`,
-which is exactly what moving it into Vaultwarden was meant to prevent.
 
 The provider URI pins `?server=https://vw.w.phonkd.net`. That does not configure
 the `bw` CLI — it is an assertion secretspec checks before every operation, so a

@@ -2,11 +2,6 @@
 let
   # The homelab Vaultwarden (modules/homelab/apps/vaultwarden.nix, on 201).
   bwServer = "https://vw.w.phonkd.net";
-  # Garage's S3 API endpoint (modules/homelab/apps/s3-garage.nix -> phonkds.modules.s3-api).
-  # Split because MC_HOST_<remote> wants the credentials *inside* the URL, i.e.
-  # scheme://id:key@host, so the host has to be interpolated on its own.
-  s3Scheme = "https";
-  s3Host = "api.s3.w.phonkd.net";
 in
 {
   # secretspec (github:cachix/secretspec) -- declarative secret *requirements*
@@ -63,35 +58,6 @@ in
         key=$(command bw unlock --raw "$@") || return
         export BW_SESSION="$key"
         echo "BW_SESSION exported (${bwServer})"
-      '';
-
-      # `mc` against our Garage, with the credentials pulled fresh from the
-      # vault for each invocation: `mcg ls garage/`, `mcg cp f garage/bucket/`.
-      #
-      # Deliberately NOT `mc alias set garage ...` -- that writes the secret key
-      # in plaintext into ~/.mc/config.json, which would undo the entire point
-      # of keeping it in Vaultwarden. mc also reads per-remote credentials from
-      # MC_HOST_<remote>, so the secret only ever lives in the environment of
-      # the one mc process.
-      #
-      # `local -x` (rather than `export`) keeps it out of the calling shell and
-      # unsets it when the function returns, while still being visible to
-      # `command mc`.
-      #
-      # The `|| return` guards matter: with no MC_HOST_garage set, mc does not
-      # error on `garage/` -- it silently reinterprets it as a *local relative
-      # path* and reports "path not found". Bailing out early turns a failed
-      # secret lookup into an obvious error instead of that red herring.
-      #
-      # No percent-encoding of the credentials is needed here: Garage issues
-      # access key IDs as "GK" + hex and secret keys as 64 hex chars, so neither
-      # can contain a character that is reserved in a URL userinfo field.
-      programs.zsh.siteFunctions.mcg = ''
-        local id key
-        id=$(command secretspec get S3_ACCESS_KEY_ID) || return
-        key=$(command secretspec get S3_SECRET_ACCESS_KEY) || return
-        local -x MC_HOST_garage="${s3Scheme}://$id:$key@${s3Host}"
-        command mc "$@"
       '';
     };
 }
