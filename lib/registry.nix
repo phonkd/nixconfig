@@ -67,6 +67,11 @@
       [
         /etc/nixos/hardware-configuration.nix
         self.nixosModules.g14
+        # Offload x86_64-linux builds to 205-builder, same as every homelab VM
+        # (they get it transitively via oldblac-vm). g14 runs `deploy` too, and
+        # without this the laptop compiles every host's closure itself.
+        # Supplies the nixremote key via sops and pins 205's host key.
+        self.nixosModules.builder-client
       ];
   };
 

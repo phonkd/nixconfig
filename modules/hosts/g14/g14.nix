@@ -143,10 +143,18 @@ usb:v27C6p538D*
         # the tailnet, so the node hostnames in lib/registry.nix resolve from
         # here too and `deploy 201` works off this laptop.
         #
-        # Unlike the Mac this builds LOCALLY: g14 is x86_64-linux, so it can
-        # build every homelab closure natively and needs no nix.buildMachines
-        # offload to 205 (which is a LAN-only 192.168.3.205 anyway, and this
-        # machine is often off-LAN).
+        # g14 is x86_64-linux so it *can* build every homelab closure natively
+        # -- but "can" turned out to mean "does": running `deploy` from here
+        # compiled all of them on the laptop, which is slow and pointless while
+        # a builder VM sits idle. So the registry now also imports
+        # `builder-client` for g14 (the same module every homelab VM gets
+        # transitively via oldblac-vm), which supplies the nixremote key via
+        # sops and pins 205's host key.
+        #
+        # It targets the LAN address 192.168.3.205, so offload only happens on
+        # the home network. Off-LAN nix just falls back to building locally
+        # after the builder fails to answer -- which is the old behaviour, so
+        # nothing is lost; it is simply no longer the default at home.
         environment.systemPackages = [ self.packages.${pkgs.system}.deploy-cli ];
 
         boot.loader.systemd-boot.enable = false;
