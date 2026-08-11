@@ -93,50 +93,51 @@
           };
         }
       ];
-    homebrew.casks = [
-      "zen"
-      "firefox"
-      "android-platform-tools"
-      "obsidian"
-      "spotify"
-      "claude-code@latest"
-      "zed"
-      "utm"
-      "eqmac"
-      "microsoft-teams"
-      "royal-tsx"
-      "displaylink"
-      "music-decoy"
-      "discord"
-      "grandperspective"
-      "clipbook"
-      "betterdisplay"
-      "shottr"
-      "yubico-authenticator"
-      "caffeine"
-      "linearmouse"
-      "blackhole-2ch"
-      # Signed/notarized kitty. The nixpkgs kitty is ad-hoc signed and can't
-      # hold a TCC Microphone grant, which cava (reading BlackHole, an input
-      # device) needs. Run cava from this build and the mic permission sticks.
-      "kitty"
-      # Handy — offline on-device whisper STT (push-to-talk dictation).
-      # A signed, self-contained app captures the mic in-process, so it holds
-      # a TCC Microphone grant. The old DIY whisper.cpp+Hammerspoon rig failed
-      # because macOS TCC won't extend a mic grant to spawned nix CLI helpers.
-      "handy"
-      "tidal"
-      "tailscale"
-      "kde-connect"
-      "bitwarden"
-    ];
-    homebrew.brews = [
-      "yt-dlp"
-      "lsusb-laniksj"
-      "cmake"
-      "sdl2"
-      "ffmpeg"
-    ];
+      homebrew.casks = [
+        "zen"
+        "firefox"
+        "android-platform-tools"
+        "obsidian"
+        "spotify"
+        "claude-code@latest"
+        "codex"
+        "zed"
+        "utm"
+        "eqmac"
+        "microsoft-teams"
+        "royal-tsx"
+        "displaylink"
+        "music-decoy"
+        "discord"
+        "grandperspective"
+        "clipbook"
+        "betterdisplay"
+        "shottr"
+        "yubico-authenticator"
+        "caffeine"
+        "linearmouse"
+        "blackhole-2ch"
+        # Signed/notarized kitty. The nixpkgs kitty is ad-hoc signed and can't
+        # hold a TCC Microphone grant, which cava (reading BlackHole, an input
+        # device) needs. Run cava from this build and the mic permission sticks.
+        "kitty"
+        # Handy — offline on-device whisper STT (push-to-talk dictation).
+        # A signed, self-contained app captures the mic in-process, so it holds
+        # a TCC Microphone grant. The old DIY whisper.cpp+Hammerspoon rig failed
+        # because macOS TCC won't extend a mic grant to spawned nix CLI helpers.
+        "handy"
+        "tidal"
+        "tailscale"
+        "kde-connect"
+        "bitwarden"
+      ];
+      homebrew.brews = [
+        "yt-dlp"
+        "lsusb-laniksj"
+        "cmake"
+        "sdl2"
+        "ffmpeg"
+      ];
 
     };
 }
