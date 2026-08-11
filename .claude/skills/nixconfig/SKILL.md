@@ -126,6 +126,11 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
 
 ## Workflow rules (user-established)
 
+Sizing and the land-on-`main`-then-`deploy` path that both sizes share live in
+`CLAUDE.md` at the repo root, which is always in context. Small to medium: just do
+it. Large (new service/module/host, cross-repo, schema, `201-mono`, multi-host): a
+`plans/` plan first, then the same path. Below is the detail behind that.
+
 - **Never verify with full evals** — no `nixosConfigurations.<x>` toplevel builds or
   getFlake harnesses. `nix-instantiate --parse <file>` + grep for dangling refs is
   the ceiling. Rebuilds happen via `deploy <host>` (deploy-rs, `modules/deploy.nix`,
@@ -142,20 +147,29 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
     overhead for a single-user repo.
   - Working on a branch in the normal checkout: merge it into `main` when done.
   - Working in a worktree (background/parallel agent sessions are forced into one):
-    the branch still has to reach `main`, but a worktree-isolated session **cannot
-    write to the main checkout** — the harness refuses `git -C <main checkout> …`
-    and every other route out of the worktree. So end the job with the merge
-    already staged for one paste, naming the branch, and say plainly that the
-    commit is not yet on `main`:
+    commit on the branch, then **`ExitWorktree` with `action: "keep"`** — that
+    returns the session to the main checkout with the worktree left on disk — and
+    merge from there. The harness does refuse `git -C <main checkout> …` while you
+    are still *inside* the worktree, but exiting first is a legitimate route out,
+    not a workaround, and it is the expected way to finish. Verify afterwards that
+    `main` actually moved (`git log --oneline -1`).
+
+    Only if that genuinely fails, end the job with the merge staged for one paste,
+    naming the branch, and say plainly that the commit is not yet on `main`:
 
     ```
     cd ~/git/nixconfig && git merge --no-ff worktree-<name>
     ```
 
-  Either way the failure to avoid is stopping at "it's committed on branch X,
-  cherry-pick it whenever" with no merge line and no flag that the work is still
-  parked. `deploy` builds from a checkout, so until it lands on `main` nothing can
-  be applied — a commit stranded on a branch is not delivered work.
+  The failure to avoid is stopping at "it's committed on branch X, cherry-pick it
+  whenever" with no merge line and no flag that the work is still parked. `deploy`
+  builds from a checkout, so until it lands on `main` nothing can be applied — a
+  commit stranded on a branch is not delivered work.
+
+  **Worktrees can branch from a stale HEAD.** `EnterWorktree` has been seen basing
+  a new worktree on an older commit than `main`, which turns the merge into a
+  surprise divergence that drags unrelated commits along. Check `git log --oneline -1`
+  right after entering, and `git reset --hard main` if it isn't on `main`.
 
   Merge with `--no-ff` so the branch stays legible in history; a fast-forward is
   fine for a single commit. If `main` has uncommitted work in the way (it often

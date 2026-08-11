@@ -8,8 +8,13 @@ description: Where and when to write design/implementation plans for this repo (
 Non-trivial work gets a short written plan in `plans/` **before** implementation.
 A plan is a thinking artifact: it forces the design and the open decisions into
 the open where the user can steer them before code exists. Small stuff does not
-need one — this repo's culture is "commit small tweaks straight to main" (see the
-`nixconfig` skill); don't ceremony-wrap a one-line option change.
+need one — this repo's culture is "commit small tweaks straight to main" (see
+`CLAUDE.md`); don't ceremony-wrap a one-line option change.
+
+The plan is the *only* extra step large work gets. Once it's written, execution is
+just as autonomous as a small change: land it on `main` (commit directly, or merge
+your branch/worktree in yourself), never push, `deploy <host>`, report. `CLAUDE.md`
+has that rule; `nixconfig-ops` has the deploy flags.
 
 ## Write a plan when the work is
 
