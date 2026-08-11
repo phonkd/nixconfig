@@ -70,11 +70,25 @@
       # isn't yet on-link), which aborts the whole script before the ip rule
       # is installed. onlink forces the kernel to treat the gateway as
       # directly reachable on ens19 regardless of address-assignment timing.
+      #
+      # The rule MUST carry an explicit priority. `ip rule add` without one
+      # gets "lowest existing pref - 1" from iproute2, which is the same trap
+      # that bit wg-quick below (see the 203-vpn postUp comment). If this runs
+      # while tailscaled is already up (a restart, or losing the boot race) it
+      # lands at 5209 -- ABOVE Tailscale's 5210 fwmark rules -- and then every
+      # packet sourced from 192.168.3.203, including Tailscale's own marked
+      # underlay, is diverted out ens19 to the homelab gateway instead of the
+      # real WAN. Observed live 2026-08-11: 203 at pref 5209, netcheck
+      # reporting `UDP: false / IPv4: (no addr found)`, no direct paths, and
+      # eventually off the tailnet entirely. 32765 keeps it below Tailscale
+      # (5210..5270) and above the wg-quick pair (32763/32764), which is what
+      # the rest of this file already assumes. The while-loop delete clears any
+      # duplicates a previous priority-less run left behind.
       networking.localCommands = ''
         ip route flush table 203 2>/dev/null || true
         ip route add default via 192.168.3.1 dev ens19 table 203 onlink
-        ip rule del from 192.168.3.203 lookup 203 2>/dev/null || true
-        ip rule add from 192.168.3.203 lookup 203
+        while ip rule del from 192.168.3.203 lookup 203 2>/dev/null; do :; done
+        ip rule add from 192.168.3.203 lookup 203 pref 32765
       '';
 
       networking.firewall.allowedTCPPorts = [

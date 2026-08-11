@@ -90,8 +90,25 @@
       # other host reaches the public IP via its own uplink and is unaffected.
       # (201's inability to route to Hetzner is a separate, pre-existing uplink
       # fault — this just keeps mesh control/DERP on the tunnel it can use.)
-      networking.hosts = lib.mkIf (config.noughty.host.name == "201-mono") {
-        "10.9.0.1" = [ "hs.phonkd.net" ];
-      };
+      # Everywhere else, pin the same name to obs's PUBLIC address. This is a
+      # bootstrap fix, not routing: tailscaled takes over resolv.conf and
+      # leaves MagicDNS as the ONLY nameserver (verified on 203:
+      # `nameserver 100.100.100.100` and nothing else, despite
+      # networking.nameservers being set). 100.100.100.100 is answered by
+      # tailscaled itself, so the moment a host loses its tailnet session it
+      # can no longer resolve hs.phonkd.net -- which is exactly what it needs
+      # to resolve in order to reconnect. That deadlock stranded 203 on
+      # 2026-08-11 and needed a hand-edited /etc/hosts over LAN ssh to break.
+      #
+      # /etc/hosts is consulted before DNS (nsswitch files->dns), so this makes
+      # reconnection independent of whether tailscaled is currently healthy.
+      # Hardcoding the IP is acceptable here: it is already hardcoded in the
+      # 201 pin above and in modules/dns.nix, and headscale's cert is valid on
+      # this path (SNI unchanged).
+      networking.hosts =
+        if config.noughty.host.name == "201-mono" then
+          { "10.9.0.1" = [ "hs.phonkd.net" ]; }
+        else
+          { "89.167.83.90" = [ "hs.phonkd.net" ]; };
     };
 }
