@@ -11,7 +11,7 @@
     { pkgs, ... }:
     {
       home.packages = with pkgs; [
-       # nicotine-plus
+        # nicotine-plus
         localsend
         (discord.override {
           #withOpenASAR = true;
@@ -63,19 +63,22 @@
         # content is generated from the settings below, so there is nothing
         # worth preserving: overwrite it and skip the backup entirely.
         gtk2.force = true;
-        theme = {
+        # mkDefault throughout: on KDE hosts modules/win7.nix replaces the
+        # whole look with a light Windows 7 one, and a GTK stack still set to
+        # dark Nordic would be the one thing left contradicting it.
+        theme = lib.mkDefault {
           package = pkgs.nordic;
           name = "Nordic-darker";
         };
-        iconTheme = {
+        iconTheme = lib.mkDefault {
           package = pkgs.kora-icon-theme;
           name = "kora-pgrey";
         };
         gtk3.extraConfig = {
-          "gtk-application-prefer-dark-theme" = 1;
+          "gtk-application-prefer-dark-theme" = lib.mkDefault 1;
         };
         gtk4.extraConfig = {
-          "gtk-application-prefer-dark-theme" = 1;
+          "gtk-application-prefer-dark-theme" = lib.mkDefault 1;
         };
       };
     };
