@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Aero7 close button. Unlike minimize/maximize this one is red-tinted in every
+  state, which is what Windows 7 did: the close button is always the red one,
+  hovering just makes it glow. See minimize.svg for the state contract.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="26" height="17" version="1.1">
+  <defs>
+    <linearGradient id="r-active" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="17">
+      <stop offset="0"    stop-color="#f6a9a1" stop-opacity="0.80"/>
+      <stop offset="0.5"  stop-color="#e26257" stop-opacity="0.78"/>
+      <stop offset="0.52" stop-color="#cf4438" stop-opacity="0.80"/>
+      <stop offset="1"    stop-color="#e8776a" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="r-hover" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="17">
+      <stop offset="0"    stop-color="#ffc4bc" stop-opacity="0.98"/>
+      <stop offset="0.5"  stop-color="#f46d5f" stop-opacity="0.96"/>
+      <stop offset="0.52" stop-color="#e2402f" stop-opacity="0.96"/>
+      <stop offset="1"    stop-color="#fb8877" stop-opacity="0.98"/>
+    </linearGradient>
+    <linearGradient id="r-pressed" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="17">
+      <stop offset="0"   stop-color="#a82f24" stop-opacity="0.98"/>
+      <stop offset="0.5" stop-color="#c94033" stop-opacity="0.95"/>
+      <stop offset="1"   stop-color="#e5776a" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="r-inactive" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="17">
+      <stop offset="0" stop-color="#e8b4ae" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#c4837a" stop-opacity="0.38"/>
+    </linearGradient>
+  </defs>
+
+  <g id="active-center">
+    <rect x="0.5" y="0.5" width="25" height="16" rx="2"
+          fill="url(#r-active)" stroke="#ffffff" stroke-opacity="0.55" stroke-width="1"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#7c1a12" stroke-opacity="0.45" stroke-width="2.6" stroke-linecap="round" transform="translate(0,1)"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+
+  <g id="hover-center">
+    <rect x="0.5" y="0.5" width="25" height="16" rx="2"
+          fill="url(#r-hover)" stroke="#ffffff" stroke-opacity="0.85" stroke-width="1"/>
+    <rect x="1.5" y="1.5" width="23" height="14" rx="1.5"
+          fill="none" stroke="#ffd0c8" stroke-opacity="0.7" stroke-width="1"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#7c1a12" stroke-opacity="0.5" stroke-width="2.6" stroke-linecap="round" transform="translate(0,1)"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+
+  <g id="pressed-center">
+    <rect x="0.5" y="0.5" width="25" height="16" rx="2"
+          fill="url(#r-pressed)" stroke="#8e2a20" stroke-opacity="0.9" stroke-width="1"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#ffffff" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+
+  <g id="inactive-center">
+    <rect x="0.5" y="0.5" width="25" height="16" rx="2"
+          fill="url(#r-inactive)" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#ffffff" stroke-opacity="0.8" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+
+  <g id="deactivated-center">
+    <rect x="0.5" y="0.5" width="25" height="16" rx="2"
+          fill="#c4837a" fill-opacity="0.18" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1"/>
+    <path d="M 9.5,5.5 L 16.5,11.5 M 16.5,5.5 L 9.5,11.5"
+          stroke="#ffffff" stroke-opacity="0.4" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+</svg>

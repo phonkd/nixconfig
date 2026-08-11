@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The start orb: the glass sphere Windows 7 used for its Start button, drawn
+  from scratch rather than lifted from Microsoft's artwork.
+
+  Rendered by Plasma's icon loader (Qt SVG), so it stays within what a
+  Tiny-profile renderer handles: gradients and paths, no filters, no masks.
+  The gloss is a plain ellipse with a fading white ramp, the way the original
+  faked its highlight too.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" version="1.1">
+  <defs>
+    <linearGradient id="rim" gradientUnits="userSpaceOnUse" x1="20" y1="8" x2="108" y2="120">
+      <stop offset="0"   stop-color="#e8f4ff"/>
+      <stop offset="0.4" stop-color="#8fbde2"/>
+      <stop offset="1"   stop-color="#123a63"/>
+    </linearGradient>
+    <radialGradient id="sphere" gradientUnits="userSpaceOnUse" cx="46" cy="38" r="78">
+      <stop offset="0"    stop-color="#8ed0f7"/>
+      <stop offset="0.35" stop-color="#2f7ec0"/>
+      <stop offset="0.75" stop-color="#134a86"/>
+      <stop offset="1"    stop-color="#0a2c52"/>
+    </radialGradient>
+    <linearGradient id="gloss" gradientUnits="userSpaceOnUse" x1="64" y1="12" x2="64" y2="70">
+      <stop offset="0"   stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0.14"/>
+      <stop offset="1"   stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="pane" gradientUnits="userSpaceOnUse" x1="34" y1="34" x2="94" y2="94">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.98"/>
+      <stop offset="1" stop-color="#d7ecff" stop-opacity="0.88"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="64" cy="64" r="62" fill="url(#rim)"/>
+  <circle cx="64" cy="64" r="56" fill="url(#sphere)"/>
+
+  <!-- The four-pane flag, tipped and sheared the way the Windows logo leans. -->
+  <g transform="translate(64,64) rotate(-6) skewY(-5)" fill="url(#pane)">
+    <rect x="-25" y="-23" width="22" height="20" rx="2"/>
+    <rect x="3"   y="-23" width="22" height="20" rx="2"/>
+    <rect x="-25" y="3"   width="22" height="20" rx="2"/>
+    <rect x="3"   y="3"   width="22" height="20" rx="2"/>
+  </g>
+
+  <ellipse cx="64" cy="40" rx="47" ry="29" fill="url(#gloss)"/>
+  <circle cx="64" cy="64" r="59.5" fill="none" stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5"/>
+</svg>

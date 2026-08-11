@@ -38,6 +38,9 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.gaming
+        # Windows 7 look for Plasma. Self-gating: it checks
+        # osConfig.noughty.host.desktop and does nothing on a non-KDE desktop.
+        self.homeModules.win7
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
       ];

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Aero7 panel background: the Windows 7 taskbar.
+
+  Plasma 9-slices this the same way Aurorae slices a window frame, so the ids
+  are fixed and each group's bounding box is its slice. The panel sits on the
+  bottom screen edge, so only the top border is real; the other three sides are
+  present but effectively empty (Plasma still measures them for its margins).
+
+  Kept deliberately light rather than the charcoal glass of a default Windows 7
+  install: this theme ships no `colors` file, so panel text takes its colour
+  from the Aero colour scheme, which is a dark-on-light one. A light bar keeps
+  the clock and tray legible. Windows 7 let you pick the taskbar tint anyway.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="44" version="1.1">
+  <defs>
+    <linearGradient id="bar" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="42">
+      <stop offset="0"    stop-color="#eef5fd" stop-opacity="0.82"/>
+      <stop offset="0.48" stop-color="#d3e2f3" stop-opacity="0.76"/>
+      <stop offset="0.52" stop-color="#c3d7ec" stop-opacity="0.76"/>
+      <stop offset="1"    stop-color="#dcebfa" stop-opacity="0.84"/>
+    </linearGradient>
+  </defs>
+
+  <!-- top edge: the bright hairline Windows 7 ran along the top of the bar -->
+  <g id="topleft">
+    <rect x="0" y="0" width="2" height="1" fill="#ffffff" fill-opacity="0.75"/>
+    <rect x="0" y="1" width="2" height="1" fill="#ffffff" fill-opacity="0.30"/>
+  </g>
+  <g id="top">
+    <rect x="2" y="0" width="36" height="1" fill="#ffffff" fill-opacity="0.75"/>
+    <rect x="2" y="1" width="36" height="1" fill="#ffffff" fill-opacity="0.30"/>
+  </g>
+  <g id="topright">
+    <rect x="38" y="0" width="2" height="1" fill="#ffffff" fill-opacity="0.75"/>
+    <rect x="38" y="1" width="2" height="1" fill="#ffffff" fill-opacity="0.30"/>
+  </g>
+
+  <g id="left">
+    <rect x="0" y="2" width="2" height="40" fill="url(#bar)"/>
+  </g>
+  <g id="center">
+    <rect x="2" y="2" width="36" height="40" fill="url(#bar)"/>
+  </g>
+  <g id="right">
+    <rect x="38" y="2" width="2" height="40" fill="url(#bar)"/>
+  </g>
+
+  <g id="bottomleft">
+    <rect x="0" y="42" width="2" height="2" fill="#c3d7ec" fill-opacity="0.84"/>
+  </g>
+  <g id="bottom">
+    <rect x="2" y="42" width="36" height="2" fill="#c3d7ec" fill-opacity="0.84"/>
+  </g>
+  <g id="bottomright">
+    <rect x="38" y="42" width="2" height="2" fill="#c3d7ec" fill-opacity="0.84"/>
+  </g>
+</svg>

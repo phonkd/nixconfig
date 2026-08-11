@@ -26,6 +26,13 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Declarative Plasma 6 config (panels, kwin, colour scheme, fonts) as a
+    # Home Manager module. Sole consumer: modules/win7.nix.
+    plasma-manager = {
+      url = "github:nix-community/plasma-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
     sops-nix.url = "github:Mic92/sops-nix";
     # deploy-rs: `deploy <host>` builds (offloaded to 205 via nix.buildMachines)
     # and activates a NixOS host with magic rollback. Nodes are generated from

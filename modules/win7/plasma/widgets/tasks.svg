@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Aero7 task manager buttons: the glassy tiles behind taskbar icons.
+
+  Plasma asks for one 9-sliced frame per task state, so this file carries six
+  independent frames laid out left to right, each 10x32 with a 2px gutter:
+
+    normal     x 0    a running window, not focused
+    hover      x 12   pointer over the tile
+    focus      x 24   the active window
+    minimized  x 36   minimized window, dimmer than normal
+    attention  x 48   window demanding attention
+    progress   x 60   the fill Plasma paints for job progress
+
+  Within a frame the 1px edges and corners are the border and the 8x30 centre
+  is the glass. Centre gradients are userSpaceOnUse over y 1..31, which is the
+  same band for every frame, so one vertical coordinate space serves all six.
+  Plasma maps each element's bounding box onto the tile, so the ramp scales
+  with the button instead of being clipped.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="32" version="1.1">
+  <defs>
+    <linearGradient id="c-normal" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="31">
+      <stop offset="0"    stop-color="#ffffff" stop-opacity="0.30"/>
+      <stop offset="0.48" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="0.52" stop-color="#c8dcf0" stop-opacity="0.14"/>
+      <stop offset="1"    stop-color="#e4eefa" stop-opacity="0.24"/>
+    </linearGradient>
+    <linearGradient id="c-hover" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="31">
+      <stop offset="0"    stop-color="#f2faff" stop-opacity="0.72"/>
+      <stop offset="0.48" stop-color="#c9e6fb" stop-opacity="0.58"/>
+      <stop offset="0.52" stop-color="#a6d3f7" stop-opacity="0.56"/>
+      <stop offset="1"    stop-color="#d8eeff" stop-opacity="0.66"/>
+    </linearGradient>
+    <linearGradient id="c-focus" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="31">
+      <stop offset="0"    stop-color="#ffffff" stop-opacity="0.62"/>
+      <stop offset="0.48" stop-color="#e6f2fd" stop-opacity="0.42"/>
+      <stop offset="0.52" stop-color="#c9dff5" stop-opacity="0.40"/>
+      <stop offset="1"    stop-color="#e9f3fd" stop-opacity="0.52"/>
+    </linearGradient>
+    <linearGradient id="c-minimized" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="31">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#dbe7f4" stop-opacity="0.08"/>
+    </linearGradient>
+    <linearGradient id="c-attention" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="31">
+      <stop offset="0"    stop-color="#ffe6b4" stop-opacity="0.85"/>
+      <stop offset="0.48" stop-color="#fcc55f" stop-opacity="0.72"/>
+      <stop offset="0.52" stop-color="#f2a92f" stop-opacity="0.72"/>
+      <stop offset="1"    stop-color="#ffd68c" stop-opacity="0.80"/>
+    </linearGradient>
+    <linearGradient id="c-progress" gradientUnits="userSpaceOnUse" x1="0" y1="1" x2="0" y2="31">
+      <stop offset="0"    stop-color="#ddf6d6" stop-opacity="0.80"/>
+      <stop offset="0.48" stop-color="#9ee08e" stop-opacity="0.66"/>
+      <stop offset="0.52" stop-color="#77cd65" stop-opacity="0.66"/>
+      <stop offset="1"    stop-color="#c4eeb9" stop-opacity="0.74"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ============================= normal ============================= -->
+  <g id="normal-topleft"><rect x="0" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.35"/></g>
+  <g id="normal-top"><rect x="1" y="0" width="8" height="1" fill="#ffffff" fill-opacity="0.45"/></g>
+  <g id="normal-topright"><rect x="9" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.35"/></g>
+  <g id="normal-left"><rect x="0" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.35"/></g>
+  <g id="normal-center"><rect x="1" y="1" width="8" height="30" fill="url(#c-normal)"/></g>
+  <g id="normal-right"><rect x="9" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.35"/></g>
+  <g id="normal-bottomleft"><rect x="0" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.28"/></g>
+  <g id="normal-bottom"><rect x="1" y="31" width="8" height="1" fill="#ffffff" fill-opacity="0.28"/></g>
+  <g id="normal-bottomright"><rect x="9" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.28"/></g>
+
+  <!-- ============================== hover ============================= -->
+  <g id="hover-topleft"><rect x="12" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.75"/></g>
+  <g id="hover-top"><rect x="13" y="0" width="8" height="1" fill="#ffffff" fill-opacity="0.88"/></g>
+  <g id="hover-topright"><rect x="21" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.75"/></g>
+  <g id="hover-left"><rect x="12" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.80"/></g>
+  <g id="hover-center"><rect x="13" y="1" width="8" height="30" fill="url(#c-hover)"/></g>
+  <g id="hover-right"><rect x="21" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.80"/></g>
+  <g id="hover-bottomleft"><rect x="12" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.60"/></g>
+  <g id="hover-bottom"><rect x="13" y="31" width="8" height="1" fill="#ffffff" fill-opacity="0.60"/></g>
+  <g id="hover-bottomright"><rect x="21" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.60"/></g>
+
+  <!-- ============================== focus ============================= -->
+  <g id="focus-topleft"><rect x="24" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.80"/></g>
+  <g id="focus-top"><rect x="25" y="0" width="8" height="1" fill="#ffffff" fill-opacity="0.92"/></g>
+  <g id="focus-topright"><rect x="33" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.80"/></g>
+  <g id="focus-left"><rect x="24" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.85"/></g>
+  <g id="focus-center"><rect x="25" y="1" width="8" height="30" fill="url(#c-focus)"/></g>
+  <g id="focus-right"><rect x="33" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.85"/></g>
+  <g id="focus-bottomleft"><rect x="24" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.65"/></g>
+  <g id="focus-bottom"><rect x="25" y="31" width="8" height="1" fill="#ffffff" fill-opacity="0.65"/></g>
+  <g id="focus-bottomright"><rect x="33" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.65"/></g>
+
+  <!-- ============================ minimized =========================== -->
+  <g id="minimized-topleft"><rect x="36" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.22"/></g>
+  <g id="minimized-top"><rect x="37" y="0" width="8" height="1" fill="#ffffff" fill-opacity="0.28"/></g>
+  <g id="minimized-topright"><rect x="45" y="0" width="1" height="1" fill="#ffffff" fill-opacity="0.22"/></g>
+  <g id="minimized-left"><rect x="36" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.22"/></g>
+  <g id="minimized-center"><rect x="37" y="1" width="8" height="30" fill="url(#c-minimized)"/></g>
+  <g id="minimized-right"><rect x="45" y="1" width="1" height="30" fill="#ffffff" fill-opacity="0.22"/></g>
+  <g id="minimized-bottomleft"><rect x="36" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.18"/></g>
+  <g id="minimized-bottom"><rect x="37" y="31" width="8" height="1" fill="#ffffff" fill-opacity="0.18"/></g>
+  <g id="minimized-bottomright"><rect x="45" y="31" width="1" height="1" fill="#ffffff" fill-opacity="0.18"/></g>
+
+  <!-- ============================ attention =========================== -->
+  <g id="attention-topleft"><rect x="48" y="0" width="1" height="1" fill="#ffe6b8" fill-opacity="0.90"/></g>
+  <g id="attention-top"><rect x="49" y="0" width="8" height="1" fill="#fff2d8" fill-opacity="0.95"/></g>
+  <g id="attention-topright"><rect x="57" y="0" width="1" height="1" fill="#ffe6b8" fill-opacity="0.90"/></g>
+  <g id="attention-left"><rect x="48" y="1" width="1" height="30" fill="#ffe6b8" fill-opacity="0.90"/></g>
+  <g id="attention-center"><rect x="49" y="1" width="8" height="30" fill="url(#c-attention)"/></g>
+  <g id="attention-right"><rect x="57" y="1" width="1" height="30" fill="#ffe6b8" fill-opacity="0.90"/></g>
+  <g id="attention-bottomleft"><rect x="48" y="31" width="1" height="1" fill="#ffe6b8" fill-opacity="0.70"/></g>
+  <g id="attention-bottom"><rect x="49" y="31" width="8" height="1" fill="#ffe6b8" fill-opacity="0.70"/></g>
+  <g id="attention-bottomright"><rect x="57" y="31" width="1" height="1" fill="#ffe6b8" fill-opacity="0.70"/></g>
+
+  <!-- ============================= progress =========================== -->
+  <g id="progress-topleft"><rect x="60" y="0" width="1" height="1" fill="#d9f5d4" fill-opacity="0.85"/></g>
+  <g id="progress-top"><rect x="61" y="0" width="8" height="1" fill="#e9fbe5" fill-opacity="0.90"/></g>
+  <g id="progress-topright"><rect x="69" y="0" width="1" height="1" fill="#d9f5d4" fill-opacity="0.85"/></g>
+  <g id="progress-left"><rect x="60" y="1" width="1" height="30" fill="#d9f5d4" fill-opacity="0.85"/></g>
+  <g id="progress-center"><rect x="61" y="1" width="8" height="30" fill="url(#c-progress)"/></g>
+  <g id="progress-right"><rect x="69" y="1" width="1" height="30" fill="#d9f5d4" fill-opacity="0.85"/></g>
+  <g id="progress-bottomleft"><rect x="60" y="31" width="1" height="1" fill="#d9f5d4" fill-opacity="0.65"/></g>
+  <g id="progress-bottom"><rect x="61" y="31" width="8" height="1" fill="#d9f5d4" fill-opacity="0.65"/></g>
+  <g id="progress-bottomright"><rect x="69" y="31" width="1" height="1" fill="#d9f5d4" fill-opacity="0.65"/></g>
+</svg>

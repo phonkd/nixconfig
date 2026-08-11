@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Aero-style wallpaper: a dark blue field with a luminous ribbon sweeping
+  through it, in the spirit of the Windows 7 default without being a copy of
+  Microsoft's artwork.
+
+  Unlike the theme SVGs this one is never handed to Qt: the Nix build renders
+  it to a PNG with librsvg, so Gaussian blur is fair game and the softness is
+  real rather than faked with gradient stops.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" version="1.1">
+  <defs>
+    <linearGradient id="sky" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1080">
+      <stop offset="0"   stop-color="#03102e"/>
+      <stop offset="0.5" stop-color="#062247"/>
+      <stop offset="1"   stop-color="#0a3163"/>
+    </linearGradient>
+
+    <radialGradient id="core-glow" gradientUnits="userSpaceOnUse" cx="860" cy="720" r="820">
+      <stop offset="0"   stop-color="#3fa5e8" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#1a5fa8" stop-opacity="0.28"/>
+      <stop offset="1"   stop-color="#03102e" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="ribbon-main" gradientUnits="userSpaceOnUse" x1="0" y1="900" x2="1920" y2="300">
+      <stop offset="0"    stop-color="#0e4f96" stop-opacity="0.10"/>
+      <stop offset="0.35" stop-color="#63c8ff" stop-opacity="0.75"/>
+      <stop offset="0.62" stop-color="#bde9ff" stop-opacity="0.85"/>
+      <stop offset="1"    stop-color="#2a6fc0" stop-opacity="0.08"/>
+    </linearGradient>
+
+    <linearGradient id="ribbon-teal" gradientUnits="userSpaceOnUse" x1="200" y1="1000" x2="1700" y2="200">
+      <stop offset="0"   stop-color="#0b6f7a" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#2fd0c8" stop-opacity="0.45"/>
+      <stop offset="1"   stop-color="#0b6f7a" stop-opacity="0"/>
+    </linearGradient>
+
+    <linearGradient id="ribbon-violet" gradientUnits="userSpaceOnUse" x1="0" y1="600" x2="1920" y2="800">
+      <stop offset="0"   stop-color="#3b3a8f" stop-opacity="0"/>
+      <stop offset="0.45" stop-color="#7d6cf0" stop-opacity="0.35"/>
+      <stop offset="1"   stop-color="#3b3a8f" stop-opacity="0"/>
+    </linearGradient>
+
+    <radialGradient id="vignette" gradientUnits="userSpaceOnUse" cx="960" cy="620" r="1250">
+      <stop offset="0"    stop-color="#000000" stop-opacity="0"/>
+      <stop offset="0.62" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1"    stop-color="#000000" stop-opacity="0.55"/>
+    </radialGradient>
+
+    <filter id="soft-lg" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="46"/>
+    </filter>
+    <filter id="soft-md" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <filter id="soft-sm" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="7"/>
+    </filter>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <rect width="1920" height="1080" fill="url(#core-glow)"/>
+
+  <!-- Broad underlying wash, blurred almost to fog. -->
+  <path d="M -200,880 C 380,980 700,600 1080,470 C 1440,346 1720,300 2120,240
+           L 2120,520 C 1700,560 1420,620 1080,760 C 720,908 340,1090 -200,1080 Z"
+        fill="url(#ribbon-violet)" filter="url(#soft-lg)"/>
+
+  <path d="M -200,1010 C 300,960 660,700 1010,520 C 1360,342 1680,268 2120,220
+           L 2120,400 C 1660,452 1340,540 1010,700 C 660,870 300,1080 -200,1080 Z"
+        fill="url(#ribbon-teal)" filter="url(#soft-lg)"/>
+
+  <!-- The main ribbon, then a tighter, brighter copy of its leading edge to
+       give the fold a hot core the way a real light streak has one. -->
+  <path d="M -200,960 C 320,900 640,660 980,470 C 1320,282 1660,214 2120,180
+           L 2120,300 C 1680,338 1360,430 1010,610 C 660,790 300,1010 -200,1060 Z"
+        fill="url(#ribbon-main)" filter="url(#soft-md)"/>
+
+  <path d="M -200,962 C 320,902 640,662 980,472 C 1320,284 1660,216 2120,182"
+        fill="none" stroke="#dff3ff" stroke-opacity="0.85" stroke-width="9"
+        filter="url(#soft-sm)"/>
+  <path d="M -200,962 C 320,902 640,662 980,472 C 1320,284 1660,216 2120,182"
+        fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="2.5"/>
+
+  <!-- A thin second streak crossing under the first. -->
+  <path d="M -200,1080 C 420,1000 780,880 1160,700 C 1500,540 1800,470 2120,440"
+        fill="none" stroke="#79d8ff" stroke-opacity="0.30" stroke-width="26"
+        filter="url(#soft-md)"/>
+
+  <rect width="1920" height="1080" fill="url(#vignette)"/>
+</svg>

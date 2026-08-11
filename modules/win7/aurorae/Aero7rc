@@ -1,0 +1,58 @@
+# Aurorae layout for the Aero7 decoration. These numbers are the other half of
+# decoration.svg's geometry -- change one and you must change the other.
+#
+# Button letters: I=minimize A=maximize X=close (M=menu, S=sticky, H=help,
+# F=above, B=below, L=shade). Windows 7 also puts the app icon top-left, which
+# would be M, but Aurorae draws that button from the window icon rather than
+# from theme art, so it is left off here instead of shipping a menu.svg that
+# would not match.
+
+[General]
+Animation=150
+TitleAlignment=Left
+TitleVerticalAlignment=Center
+ActiveTextColor=26,42,58
+InactiveTextColor=110,124,138
+# Aero titles sit on glass, so they carry a white glow rather than a dark
+# shadow -- one pixel down, no offset sideways.
+UseTextShadow=true
+ActiveTextShadowColor=255,255,255,220
+InactiveTextShadowColor=255,255,255,150
+TextShadowOffsetX=0
+TextShadowOffsetY=1
+LeftButtons=
+RightButtons=IAX
+# The drop shadow is painted into the Padding* area of decoration.svg, so KWin
+# must not add one of its own on top.
+Shadow=false
+
+[Layout]
+PaddingLeft=10
+PaddingRight=10
+PaddingTop=10
+PaddingBottom=10
+
+BorderLeft=8
+BorderRight=8
+BorderBottom=8
+
+TitleEdgeTop=3
+TitleEdgeBottom=3
+TitleEdgeLeft=6
+TitleEdgeRight=4
+TitleHeight=24
+TitleBorderLeft=4
+TitleBorderRight=4
+
+# Maximized windows lose the outer air: the titlebar runs straight into the
+# screen edge, as it does in Windows 7.
+TitleEdgeTopMaximized=0
+TitleEdgeBottomMaximized=2
+TitleEdgeLeftMaximized=4
+TitleEdgeRightMaximized=2
+
+ButtonWidth=26
+ButtonHeight=17
+ButtonSpacing=1
+ButtonMarginTop=1
+ExplicitButtonSpacer=4
