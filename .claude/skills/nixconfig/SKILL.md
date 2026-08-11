@@ -135,15 +135,43 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
 - Verify NixOS option names against the real module source, not from memory. Locate
   nixpkgs: `nix eval --raw .#nixosConfigurations."203-media".pkgs.path`, then read
   `<path>/nixos/modules/...`.
-- **Default to committing straight to `main`, but don't push** — no feature branch,
-  no PR — since most changes here are small homelab tweaks and PR ceremony is pure
-  overhead for a single-user repo. Then apply it yourself: run `deploy <host>`
-  from the Mac (see `nixconfig-ops`), which builds from the committed HEAD and
-  activates the target directly — no push-to-GitHub or pull-on-target step.
-  Only branch + open a PR when the user says so, or the
-  change is large/risky enough that a review pass genuinely matters (e.g. something
-  that could break the reverse-proxy host or take down multiple hosts at once). Don't
-  `gh pr create` unprompted even then — the user opens/merges PRs themselves.
+- **Work always lands on local `main`, and `main` is never pushed.** Several routes,
+  all ending in the same place:
+  - Working in the normal checkout: commit straight to `main`. No feature branch,
+    no PR — most changes here are small homelab tweaks and PR ceremony is pure
+    overhead for a single-user repo.
+  - Working on a branch in the normal checkout: merge it into `main` when done.
+  - Working in a worktree (background/parallel agent sessions are forced into one):
+    the branch still has to reach `main`, but a worktree-isolated session **cannot
+    write to the main checkout** — the harness refuses `git -C <main checkout> …`
+    and every other route out of the worktree. So end the job with the merge
+    already staged for one paste, naming the branch, and say plainly that the
+    commit is not yet on `main`:
+
+    ```
+    cd ~/git/nixconfig && git merge --no-ff worktree-<name>
+    ```
+
+  Either way the failure to avoid is stopping at "it's committed on branch X,
+  cherry-pick it whenever" with no merge line and no flag that the work is still
+  parked. `deploy` builds from a checkout, so until it lands on `main` nothing can
+  be applied — a commit stranded on a branch is not delivered work.
+
+  Merge with `--no-ff` so the branch stays legible in history; a fast-forward is
+  fine for a single commit. If `main` has uncommitted work in the way (it often
+  does — that's usually why the session was isolated), say which paths conflict and
+  hand back the merge rather than stashing around it: the stash stack is shared with
+  every other worktree and popping it can steal another session's changes.
+
+  **Never `git push`** — not to `main`, not anywhere, unless the user asks in so many
+  words. Applying a change is `deploy <host>` from the Mac (see `nixconfig-ops`),
+  which builds from the local committed HEAD and activates the target directly;
+  there is no push-to-GitHub or pull-on-target step anywhere in that path.
+
+  Only open a PR when the user says so, or the change is large/risky enough that a
+  review pass genuinely matters (e.g. something that could break the reverse-proxy
+  host or take down multiple hosts at once). Don't `gh pr create` unprompted even
+  then — the user opens/merges PRs themselves.
 - GitHub's "Potential fix for pull request finding" autofix commits have invented
   nonexistent options before (`services.ocis.settings`) — if a merged branch breaks,
   diff against your own last commit first.
