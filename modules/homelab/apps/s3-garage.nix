@@ -16,6 +16,23 @@
             ipfilter = false;
           };
         };
+        # The `public` bucket predates this repo (created 2025-12-29) and still
+        # carries a second global alias, `s3.phonkd.net`, from the pre-nix
+        # homelab. Garage serves it through the exact-domain path rather than
+        # s3_web.root_domain, and the Cloudflare A record still points here --
+        # only the traefik router was never carried over, so the host fell back
+        # to TRAEFIK DEFAULT CERT and TLS failed. This restores the route; the
+        # bucket alias and DNS needed no change.
+        s3-legacy-public = {
+          ip = "127.0.0.1";
+          port = 3902;
+          dashboard.enable = false;
+          traefik = {
+            enable = true;
+            domain = "s3.phonkd.net";
+            ipfilter = false;
+          };
+        };
         s3-priv = {
           ip = "127.0.0.1";
           port = 3902;
