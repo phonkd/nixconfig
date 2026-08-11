@@ -37,8 +37,8 @@
       # ollama. API on :8095 (POST /api/ask, GET /api/health).
       services.noobservability = {
         enable = true;
-        lokiUrl = "http://10.9.0.1:3100";
-        mimirUrl = "http://10.9.0.1:9009/prometheus";
+        lokiUrl = "http://100.64.0.4:3100";
+        mimirUrl = "http://100.64.0.4:9009/prometheus";
         ollamaUrl = "http://192.168.3.203:11434";
         model = "qwen3.5:9b";
         extraContext = ''
@@ -178,7 +178,7 @@
 
             ## Before you start
 
-            - Address: `http://10.9.0.1:9009` — only reachable over the home
+            - Address: `http://100.64.0.4:9009` — only reachable over the home
               site-to-site VPN; this host already has that route (it ships metrics
               there via Alloy).
             - Tenant: single-tenant homelab (`multitenancy_enabled: false`), so no
@@ -226,7 +226,7 @@
             2. **POST it to the `hermes` namespace:**
 
                ```bash
-               curl -sS -X POST http://10.9.0.1:9009/prometheus/config/v1/rules/hermes \
+               curl -sS -X POST http://100.64.0.4:9009/prometheus/config/v1/rules/hermes \
                  -H "Content-Type: application/yaml" \
                  --data-binary @rule-group.yaml
                ```
@@ -238,7 +238,7 @@
             3. **Verify it's actually evaluating** (don't just trust the 200):
 
                ```bash
-               curl -sS http://10.9.0.1:9009/prometheus/api/v1/rules | grep -A5 <alert-name>
+               curl -sS http://100.64.0.4:9009/prometheus/api/v1/rules | grep -A5 <alert-name>
                ```
 
                Look for `"health": "ok"` and, once the condition is true,
@@ -248,7 +248,7 @@
                reached Alertmanager (and from there, Discord):
 
                ```bash
-               curl -sS http://10.9.0.1:9009/alertmanager/api/v2/alerts
+               curl -sS http://100.64.0.4:9009/alertmanager/api/v2/alerts
                ```
 
             ## Pitfalls
