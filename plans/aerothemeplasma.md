@@ -102,7 +102,22 @@ session at SDDM (it is the default), and let the wizard run.
 
 - Plain Plasma stays installed and listed at the login screen. That's deliberate
   — it's the escape hatch if a Plasma point release ever breaks the patched
-  shell before the flake catches up.
+  shell before the flake catches up. **Switching between the two sessions needs
+  a reboot, not a logout.** `PLASMA_DEFAULT_SHELL` is what the systemd user
+  drop-ins condition on to pick `aeroshell` over `plasmashell`, and it is set in
+  the systemd *user manager*, which outlives an individual session. Log out of
+  AeroThemePlasma and pick "Plasma (Wayland)" and the variable is still there,
+  so you get aeroshell again and the escape hatch silently isn't one. Check with
+  `systemctl --user show-environment | grep PLASMA_DEFAULT_SHELL`; clear it for
+  the current manager with `systemctl --user unset-environment
+  PLASMA_DEFAULT_SHELL`.
+- Logging straight back in after `nixos-rebuild switch` can bounce you to the
+  login screen once. The user manager survives the switch holding a dead
+  `WAYLAND_DISPLAY`, so `plasma-ksplash` core-dumps and the new session's
+  `plasma-workspace-wayland.target` is refused with "Requested transaction
+  contradicts existing jobs … graphical-session.target has 'stop' job queued".
+  A slow-stopping user unit (easyeffects, here) widens the window. Waiting a few
+  seconds, or rebooting, gets past it — it isn't a broken build.
 - Lucida Console (used only on the Plymouth LUKS prompt) is off: it has to be
   copied off a Windows install by hand.
 - The Windows 7 *sound* theme is packaged by the flake and installed with the
