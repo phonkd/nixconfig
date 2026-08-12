@@ -110,3 +110,12 @@ session at SDDM (it is the default), and let the wizard run.
 - Windows 7 games, Office 2010-on-Wine and the Geckium/Aero-userchrome Firefox
   work from the same rice writeup are out of scope; none of them are Plasma
   configuration.
+- Dolphin gets Windows 7 *defaults* (Details view, Explorer's columns, 16px
+  rows, no tab bar, full-width status bar) but not Explorer's *chrome*. Two
+  parts can't be reached from configuration: the Places sidebar headings
+  ("Places / Remote / Recent / Devices" rather than Favorites / Libraries /
+  Computer / Network) are hardcoded in KFilePlacesModel, and Windows 7's
+  command bar — Organize / Include in library / Share with / New folder — has
+  no Dolphin equivalent. Rebuilding the toolbar would mean shipping our own
+  `dolphinui.rc`, which is version-coupled to Dolphin and would break on
+  upgrades; not worth it for the gain.

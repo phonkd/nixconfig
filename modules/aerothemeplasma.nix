@@ -101,6 +101,46 @@ in
             # while still losing to any ordinary definition in a host module --
             # i.e. a host can still pin its own session without mkForce.
             services.displayManager.defaultSession = lib.mkOverride 900 "aerothemeplasma";
+
+            # Dolphin. AeroThemePlasma dresses the shell, not the apps, and
+            # upstream ships nothing for the file manager -- so out of the box
+            # you get Windows 7 icons and Aero widgets wrapped around Dolphin's
+            # own layout, which reads as neither. These are the settings that
+            # close most of that gap; the ones that can't be closed from config
+            # (the sidebar's "Places/Remote/Devices" headings, the toolbar
+            # layout) are hardcoded in KIO and Dolphin's ui.rc respectively.
+            #
+            # /etc/xdg, not ~/.config: dolphinrc is an ordinary KConfig file, so
+            # it cascades through XDG_CONFIG_DIRS. That makes every line below a
+            # *default* -- Dolphin's settings dialog still works, and whatever
+            # the user changes lands in ~/.config/dolphinrc and wins. Writing
+            # the home file instead would freeze the dialog's output.
+            environment.etc."xdg/dolphinrc".text = ''
+              [General]
+              # Explorer has no tabs, and opens on one folder rather than
+              # restoring the last session.
+              RememberOpenedTabs=false
+              # One view for every folder, the way Explorer's "Apply to Folders"
+              # leaves it. Also load-bearing: the default view mode itself is
+              # seeded into ~/.local/share/dolphin/view_properties/global,
+              # which Dolphin only reads while this is on.
+              GlobalViewProps=true
+              # Explorer's status bar spans the window; Dolphin's default is a
+              # small floating overlay in the corner.
+              ShowStatusBar=1
+              # No hover check-circle on items -- Windows 7 has that off too.
+              ShowSelectionToggle=false
+              # Explorer walks into a .zip like a folder.
+              BrowseThroughArchives=true
+
+              [DetailsMode]
+              # 16px rows with no thumbnail inflation, i.e. Explorer's Details
+              # view. Dolphin's own preview size here is 48.
+              IconSize=16
+              PreviewSize=16
+              # Explorer's Details view has no tree expanders on folders.
+              ExpandableFolders=false
+            '';
           };
     };
 
@@ -117,6 +157,15 @@ in
     let
       isKde = osConfig == null || (osConfig.noughty.host.desktop or null) == "kde";
       atp = inputs.aerothemeplasma.packages.${pkgs.system};
+      # ViewMode 1 is Details; the roles are Explorer's columns, in Explorer's
+      # order. Version 4 is Dolphin's current view-properties format -- without
+      # it the file reads as pre-migration and Dolphin rewrites the roles.
+      dolphinViewProps = pkgs.writeText "dolphin-global-view-properties" ''
+        [Dolphin]
+        Version=4
+        ViewMode=1
+        VisibleRoles=Details_text,Details_modificationtime,Details_type,Details_size
+      '';
     in
     {
       config = lib.mkIf isKde {
@@ -145,6 +194,30 @@ in
           size = 30;
           gtk.enable = true;
         };
+
+        # Explorer opens folders in Details view; Dolphin opens them in a grid
+        # of 96px icons, which is the loudest thing left saying "not Windows".
+        #
+        # This one setting can't come from /etc/xdg like the rest of dolphinrc:
+        # view properties live in a .directory file that Dolphin opens by
+        # absolute path, and KConfig doesn't cascade a path it was handed. So it
+        # gets seeded instead of managed -- written once if absent, never
+        # touched again. Switch Dolphin to Icons view and it stays switched,
+        # which is the whole point of not making this a home.file.
+        home.activation.aerothemeplasmaDolphinView = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+          viewProps="${config.xdg.dataHome}/dolphin/view_properties/global/.directory"
+          if [ ! -e "$viewProps" ] && [ -z "''${DRY_RUN:-}" ]; then
+            verboseEcho "Seeding Dolphin's default view properties"
+            mkdir -p "$(dirname "$viewProps")"
+            # Dated now, not at build time: Dolphin discards view properties
+            # older than dolphinrc's ViewPropsTimestamp, which the setup wizard
+            # stamps on first login.
+            {
+              cat ${dolphinViewProps}
+              ${pkgs.coreutils}/bin/date '+Timestamp=%Y,%-m,%-d,%-H,%-M,%-S.000'
+            } > "$viewProps"
+          fi
+        '';
       };
     };
 }
