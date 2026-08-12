@@ -1,7 +1,8 @@
 # Retire wg-obs — move the observability data plane onto the tailnet
 
-**Repo(s):** nixconfig   **Status:** in-progress — Phase 1 shipped and verified;
-Phase 2 written, deploy of the teardown gated on 203-media landing.
+**Repo(s):** nixconfig   **Status:** DONE on the nix side (2026-08-12) — wg-obs
+is deleted and every sender runs over the tailnet. Only the router-side cleanup
+is outstanding, and it is inert: four UniFi rules that now point at nothing.
 
 ## CORRECTION (2026-08-11) — the original premise was partly wrong
 
@@ -120,13 +121,22 @@ resolution), then tearing the tunnel down, then confirming 201 re-establishes to
       `alwaysImport`, wg-obs firewall block gone, 203's `10.9.0.0/24`
       postUp/preDown gone, Mac `obs-rescue` tunnel route gone, comments in
       `dns.nix`/`mac.nix` corrected.
-- [ ] **`deploy 203-media`** — long (rebuilds CUDA, ~3 h). Until this lands 203
-      still pushes to `10.9.0.1`, so the teardown below must wait for it.
-- [ ] `deploy observability` to actually drop the wg-obs interface.
-- [ ] Router: delete the wg-obs peer, the `observability` PBR (dest 10.9.0.1),
-      the `203-observability` static route, and `203-reach-tailnet`.
-- [ ] Verify after teardown: Grafana still loads through traefik, Loki/Mimir
-      still ingesting from all senders, `tailscale ping` 201↔g14 direct.
+- [x] **`deploy 203-media`** — done. The feared ~3 h CUDA rebuild was not the
+      issue in the end: g14 now offloads to 205-builder, so `ollama-0.32.3`
+      built on `ssh://nixremote@192.168.3.205` instead of the laptop. Verified
+      after: alloy + tailscaled active, endpoints `100.64.0.4:3100/:9009`, the
+      `10.9.0.0/24` route gone, logs in Loki within 3 min, and metrics only
+      12.6 s stale.
+- [x] `deploy observability` — wg-obs interface dropped. Verified: `ip addr show
+      wg-obs` → "does not exist", udp/51821 no longer listening, and
+      loki/mimir/grafana/alloy all still active.
+- [x] Verified after teardown: Loki's `hostname` label still lists all six
+      senders in the last 5 min, and Grafana still serves through traefik
+      (`https://grafana.phonkd.net` → 302 login redirect via 85.195.231.133).
+- [ ] **Router (only thing left):** delete the wg-obs peer, the `observability`
+      PBR (dest 10.9.0.1), the `203-observability` static route (10.9.0.0/24),
+      and `203-reach-tailnet`. All four are now dead weight — nothing routes to
+      10.9.0.0/24 any more — so this is tidying, not a fix.
 
 _Gotcha seen during Phase 1:_ 205's activation **stopped alloy and did not
 restart it** — the deploy exited 0 but never printed `Deployment confirmed`, and
