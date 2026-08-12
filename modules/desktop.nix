@@ -63,9 +63,9 @@
         # content is generated from the settings below, so there is nothing
         # worth preserving: overwrite it and skip the backup entirely.
         gtk2.force = true;
-        # mkDefault throughout: on KDE hosts modules/win7.nix replaces the
-        # whole look with a light Windows 7 one, and a GTK stack still set to
-        # dark Nordic would be the one thing left contradicting it.
+        # mkDefault throughout: on KDE hosts modules/aerothemeplasma.nix
+        # replaces the whole look with a light Windows 7 one, and a GTK stack
+        # still set to dark Nordic would be the one thing left contradicting it.
         theme = lib.mkDefault {
           package = pkgs.nordic;
           name = "Nordic-darker";
