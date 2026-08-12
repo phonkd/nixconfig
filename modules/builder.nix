@@ -46,7 +46,7 @@ let
     gigaplayer-server # gated on hostHasTag "gigaplayer-server"
     gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
-    win7 # gated on host.is.nixosDesktop AND desktop == "kde"
+    aerothemeplasma # gated on host.is.nixosDesktop AND desktop == "kde"
 
     # Server baseline (gated on host.is.server).
     server-globalconfig
