@@ -322,6 +322,35 @@
       # useRoutingFeatures = "client"/"both" turns on for exactly this reason.
       networking.firewall.checkReversePath = "loose";
 
+      # IPv6 KILL-SWITCH. Proton's tunnel below carries `allowedIPs =
+      # [ "0.0.0.0/0" ]` and nothing else -- it is IPv4-only. So the moment this
+      # LAN starts carrying IPv6, SLAAC would hand 203 a global v6 address and a
+      # v6 default route out ens18, and every IPv6 flow would go straight to the
+      # internet *around* Proton. That is a VPN leak, and a silent one: v4 still
+      # looks correct in every test while anything with a AAAA record egresses
+      # from the home address.
+      #
+      # It cannot be prevented at the router. 201 needs IPv6 (it is the exit
+      # node, and an exit node advertises ::/0 whether or not it can carry it --
+      # see modules/homelab/apps/headscale-policy.hujson), and 201 and 203 share
+      # 192.168.3.0/24, so any RA that reaches one reaches the other.
+      #
+      # Refusing RAs is the surgical fix: no RA, no global address, no v6
+      # default, nothing to leak. `autoconf = 0` is belt-and-braces in case an
+      # RA arrives by some other path. Both are per-interface on purpose --
+      # `conf.all.accept_ra` is not consulted for this knob, and tailscale0 is
+      # deliberately left alone so Tailscale keeps its fd7a: ULA and the tailnet
+      # stays dual-stack.
+      #
+      # Revisit only if Proton's peer gains ::/0; until then IPv6 on 203 is a
+      # leak by construction, not a feature that is merely missing.
+      boot.kernel.sysctl = {
+        "net.ipv6.conf.ens18.accept_ra" = 0;
+        "net.ipv6.conf.ens19.accept_ra" = 0;
+        "net.ipv6.conf.ens18.autoconf" = 0;
+        "net.ipv6.conf.ens19.autoconf" = 0;
+      };
+
       networking.wg-quick.interfaces.wg0 = {
         address = [ "10.2.0.2/32" ];
         privateKeyFile = config.sops.secrets.proton_wg_privatekey.path;
