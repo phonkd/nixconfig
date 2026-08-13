@@ -71,6 +71,7 @@ let
     homelab-immich
     homelab-garage
     homelab-notes
+    homelab-affine
     homelab-hermes
 
     # Observability stack (server + VPN gated on "observability-server",
