@@ -42,22 +42,26 @@
   // So "approve only the working half" is not an option, and dropping this
   // autoApprover buys nothing. It stays.
   //
-  // Know the consequence: 201-mono has NO IPv6 upstream (no global v6 address,
-  // no v6 default route -- the ISP gives none), so a client that selects it as
-  // exit node installs a v6 default pointing at a host that cannot forward v6.
-  // In the steady state this is benign: 201 has no route, the connection is
-  // refused in well under a second, and Happy Eyeballs falls straight over to
-  // v4. Measured from g14 over the exit node: v6 fails in 0.2-0.7 s, v4 serves
-  // example.com in 0.16 s with egress correctly showing the home IP.
+  // That pairing used to be a problem and no longer is. 201-mono had no IPv6
+  // upstream at all, so the ::/0 half was a black hole: clients selecting the
+  // exit node got a v6 default aimed at a host that could not forward v6, and
+  // anything with a AAAA record stalled instead of failing over to v4.
   //
-  // It is NOT always benign. Right after the exit node is first selected,
-  // tailscaled can land in a state where v6 black-holes instead of refusing --
-  // `curl -6 https://example.com` hung the full 20 s timeout while v4 was fine,
-  // which presents as "the exit node broke everything" because every AAAA name
-  // stalls. Re-selecting the exit node (`tailscale set --exit-node=201-mono`)
-  // cleared it and it did not return. An `unreachable ::/0` on 201 was tried as
-  // a fix and made no difference (0.68 s with it, 0.41 s without), so it was not
-  // kept -- do not re-add it thinking it helps.
+  // Fixed properly rather than worked around. Init7 delegates a static /48 by
+  // DHCPv6-PD, UniFi advertises a /64 onto the homelab LAN, and 201 needed
+  // accept_ra = 2 to take it -- as a forwarding host, the default of 1 means
+  // "accept RAs if forwarding is disabled", i.e. nothing. See the comment in
+  // modules/hosts/201-mono.nix. Both halves of the exit node are now real:
+  // measured from g14 over the exit node, v6 egress 2a02:168:b066:… and v4
+  // egress 85.195.231.133, example.com 200 over v6 in 0.18 s.
+  //
+  // Do NOT add an `unreachable ::/0` on 201 as a "fast fail" mitigation. It was
+  // tried while the black hole existed and made no measurable difference
+  // (0.68 s with it, 0.41 s without); it is now actively wrong.
+  //
+  // 203-media is the deliberate exception and must stay that way: its Proton
+  // tunnel is IPv4-only, so it refuses RAs outright (modules/hosts/203-media.nix)
+  // and holds no v6 address. Same LAN as 201, opposite setting, on purpose.
   "autoApprovers": {
     "exitNode": ["phonkd@"],
   },
