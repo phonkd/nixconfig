@@ -30,6 +30,28 @@
           prefixLength = 24;
         }
       ];
+      # Accept router advertisements even though this host forwards.
+      #
+      # 2, not 1, and the difference is the whole point. The kernel reads
+      # accept_ra = 1 as "accept RAs *if forwarding is disabled*", and 201
+      # forwards: services.tailscale's useRoutingFeatures = "server" turns on
+      # net.ipv6.conf.all.forwarding so it can act as the tailnet exit node
+      # (modules/tailnet.nix). With forwarding on, accept_ra = 1 is silently
+      # equivalent to 0 -- RAs arrive and are dropped, no SLAAC address, no v6
+      # default route, and nothing in the logs to say so. Only 2 overrules it.
+      #
+      # This is what makes the exit node's IPv6 half real. An exit node always
+      # advertises ::/0 alongside 0.0.0.0/0 -- neither tailscale nor headscale
+      # will let the pair be split, see the note in
+      # modules/homelab/apps/headscale-policy.hujson -- so before 201 had a v6
+      # uplink of its own, every client selecting it inherited a v6 default
+      # aimed at a host that could not forward v6.
+      #
+      # Init7 delegates a static /48 by DHCPv6-PD; the UniFi gateway hands this
+      # LAN a /64 out of it and 201 autoconfigures from the RA. Nothing here
+      # pins an address, so a prefix change needs no config change.
+      boot.kernel.sysctl."net.ipv6.conf.ens18.accept_ra" = 2;
+
       security.sudo.wheelNeedsPassword = false;
       networking.hostName = "201-mono";
       networking.networkmanager.dhcp = "internal";
