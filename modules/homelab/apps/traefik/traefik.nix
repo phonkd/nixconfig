@@ -213,9 +213,30 @@
                 storage = "/var/lib/traefik/acme.json";
                 dnsChallenge = {
                   provider = "cloudflare";
+                  # Check propagation against the zone's AUTHORITATIVE
+                  # nameservers, not a recursive resolver.
+                  #
+                  # These were 1.1.1.1 / 1.0.0.1, and that quietly broke every
+                  # new domain. lego queries the challenge name *before* it
+                  # creates the TXT record (walking up for the SOA), so the
+                  # recursive resolver caches an NXDOMAIN for it — and
+                  # phonkd.net's SOA minimum is 1800s, so that negative answer
+                  # sticks for 30 minutes while lego gives up after ~2. The
+                  # record was created correctly every time; lego just kept
+                  # being handed its own stale NXDOMAIN. Symptom was
+                  # `dns01: time limit exceeded: ... did not return the
+                  # expected TXT record`, and it took out all 14 names in the
+                  # home.phonkd.net migration at once. The earlier one-off on
+                  # affine.int.w was the same bug — a retry only "fixed" it by
+                  # landing on a different anycast node with a cold cache.
+                  #
+                  # Cloudflare's own nameservers answer authoritatively with no
+                  # caching layer, so the check sees the record immediately.
+                  # By name, not IP: these are anycast addresses that change
+                  # (chin ≈ 108.162.192.84, drake ≈ 108.162.195.14 today).
                   resolvers = [
-                    "1.1.1.1:53"
-                    "1.0.0.1:53"
+                    "chin.ns.cloudflare.com:53"
+                    "drake.ns.cloudflare.com:53"
                   ];
                 };
               };
