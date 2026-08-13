@@ -42,6 +42,26 @@
             base_domain = "ts.phonkd.net"; # MagicDNS suffix; != server_url host
             magic_dns = true;
             override_local_dns = false; # don't hijack clients' resolvers
+
+            # Split DNS: send ONLY home.phonkd.net (the internal, ipfilter =
+            # true services) to 201's dnsmasq over the tailnet. Everything else
+            # keeps using whatever resolver the client already had —
+            # override_local_dns = false above stays honoured, because a split
+            # route is a per-domain addition, not a global resolver swap.
+            #
+            # This is what makes `ipfilter = true` usable away from home. 201's
+            # dnsmasq answers 100.64.0.5 for this domain (modules/dns.nix), so
+            # the client connects over the tailnet and traefik sees a
+            # 100.64.0.x source, which `ip-filter` already allows. Without this
+            # a remote client resolves the name through public DNS and gets an
+            # RFC1918 address it cannot route to.
+            #
+            # A wildcard is why this is a split route rather than
+            # dns.extra_records: extra_records is per-name, and internal
+            # services are added often.
+            nameservers.split = {
+              "home.phonkd.net" = [ "100.64.0.5" ];
+            };
           };
 
           tls_letsencrypt_hostname = "hs.phonkd.net";

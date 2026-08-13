@@ -51,7 +51,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "sonarr.int.w.phonkd.net";
+                domain = "sonarr.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -67,7 +67,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "prowlarr.int.w.phonkd.net";
+                domain = "prowlarr.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -88,7 +88,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "sabnzbd.int.w.phonkd.net";
+                domain = "sabnzbd.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -104,7 +104,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "seerr.int.w.phonkd.net";
+                domain = "seerr.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -120,7 +120,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "radarr.int.w.phonkd.net";
+                domain = "radarr.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -136,7 +136,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "lidarr.int.w.phonkd.net";
+                domain = "lidarr.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -152,7 +152,7 @@
               };
               traefik = {
                 enable = true;
-                domain = "slskd.int.w.phonkd.net";
+                domain = "slskd.home.phonkd.net";
                 auth = false;
                 ipfilter = true;
               };
@@ -306,7 +306,7 @@
             usenetClients.sabnzbd = {
               enable = true;
               settings.misc.port = 8080;
-              settings.misc.host_whitelist = "sabnzbd.int.w.phonkd.net";
+              settings.misc.host_whitelist = "sabnzbd.home.phonkd.net";
               settings.misc.api_key = {
                 _secret = "/run/secrets/sabnzbd-api-key";
               };

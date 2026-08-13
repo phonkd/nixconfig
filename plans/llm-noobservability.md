@@ -84,7 +84,7 @@ for hard questions later — off by default, this is a local-first project.
    mandatory `grep -rn "<port>" modules` collision check.
 7. `phonkds.modules.noobservability`: `lib.mkMerge` two-block pattern —
    workload gated on the 204 host, routing/dashboard gated on `reverse-proxy`
-   (`noob.int.w.phonkd.net`, `ipfilter = true`). Phase 2, once the UI exists.
+   (`noob.home.phonkd.net`, `ipfilter = true`). Phase 2, once the UI exists.
 8. `deploy 204-agent`, verify with real questions end-to-end.
 
 **0.2.2 repair:**

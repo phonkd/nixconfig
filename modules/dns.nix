@@ -44,6 +44,9 @@
         # dnsmasq matches a bare domain and all its subdomains, so dropping
         # the dot keeps `address=/w.phonkd.net/…` covering *.w.phonkd.net.
         addresses = {
+          # Internal (ipfilter = true) services. Covers the apex too, which is
+          # Home Assistant — see modules/homelab/apps/orphans.nix.
+          "home.phonkd.net" = "100.64.0.5";
           "int.phonkd.net" = "100.64.0.5";
           "w.int.phonkd.net" = "100.64.0.5";
           "w.phonkd.net" = "100.64.0.5";
@@ -77,6 +80,23 @@
 
           # wildcard DNS
           address = [
+            # Internal (ipfilter = true) services live under home.phonkd.net,
+            # and answer 201's TAILNET address — not its LAN one like every
+            # other entry here. That is the whole point of the scheme: a client
+            # connects to 100.64.0.5, so traefik sees a 100.64.0.x source and
+            # the `ip-filter` middleware (which already allows 100.64.0.0/10)
+            # lets it through from anywhere, not just from home. The old
+            # *.int.w.phonkd.net names answered 192.168.3.201, which is
+            # unroutable off the LAN — that is what made every internal service
+            # unreachable when away. Headscale pushes the same domain as a
+            # split-DNS route to every tailnet client (headscale.nix), so this
+            # entry is really only for LAN clients that resolve via 201.
+            #
+            # Consequence: internal services are tailnet-only. A device with
+            # tailscaled down cannot reach them even on the LAN. The apex is
+            # included, so Home Assistant rides the tailnet too.
+            "/.home.phonkd.net/100.64.0.5"
+            "/.home.phonkd.net/::"
             "/.int.phonkd.net/192.168.3.201"
             "/.int.phonkd.net/::"
             "/.segglaecloud.phonkd.net/192.168.3.123"
