@@ -38,6 +38,24 @@
             "kvm"
           ];
         }
+        # Same box, aarch64-linux via qemu-user binfmt (registered in
+        # 205-builder.nix). A build machine is only offered derivations whose
+        # system it *declares*, so without this second entry nothing ever
+        # reaches 205's emulation -- clients just fail with "platform mismatch".
+        #
+        # Emulated, so it advertises less than the native entry: no "kvm" (an
+        # aarch64 guest needs an aarch64 host CPU) and no "nixos-test"
+        # (qemu-user can't boot a VM), and a lower speedFactor/maxJobs so this
+        # never out-ranks a real aarch64 machine if one ever joins.
+        {
+          hostName = "192.168.3.205";
+          sshUser = "nixremote";
+          sshKey = config.sops.secrets."nixremote_key".path;
+          system = "aarch64-linux";
+          maxJobs = 4;
+          speedFactor = 1;
+          supportedFeatures = [ "big-parallel" ];
+        }
       ];
       programs.ssh.knownHosts."192.168.3.205".publicKey =
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPRovQTSmDh+ooke5LdQK75qZeKvZCbcekwiaWK+WKeB";

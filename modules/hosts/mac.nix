@@ -190,6 +190,18 @@
             "kvm"
           ];
         }
+        # aarch64-linux on the same box via qemu-user binfmt. See the matching
+        # entry in modules/hosts/types/server/builder.nix for why it is a
+        # second entry with reduced features rather than a wider `systems` list.
+        {
+          hostName = "100.64.0.2";
+          sshUser = "nixremote";
+          sshKey = "/Users/phonkd/.ssh/nixremote_ed25519";
+          system = "aarch64-linux";
+          maxJobs = 4;
+          speedFactor = 1;
+          supportedFeatures = [ "big-parallel" ];
+        }
       ];
       security.pam.services.sudo_local = {
         enable = true;
