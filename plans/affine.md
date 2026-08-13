@@ -1,6 +1,6 @@
 # AFFiNE self-hosted on 201-mono
 
-**Repo(s):** nixconfig   **Status:** in-progress
+**Repo(s):** nixconfig   **Status:** done
 
 ## Goal
 
@@ -57,8 +57,29 @@ only — no reason to bring a daemon and a `docker` group onto the reverse proxy
 - [x] `nix-instantiate --parse` both files; confirm the unit names the module
       references really are `redis-affine.service` / `podman-affine.service` /
       `postgresql-setup.service`
-- [ ] Commit → land on `main` → `deploy 201`
+- [x] Commit → land on `main` → `deploy 201`
 - [ ] First-run: visit the domain, create the admin account through the setup page
+
+## Outcome (deployed 2026-08-13)
+
+All five new units came up active on 201 (`postgresql`, `redis-affine`,
+`affine-pgvector`, `affine-migrate`, `podman-affine`), nothing in
+`systemctl --failed`, and `curl http://127.0.0.1:3010/` → 302, so migrations
+ran and the app reached both datastores. Traefik registered
+`affine@file` with `middlewares:["ip-filter@file"]` and `status: enabled`.
+
+One snag worth recording: the **first ACME run failed** —
+`dns01: time limit exceeded: NS 1.1.1.1:53 did not return the expected TXT
+record [_acme-challenge.affine.int.w.phonkd.net]` — so the domain served
+`TRAEFIK DEFAULT CERT`. Not a misconfiguration: in the whole of
+`/var/lib/traefik/traefik.log` only two domains have ever hit this
+(`s3.phonkd.net` once, then fine). **Traefik does not retry a failed cert
+request on its own** — it retries on config reload/restart. `systemctl restart
+traefik` issued it within 20s. Worth remembering for the next new domain.
+
+Note traefik's app log is also on disk at `/var/lib/traefik/traefik.log`
+(JSON), which is how this was diagnosed — the OTLP→Loki path in `nixconfig-ops`
+is unreachable from the g14 laptop.
 
 ## Open decisions
 
