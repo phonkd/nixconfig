@@ -38,7 +38,6 @@
       url = "github:nix-community/nix-on-droid/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    nixpkgs-unstable-droid.url = "github:nixos/nixpkgs/88d3861";
     nix-index-database = {
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";

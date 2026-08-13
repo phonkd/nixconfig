@@ -4,8 +4,13 @@
   ...
 }:
 {
+  # Android tracks nixpkgs-unstable rather than the 26.05 the other hosts pin,
+  # so it stays in step with home-manager (which follows master). Don't hand-pin
+  # a nixpkgs rev here: home-manager's services-modular reads
+  # `${pkgs.path}/lib/services/lib.nix`, so a rev older than home-manager fails
+  # eval with "path .../lib/services/lib.nix does not exist".
   flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidConfiguration {
-    pkgs = import inputs.nixpkgs-unstable-droid {
+    pkgs = import inputs.nixpkgs-unstable {
       system = "aarch64-linux";
       config.allowUnfree = true;
 
@@ -51,9 +56,9 @@
             experimental-features = nix-command flakes
           '';
           nix.registry.nixpkgs = {
-            flake = inputs.nixpkgs-unstable-droid;
+            flake = inputs.nixpkgs-unstable;
           };
-          nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable-droid}" ];
+          nix.nixPath = [ "nixpkgs=${inputs.nixpkgs-unstable}" ];
 
         }
       )
