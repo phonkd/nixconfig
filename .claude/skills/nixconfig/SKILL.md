@@ -55,9 +55,15 @@ Option type lives in `modules/phonkds-options.nix`: per-app `ip`, `port`, `path`
 - Thing not managed by nix at all (router, PVE): routing-only entry in
   `apps/orphans.nix`.
 
-Traefik conventions: public domains `*.w.phonkd.net`, internal `*.int.w.phonkd.net`
-with `ipfilter = true`. Available middlewares: `forward-auth` (authelia), `ip-filter`,
-`pve-headers`, `vnc-root-rewrite`. Self-signed HTTPS backend → `scheme = "https"` +
+Traefik conventions: public domains `*.w.phonkd.net`, internal `*.home.phonkd.net`
+with `ipfilter = true` (the old `*.int.w.phonkd.net` scheme is retired — see
+`plans/home-domain-migration.md`). Internal names resolve to 201's **tailnet** IP
+`100.64.0.5`, pushed to every client as a headscale split-DNS route, so
+`ipfilter = true` keeps working away from home; they are therefore tailnet-only.
+Available middlewares: `forward-auth` (authelia, `*.w.phonkd.net`),
+`forward-auth-home` (authelia, `*.home.phonkd.net` — a session cookie is only
+valid for the parent domain that set it, so traefik picks by suffix),
+`ip-filter`, `pve-headers`, `vnc-root-rewrite`. Self-signed HTTPS backend → `scheme = "https"` +
 `transport = "insecureTransport"`. Homepage live widgets need the API key in
 `sops.templates."homepage.env"` as `HOMEPAGE_VAR_<APP>_KEY` (reverse-proxy block of
 arr-slime.nix).

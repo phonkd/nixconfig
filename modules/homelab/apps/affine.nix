@@ -1,6 +1,6 @@
 # AFFiNE -- self-hosted block-based docs/whiteboard workspace, on 201-mono
 # alongside the rest of the homelab-server apps. Additive to homelab-notes
-# (memos stays at notes.int.w.phonkd.net); nothing migrates.
+# (memos stays at notes.home.phonkd.net); nothing migrates.
 #
 # Why this module looks different from every other app here: nixpkgs has no
 # AFFiNE *server*. `pkgs.affine` / `pkgs.affine-bin` are the Electron desktop
@@ -30,7 +30,7 @@
       ...
     }:
     let
-      domain = "affine.int.w.phonkd.net";
+      domain = "affine.home.phonkd.net";
       port = 3010;
       dataDir = "/var/lib/affine";
       dbName = "affine";

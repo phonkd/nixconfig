@@ -63,7 +63,7 @@ the Phase-1 panel feels too thin (want one-click silence, or a non-VPN internal 
   host** (`observability-server` tag), talking to `http://127.0.0.1:9009/alertmanager`
   — no cross-network Alertmanager exposure, same pattern as Grafana reaching Mimir on
   loopback. Bind `127.0.0.1:<port>` (NOT `openFirewall`).
-- **How it's reached.** Front through **traefik on 201** as `alerts.int.w.phonkd.net`
+- **How it's reached.** Front through **traefik on 201** as `alerts.home.phonkd.net`
   (ipfilter=internal, authelia — it can create silences), backend `10.9.0.1:<port>`
   over the existing wg-obs tunnel — the cross-host `phonkds.modules` shape from
   `apps/ocis.nix` / `arr-slime.nix` (routing/dashboard block gated on `reverse-proxy`
@@ -123,7 +123,7 @@ source of truth is the UI-managed config on `/var/lib/mimir/alertmanager-storage
      env pair). Pick `<port>` free on the obs host (3100/9009/3000 taken; e.g. 8090)
      — grep per host-allocation rules.
    - **`reverse-proxy` block:** a `phonkds.modules.karma` entry — `ip = "10.9.0.1"`,
-     `port = <port>`, `traefik = { enable = true; domain = "alerts.int.w.phonkd.net";
+     `port = <port>`, `traefik = { enable = true; domain = "alerts.home.phonkd.net";
      ipfilter = true; auth = true; }`, `dashboard = { enable = true; icon = ...; }`.
 4. Activate it: add `flake.nixosModules.karma` to `alwaysImport` in
    `modules/builder.nix` (it self-gates by tag). Since it's split across obs + 201,
@@ -133,7 +133,7 @@ source of truth is the UI-managed config on `/var/lib/mimir/alertmanager-storage
    `observability.nix`) so traefik on 201 can reach it over the tunnel; keep it off
    every public interface.
 6. `nix-instantiate --parse` the new file + grep for dangling refs, then
-   `deploy observability` and `deploy 201`. Verify `alerts.int.w.phonkd.net` shows a
+   `deploy observability` and `deploy 201`. Verify `alerts.home.phonkd.net` shows a
    test alert.
 
 ### Track B — readable Discord (mostly Grafana UI, not repo; parallel)
@@ -150,7 +150,7 @@ source of truth is the UI-managed config on `/var/lib/mimir/alertmanager-storage
 8. **Fix the broken `Source:` link.** It currently renders as a *relative*
    `/graph?g0.expr=…` because the Alertmanager's `external_url` is unset. Either set
    the ruler/Alertmanager external URL so links resolve, or repoint the template's
-   link at the new overview (`alerts.int.w.phonkd.net`, or the Grafana dashboard URL)
+   link at the new overview (`alerts.home.phonkd.net`, or the Grafana dashboard URL)
    so a Discord alert is one click from the board.
 9. Paste the finalized template into this plan (and/or a comment in
    `observability.nix`) so it survives a lost/rebuilt Alertmanager volume, since the
@@ -174,7 +174,7 @@ source of truth is the UI-managed config on `/var/lib/mimir/alertmanager-storage
   you want inline silence/ack or a non-VPN internal URL. Not mutually exclusive; the
   dashboard is the floor, Karma the ceiling. **Leaning dashboard-first, Karma later.**
 - **Karma exposure path (if Phase 2)** — *recommend* traefik-fronted
-  `alerts.int.w.phonkd.net` (dashboard tile, authelia, ipfilter, consistent with
+  `alerts.home.phonkd.net` (dashboard tile, authelia, ipfilter, consistent with
   every other app). Alternative: reach Karma directly over wg-obs like Grafana's
   `:3000` (no 201 involvement, but no tile and VPN-only). **Leaning traefik.**
 - **Karma auth (if Phase 2)** — *recommend* `traefik.auth = true` (authelia) since

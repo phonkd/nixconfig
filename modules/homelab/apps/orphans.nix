@@ -37,7 +37,7 @@
           traefik = {
             enable = true;
             auth = true;
-            domain = "easyeffects.int.w.phonkd.net";
+            domain = "easyeffects.home.phonkd.net";
             ipfilter = true;
             extraMiddlewares = [ "vnc-root-rewrite" ];
             transport = "insecureTransport";
@@ -129,7 +129,7 @@
           port = 8095;
           traefik = {
             enable = true;
-            domain = "noobservability.int.w.phonkd.net";
+            domain = "noobservability.home.phonkd.net";
             auth = false;
             ipfilter = true;
           };

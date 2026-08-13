@@ -45,9 +45,22 @@
             tls.certResolver = "cloudflare";
 
             # CORRECT LOCATION: Apply middlewares dynamically to this specific router
+            #
+            # Which forward-auth depends on the domain: authelia can only set a
+            # session cookie for a parent it lives under, so a service on
+            # home.phonkd.net must be sent to the portal on THAT domain or it
+            # authenticates and still gets bounced. Picked by suffix here so no
+            # service has to declare it.
             middlewares =
               [ ]
-              ++ (lib.optionals (svc.traefik.auth or false) [ "forward-auth" ])
+              ++ (lib.optionals (svc.traefik.auth or false) [
+                (
+                  if lib.hasSuffix ".home.phonkd.net" svc.traefik.domain then
+                    "forward-auth-home"
+                  else
+                    "forward-auth"
+                )
+              ])
               ++ (lib.optionals (svc.traefik.ipfilter or false) [ "ip-filter" ])
               ++ svc.traefik.extraMiddlewares;
 
@@ -86,6 +99,22 @@
             forward-auth = {
               forwardAuth = {
                 address = "http://127.0.0.1:9091/api/authz/forward-auth?rd=https://auth.w.phonkd.net/";
+                trustForwardHeader = true;
+                authResponseHeaders = [
+                  "Remote-User"
+                  "Remote-Groups"
+                  "Remote-Name"
+                  "Remote-Email"
+                ];
+              };
+            };
+            # Same authelia instance, but the redirect (`rd=`) points at the
+            # portal name under home.phonkd.net. Attached automatically to
+            # auth = true routers on that domain — see the router middleware
+            # selection above and session.cookies in authelia.nix.
+            forward-auth-home = {
+              forwardAuth = {
+                address = "http://127.0.0.1:9091/api/authz/forward-auth?rd=https://auth.home.phonkd.net/";
                 trustForwardHeader = true;
                 authResponseHeaders = [
                   "Remote-User"

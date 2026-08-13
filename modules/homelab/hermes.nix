@@ -28,7 +28,7 @@
           dashboard.icon = "mdi-robot";
           traefik = {
             enable = true;
-            domain = "hermes-dashboard.int.w.phonkd.net";
+            domain = "hermes-dashboard.home.phonkd.net";
             auth = false;
             ipfilter = true;
           };
