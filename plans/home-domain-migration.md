@@ -1,6 +1,6 @@
 # Retire `int.w.phonkd.net` → `home.phonkd.net`, over the tailnet
 
-**Repo(s):** nixconfig   **Status:** in-progress
+**Repo(s):** nixconfig   **Status:** done
 
 ## Goal
 
@@ -93,9 +93,33 @@ present".
       access_control rules
 - [ ] traefik: pick `forward-auth-home` for `home.phonkd.net` routers
 - [ ] `nix-instantiate --parse` every touched file
-- [ ] Land on `main` → `deploy observability`, `deploy 201`, `deploy 203`
-- [ ] Audit ACME store for all ~16 names; restart traefik for stragglers
-- [ ] Verify from g14 over the tailnet: DNS answer, cert, HTTP status
+- [x] Land on `main` → `deploy observability`, `deploy 201`, `deploy 203`
+- [x] Audit ACME store for all ~16 names
+- [x] Verify from g14 over the tailnet: DNS answer, cert, HTTP status
+
+## Outcome (deployed 2026-08-13)
+
+Verified from g14 while on a foreign network (`10.50.168.228`, no route to
+`192.168.3.201`): `home` 200, `affine` 302, `notes` 200, `paperless` 302,
+`sonarr` 302, `slskd` 200, `auth.home` 200 — every one via `100.64.0.5` with
+`ssl_verify_result=0`. DNS confirmed on both legs: 201's dnsmasq answers
+`100.64.0.5` directly, and MagicDNS (`100.100.100.100`) returns the same
+through the new split route, with no client-side change. `easyeffects` 302s to
+`https://auth.home.phonkd.net/?rd=…`, i.e. the cookie-domain-correct portal.
+
+**The per-service cert plan hit a standing bug, now fixed.** All 14 names
+failed ACME identically with `dns01: time limit exceeded`. Cause: lego checked
+propagation via `1.1.1.1`/`1.0.0.1` and queries the challenge name *before*
+creating the TXT (SOA walk), so the recursive resolver cached NXDOMAIN — and
+`phonkd.net`'s SOA minimum is **1800s**, six times lego's ~2 min wait. The
+records were always created; lego kept reading back its own poisoned cache.
+Pointing `dnsChallenge.resolvers` at Cloudflare's authoritative nameservers
+took issuance from **0 certs in ~10 min to all 14 in under 60 s**.
+
+This also corrects the note in `plans/affine.md`: that failure was not a
+propagation flake and traefik's lack of retry was not the real story — the
+retry only succeeded by landing on a different anycast node with a cold cache.
+Same bug, hidden by luck.
 
 ## Open decisions
 
@@ -105,12 +129,22 @@ present".
   change to live DNS, so it is left for the user to trigger. Leaving them costs
   nothing functionally — it is the status quo — but keeps a private address in
   public DNS.
-- **Four `ipfilter = true` services are NOT on the new domain and stay
-  unreachable from away — needs a call.** `syncthing.w.phonkd.net`,
-  `snapcast.w.phonkd.net`, `api.s3.w.phonkd.net` and `oldblac.int.phonkd.net`
-  are internal-by-intent but sit on the public / old-internal trees, so they
-  still resolve to `192.168.3.201` (or the public IP) and still 403 remotely.
-  This migration does not touch them. Three ways out, none obviously right:
+- **Everything still on `w.phonkd.net` is unreachable from a foreign network —
+  needs a call.** Measured after cutover, from g14 sitting on `10.50.168.228`
+  (not the home LAN, cannot ping `192.168.3.201` at all): `vw.w.phonkd.net`,
+  `dashboard.w.phonkd.net` and `auth.w.phonkd.net` all time out, because
+  201's dnsmasq answers `192.168.3.201` for that whole tree, with `::` for
+  AAAA. Force the tailnet path (`--resolve <name>:443:100.64.0.5`) and all
+  three return **200 with a valid cert** — so traefik is healthy and this is
+  purely a DNS-answer problem, the exact bug this migration fixed for
+  `home.phonkd.net`. It is **pre-existing and untouched** by this work; the
+  `w.phonkd.net` dnsmasq entries are as they were.
+
+  It bites hardest on the four `ipfilter = true` services stranded off the new
+  domain — `syncthing.w.phonkd.net`, `snapcast.w.phonkd.net`,
+  `api.s3.w.phonkd.net`, `oldblac.int.phonkd.net` — which are
+  internal-by-intent and now the only ipfilter'd names that still fail away
+  from home. Three ways out, none obviously right:
   1. **Move them to `home.phonkd.net`** — most coherent (`ipfilter = true`
      ought to imply the internal domain) but changes four more URLs.
   2. **Add `w.phonkd.net` to the split-DNS map** — one line, and the Mac

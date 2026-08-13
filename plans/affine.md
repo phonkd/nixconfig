@@ -71,11 +71,21 @@ ran and the app reached both datastores. Traefik registered
 One snag worth recording: the **first ACME run failed** —
 `dns01: time limit exceeded: NS 1.1.1.1:53 did not return the expected TXT
 record [_acme-challenge.affine.int.w.phonkd.net]` — so the domain served
-`TRAEFIK DEFAULT CERT`. Not a misconfiguration: in the whole of
-`/var/lib/traefik/traefik.log` only two domains have ever hit this
-(`s3.phonkd.net` once, then fine). **Traefik does not retry a failed cert
-request on its own** — it retries on config reload/restart. `systemctl restart
-traefik` issued it within 20s. Worth remembering for the next new domain.
+`TRAEFIK DEFAULT CERT`. `systemctl restart traefik` issued it within 20s.
+
+> **Superseded — the diagnosis below was wrong.** This was read at the time as
+> a one-off propagation flake, on the grounds that only two domains had ever
+> hit it. It was not: it was a standing misconfiguration that happened to be
+> survivable for a single name. lego checked propagation through
+> `1.1.1.1`/`1.0.0.1` and queries the challenge name *before* creating the TXT,
+> so the recursive resolver cached an NXDOMAIN that `phonkd.net`'s 1800s SOA
+> minimum kept alive far past lego's ~2 min wait. The restart "fixed" it only
+> by landing on a different anycast node with a cold cache. It went on to fail
+> **all 14 names at once** during the home.phonkd.net migration, which is where
+> it was properly diagnosed and fixed —
+> see `plans/home-domain-migration.md`. Traefik still does not retry a failed
+> cert request, which remains true and worth knowing, but it was never the
+> cause.
 
 Note traefik's app log is also on disk at `/var/lib/traefik/traefik.log`
 (JSON), which is how this was diagnosed — the OTLP→Loki path in `nixconfig-ops`
