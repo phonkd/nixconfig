@@ -39,6 +39,11 @@
         networking.networkmanager.dhcp = "internal";
         networking.firewall.allowedTCPPorts = [ 22 ];
 
+        # The Droid profile targets aarch64-linux. Register qemu-user for it
+        # so Nix advertises the platform and can build its activation closure
+        # on this x86_64 builder.
+        boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
         # Server, not client: neutralize the builder-client wiring inherited
         # via oldblac-vm so this box never offloads builds to itself.
         nix.distributedBuilds = lib.mkForce false;
