@@ -42,6 +42,9 @@
         # Self-gating: it checks osConfig.noughty.host.desktop and does
         # nothing on a non-KDE desktop.
         self.homeModules.aerothemeplasma
+        # AeroSpace's Option-key bindings, on Alt, for KDE. Self-gates on the
+        # desktop being KDE, same as aerothemeplasma above.
+        self.homeModules.kde-shortcuts
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
       ];
