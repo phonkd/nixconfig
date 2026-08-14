@@ -1,17 +1,25 @@
-# AFFiNE self-hosted on 201-mono
+# AFFiNE self-hosted on 203-media
 
 **Repo(s):** nixconfig   **Status:** done
 
 ## Goal
 
-Add [AFFiNE](https://affine.pro) as a self-hosted note-taking workspace on
-`201-mono`, reachable at `https://affine.int.w.phonkd.net`, LAN/tailnet-only
+Add [AFFiNE](https://affine.pro) as a self-hosted note-taking workspace,
+reachable at `https://affine.home.phonkd.net`, tailnet-only
 (`ipfilter = true`), listed on the homepage dashboard.
 
 AFFiNE is a block-based docs/whiteboard app (Notion + Miro shaped). It is
 *additive*, not a replacement: `homelab-notes` keeps serving memos at
-`notes.int.w.phonkd.net` for quick captures, and the Obsidian home-module is
+`notes.home.phonkd.net` for quick captures, and the Obsidian home-module is
 untouched. Nothing migrates.
+
+> **Moved 201 → 203 after the first deploy.** It shipped on 201 alongside the
+> other `homelab-server` apps, then moved to `203-media` — the busy host — to
+> keep a container runtime off the box that fronts everything. The move was
+> free: it had 0 users, 0 workspaces and 16K of storage (the first-run admin
+> setup had never been done), so nothing was migrated. Routing and dashboard
+> stay on 201 via the usual two-block `lib.mkMerge`, exactly like
+> `ocis.nix` / `immich.nix`.
 
 ## Approach
 
@@ -27,9 +35,19 @@ containers: `affine`, a one-shot `affine_migration`, `redis`, and
 and Redis are ordinary NixOS services here, which keeps them inside the normal
 backup/observability/GC story instead of behind a container runtime:
 
+On 203 postgres is not even new: **immich already enables it**, so this module
+merges into the existing cluster rather than standing one up. Two consequences
+worth knowing before touching it — (1) do **not** set
+`services.postgresql.package`; immich leaves it at the nixpkgs default (17.10
+as deployed) and pinning 16 to mirror upstream's `pgvector:pg16` would aim a
+pg16 binary at a pg17 data dir, and (2) `extensions` is
+`functionTo (listOf path)`, which the module system merges by **concatenation**
+(verified with `lib.evalModules`, not assumed), so adding pgvector adds to
+immich's list instead of replacing it.
+
 | upstream compose | here |
 |---|---|
-| `postgres` (pgvector/pgvector:pg16) | `services.postgresql` + `extensions = ps: [ ps.pgvector ]` |
+| `postgres` (pgvector/pgvector:pg16) | existing `services.postgresql` on 203 + `extensions = ps: [ ps.pgvector ]` |
 | `redis` | `services.redis.servers.affine` on :6379 |
 | `affine_migration` | `affine-migrate.service`, a systemd one-shot `podman run --rm` |
 | `affine` | `virtualisation.oci-containers.containers.affine` |
