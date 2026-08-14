@@ -43,6 +43,30 @@
             url = "http://100.64.0.4:3100";
             query = ''{service_name="traefik"}'';
             labels.type = "traefik";
+            # Do NOT make startup depend on the tailnet being converged.
+            # By default the datasource probes <url>/ready for
+            # wait_for_ready (10s) before acquisition starts and a failure
+            # there is FATAL — crowdsec exits with "loki is not ready:
+            # context deadline exceeded". Loki is only reachable from 201
+            # over the tailnet (100.64.0.4; the wg-obs 10.9.0.1 path does
+            # not exist here — 201's wg0 is the client VPN on 10.8.0.0/24),
+            # and the tailnet takes 1-2 minutes to reconverge after
+            # activation restarts tailscaled. So every deploy was a coin
+            # flip; it lost on 2026-08-14 19:05:36 and rolled back an
+            # otherwise fine generation.
+            #
+            # no_ready_check skips that probe, so StreamingAcquisition
+            # returns immediately and the start job succeeds. The tail is
+            # not silently dropped: its background query loop retries with
+            # exponential backoff, logging "loki is not available, will
+            # retry for 10m0s" and then "loki is back after ...". Only
+            # after max_failure_duration of CONTINUOUS failure does the
+            # source give up and crowdsec exit — so a genuinely dead Loki
+            # still surfaces, it just no longer punishes a 2-minute tailnet
+            # reconvergence. (Upstream default is 30s, which is shorter than
+            # the reconvergence itself.)
+            no_ready_check = true;
+            max_failure_duration = "10m";
           }
         ];
         # LAPI on 127.0.0.1:8081 (not 8080 - that's traefik's own api entrypoint
@@ -96,6 +120,37 @@
             on_success = "break";
           }
         ];
+      };
+
+      # Both of these shell out to `cscli hub update`, which resolves and
+      # fetches cdn-hub.crowdsec.net — and on 201 a name lookup needs dnsmasq
+      # plus tailscaled, both of which activation restarts (see
+      # modules/dns.nix for dns-online.service and the full explanation).
+      #
+      # crowdsec already carries `Wants=network-online.target` from nixpkgs,
+      # but that target is reached on this host while the resolver is still
+      # down: on 2026-08-14 19:04:29 crowdsec-setup ran ~100ms BEFORE dnsmasq
+      # had finished starting and died with "Temporary failure in name
+      # resolution". The setup script is `set -euo pipefail`, so the whole
+      # ExecStartPre failed, switch-to-configuration exited 4 and deploy-rs
+      # discarded the generation.
+      #
+      # Note `Restart=` does not help here — crowdsec already has
+      # Restart=always/RestartSec=60 and the deploy still rolled back.
+      # switch-to-configuration-ng sets exit 4 the instant a *start job* ends
+      # with result `failed`, long before any restart timer runs. The only fix
+      # is for the start not to fail.
+      #
+      # crowdsec-update-hub is timer-driven so it never aborts its own deploy,
+      # but a unit left in `failed` aborts the NEXT one: switch-to-configuration
+      # also lists every failed unit on the system after activation settles.
+      systemd.services.crowdsec = {
+        after = [ "dns-online.service" ];
+        wants = [ "dns-online.service" ];
+      };
+      systemd.services.crowdsec-update-hub = {
+        after = [ "dns-online.service" ];
+        wants = [ "dns-online.service" ];
       };
 
       # autoUpdateService's crowdsec-update-hub oneshot runs as the

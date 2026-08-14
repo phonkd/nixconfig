@@ -56,6 +56,75 @@
     };
   flake.nixosModules."homelab-dns" = { config, pkgs, lib, ... }:
     {
+      # 201 resolves EVERYTHING through the dnsmasq below: /etc/resolv.conf is
+      # `nameserver 127.0.0.1`, and /etc/dnsmasq-resolv.conf (written by
+      # resolvconf from tailscaled) lists exactly one upstream —
+      # 100.100.100.100, Tailscale MagicDNS. So a name lookup on this host
+      # needs dnsmasq AND tailscaled, and an activation that restarts either
+      # (a nixpkgs bump restarts both) leaves the host with no DNS for
+      # anywhere from a second to a couple of minutes.
+      #
+      # `network-online.target` does not cover that. With scripted networking
+      # it pulls in only dhcpcd.service and network-addresses-ens18.service,
+      # so it is reached while the resolver is still down — every unit that
+      # (correctly) declares `Wants=network-online.target` is told the network
+      # is up while lookups still return "Temporary failure in name
+      # resolution". That is precisely how crowdsec's `cscli hub update`
+      # ExecStartPre died mid-activation on 2026-08-14 and took the whole
+      # deploy with it: switch-to-configuration exits 4 on any failed start
+      # job and deploy-rs discards the generation. See
+      # plans/201-activation-dns-race.md.
+      #
+      # This oneshot is the missing barrier — order a unit after it and it
+      # starts once lookups actually resolve. Two deliberate choices:
+      #
+      #   * NOT RemainAfterExit, so it re-runs (and re-gates) on every
+      #     activation instead of staying `active` from the last boot, which
+      #     would make it a no-op exactly when it is needed.
+      #   * It never fails. A timeout only means we stop waiting; the real
+      #     consumer still reports the real error. A barrier that failed would
+      #     itself be the `failed` unit that aborts the deploy.
+      #
+      # Fixing network-online.target itself would be more honest, but on this
+      # host traefik and authelia also wait on it, so it would delay the
+      # reverse proxy on every activation. Not worth it for three units.
+      systemd.services.dns-online = {
+        description = "Wait until DNS resolution actually works";
+        after = [
+          "network-online.target"
+          "dnsmasq.service"
+          "tailscaled.service"
+        ];
+        wants = [ "network-online.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          TimeoutStartSec = "180s";
+          ExecStart = lib.getExe (pkgs.writeShellApplication {
+            name = "wait-for-dns";
+            runtimeInputs = [
+              pkgs.getent
+              pkgs.coreutils
+            ];
+            text = ''
+              # A public name, so this exercises the whole chain
+              # (dnsmasq -> MagicDNS -> upstream) rather than one of the
+              # `address=` entries dnsmasq answers authoritatively by itself.
+              probe=one.one.one.one
+              i=0
+              while [ "$i" -lt 75 ]; do
+                if getent hosts "$probe" > /dev/null 2>&1; then
+                  exit 0
+                fi
+                sleep 2
+                i=$((i + 1))
+              done
+              echo "dns-online: '$probe' still does not resolve after 150s;" \
+                   "continuing without the barrier" >&2
+            '';
+          });
+        };
+      };
+
       services.dnsmasq = {
         enable = true;
         settings = {
