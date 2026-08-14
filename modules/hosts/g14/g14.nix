@@ -151,10 +151,11 @@ usb:v27C6p538D*
         # transitively via oldblac-vm), which supplies the nixremote key via
         # sops and pins 205's host key.
         #
-        # It targets the LAN address 192.168.3.205, so offload only happens on
-        # the home network. Off-LAN nix just falls back to building locally
-        # after the builder fails to answer -- which is the old behaviour, so
-        # nothing is lost; it is simply no longer the default at home.
+        # It targets 205 over the tailnet (100.64.0.2), so offload works from
+        # wherever the laptop is, not just on the home network. It used to
+        # point at the LAN address 192.168.3.205, which meant every off-LAN
+        # `deploy` silently fell back to compiling the closure on the laptop
+        # after the builder failed to answer.
         environment.systemPackages = [ self.packages.${pkgs.system}.deploy-cli ];
 
         boot.loader.systemd-boot.enable = false;
