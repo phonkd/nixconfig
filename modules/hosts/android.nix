@@ -10,7 +10,7 @@
   # `${pkgs.path}/lib/services/lib.nix`, so a rev older than home-manager fails
   # eval with "path .../lib/services/lib.nix does not exist".
   flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidConfiguration {
-    pkgs = import inputs.nixpkgs-unstable {
+    pkgs = import inputs.nixpkgs-android {
       system = "aarch64-linux";
       config.allowUnfree = true;
 
