@@ -12,8 +12,24 @@
     # Pinned ahead of nixpkgs-unstable purely to get Immich 3.0.2 (not yet
     # on nixpkgs-unstable's locked rev); used only for services.immich.package.
     nixpkgs-immich.url = "github:nixos/nixpkgs/e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3";
-    nixpkgs-android.url= "github:nixos/nixpkgs/88d3861acdd3d2f0e36176018218e51810df8a1";
-    home-manager-android.url = "github:nix-community/home-manager/release-25.11";
+    # nix-on-droid (modules/hosts/android.nix). PINNED as a pair, and both pins
+    # are load-bearing -- current nixpkgs/home-manager do not work on Android.
+    #
+    # The rev below is the one that was verified working on the phone in April
+    # 2026 (nixpkgs-unstable of 2026-01-21). It must be the *full* 40-char hash:
+    # a truncated 39-char rev is not a valid github ref and the flake will not
+    # even lock.
+    #
+    # home-manager is pinned to the rev this repo was locked to at that time,
+    # so the two stay the same era. Do NOT move either one on its own:
+    #  - a newer home-manager reads `${pkgs.path}/lib/services/lib.nix`, a file
+    #    the nixpkgs pin predates, and eval dies with
+    #    "path .../lib/services/lib.nix does not exist";
+    #  - an older home-manager (release-25.11 is older than this nixpkgs, not
+    #    newer) lacks options the shared homeModules use, e.g.
+    #    `programs.fzf.enableNushellIntegration`.
+    nixpkgs-android.url = "github:nixos/nixpkgs/88d3861acdd3d2f0e361767018218e51810df8a1";
+    home-manager-android.url = "github:nix-community/home-manager/0adb9993274f27168ec0d6c13ec292f03dc328d0";
 
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";

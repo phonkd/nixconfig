@@ -8,7 +8,7 @@
       ];
     };
   flake.homeModules.shell =
-    { pkgs, lib, config, ... }:
+    { pkgs, lib, config, options, ... }:
     {
       imports = [
         inputs.kubectl-aliases.homeManagerModules.default
@@ -142,7 +142,12 @@
         enable = true;
         enableZshIntegration = true;
         enableFishIntegration = false;
-        # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell is unused
+      }
+      # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell is
+      # unused. Guarded on the option existing because the android host pins a
+      # pre-May-2026 home-manager (see nixpkgs-android in flake.nix) that
+      # predates the option -- there, false is already the behaviour.
+      // lib.optionalAttrs (options.programs.fzf ? enableNushellIntegration) {
         enableNushellIntegration = false;
       };
       programs.btop = {

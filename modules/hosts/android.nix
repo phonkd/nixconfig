@@ -4,11 +4,10 @@
   ...
 }:
 {
-  # Android tracks nixpkgs-unstable rather than the 26.05 the other hosts pin,
-  # so it stays in step with home-manager (which follows master). Don't hand-pin
-  # a nixpkgs rev here: home-manager's services-modular reads
-  # `${pkgs.path}/lib/services/lib.nix`, so a rev older than home-manager fails
-  # eval with "path .../lib/services/lib.nix does not exist".
+  # Android is pinned to its own nixpkgs + home-manager pair (nixpkgs-android /
+  # home-manager-android in flake.nix), not the 26.05 the other hosts follow and
+  # not unstable. See the comment on those inputs: the pair has to stay in the
+  # same era as each other, and the rev is the one known to work on the phone.
   flake.nixOnDroidConfigurations."android" = inputs.nix-on-droid.lib.nixOnDroidConfiguration {
     pkgs = import inputs.nixpkgs-android {
       system = "aarch64-linux";
