@@ -43,6 +43,7 @@
         # Latest Claude Code from the claude-code-nix flake, not the lagging
         # nixpkgs claude-code (see the input comment in flake.nix).
         inputs.claude-code-nix.packages.${pkgs.system}.default
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.codex
       ];
       qt = {
         enable = false;
@@ -81,6 +82,7 @@
           "gtk-application-prefer-dark-theme" = lib.mkDefault 1;
         };
       };
+      programs.thunderbird.enable = true;
     };
   flake.nixosModules.desktop =
     {
@@ -198,7 +200,6 @@
         roomeqwizard
         warehouse
       ];
-
       services.flatpak.enable = true;
       xdg.portal.enable = true;
       services.pulseaudio.enable = false;
