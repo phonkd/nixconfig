@@ -207,6 +207,52 @@ usb:v27C6p538D*
           preset = "g14";
         };
 
+        # AirPlay audio *out*. g14 is the sender here: reachable AirPlay
+        # receivers become ordinary PipeWire sinks, so anything (browser,
+        # mpv, Spotify) can pick one as its output device. Receiving is the
+        # other stack entirely -- that is shairport-sync on 203-media, see
+        # modules/gigaplayer.nix.
+        #
+        # PipeWire already ships libpipewire-module-raop-{discover,sink} and
+        # the sender itself is fine: with the sink pointed straight at
+        # 203-media's shairport-sync (the snapserver AirPlay input, :5000) the
+        # RTSP handshake completes -- OPTIONS/ANNOUNCE/SETUP/RECORD all 200 --
+        # and snapserver's "Airplay" stream flips idle -> playing for as long
+        # as audio flows. Three things were missing around it:
+        #
+        # 1. avahi. module-raop-discover browses mDNS through avahi's client
+        #    library; with no daemon it finds nothing and no sink ever shows
+        #    up. Publishing stays off -- the laptop only browses, it does not
+        #    announce itself.
+        # 2. module-raop-discover is not in PipeWire's default module set, so
+        #    nothing loads it. Hence the drop-in below.
+        # 3. The firewall, which is what actually broke playback on the LAN.
+        #    RAOP hands the receiver a control and a timing port and the
+        #    receiver connects *back* to them; NixOS' default-deny input chain
+        #    drops that. The failure is silent and misleading: a Sonos answers
+        #    OPTIONS, POST /auth-setup and ANNOUNCE with 200 and then simply
+        #    never replies to SETUP, so the session hangs mid-handshake with
+        #    no error logged anywhere. Measured on this host beforehand: 25 s
+        #    of passive listening on wlp2s0 caught zero mDNS and zero SSDP
+        #    packets, on a LAN with three Sonos and an Apple TV on it.
+        #
+        # Scope: this drives AirPlay 1 (RAOP) receivers. It cannot drive
+        # anything that insists on HomeKit pairing -- PipeWire implements
+        # /auth-setup but not pair-setup/pair-verify, which is why the Apple
+        # TV on this LAN answers 403 Forbidden to the very first OPTIONS.
+        # Sonos speakers do speak the legacy path (they 200 the auth-setup and
+        # 403 an unencrypted ANNOUNCE, i.e. they want it), so they are the
+        # expected beneficiaries once the return path is open.
+        services.avahi = {
+          enable = true;
+          nssmdns4 = true;
+          openFirewall = true; # UDP 5353 in, or the discovery replies are dropped
+        };
+        services.pipewire.raopOpenFirewall = true; # UDP 6001-6002: RAOP control + timing
+        services.pipewire.extraConfig.pipewire."10-airplay" = {
+          "context.modules" = [ { name = "libpipewire-module-raop-discover"; } ];
+        };
+
         # Fingerprint reader (Goodix 27c6:521d): driven, provisioned, enrols --
         # and left DISABLED, because it cannot authenticate. See
         # plans/g14-fingerprint.md for the full write-up.
