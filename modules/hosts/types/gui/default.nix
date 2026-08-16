@@ -25,6 +25,10 @@
         # `gui` rather than `desktop-nixos-specific` so the Mac gets it too.
         self.homeModules.secretspec
       ];
+      home.packages = with pkgs; [
+        android-tools
+        unzip
+      ];
     };
   flake.homeModules.gui-nixos =
     {
@@ -106,7 +110,6 @@
         "zen"
         "firefox"
         "android-platform-tools"
-        "android-tools"
         "obsidian"
         "spotify"
         "claude-code@latest"
