@@ -31,6 +31,9 @@
         22
         8095 # noobservability API
       ];
+      environment.systemPackages = [
+        pkgs.claude-code
+      ];
 
       # llm-NOOBservability: natural-language questions -> LogQL/PromQL directly
       # against Loki/Mimir on the obs host, translated by qwen3.5:9b on 203's
@@ -58,7 +61,9 @@
 
       users.users.phonkd.extraGroups = [ "hermes" ];
 
-      sops.secrets."hermes-openrouter-key" = { owner = "hermes"; };
+      sops.secrets."hermes-openrouter-key" = {
+        owner = "hermes";
+      };
       # Discord config is split one env-var-per-secret (each decrypted file is a
       # single `KEY=VALUE` line). They were previously crammed into ONE secret
       # space-separated on a single line, so python-dotenv read the whole blob as
@@ -67,13 +72,21 @@
       #   hermes-discord      → DISCORD_BOT_TOKEN=<bot token>
       #   hermes-discord-users→ DISCORD_ALLOWED_USERS=<comma-separated user IDs>
       #   hermes-discord-home → DISCORD_HOME_CHANNEL=<channel ID>
-      sops.secrets."hermes-discord" = { owner = "hermes"; };
-      sops.secrets."hermes-discord-users" = { owner = "hermes"; };
-      sops.secrets."hermes-discord-home" = { owner = "hermes"; };
+      sops.secrets."hermes-discord" = {
+        owner = "hermes";
+      };
+      sops.secrets."hermes-discord-users" = {
+        owner = "hermes";
+      };
+      sops.secrets."hermes-discord-home" = {
+        owner = "hermes";
+      };
       # GITHUB_TOKEN (fine-grained PAT) — for the gh CLI only. The Copilot API
       # rejects PATs of any kind ("Personal Access Tokens are not supported"),
       # regardless of the Copilot Requests permission.
-      sops.secrets."hermes-github" = { owner = "hermes"; };
+      sops.secrets."hermes-github" = {
+        owner = "hermes";
+      };
       # COPILOT_GITHUB_TOKEN (gho_* OAuth token) — feeds the Copilot model
       # provider. Hermes resolves COPILOT_GITHUB_TOKEN > GH_TOKEN > GITHUB_TOKEN,
       # so this outranks the PAT above. Minted via the GitHub device-code flow
@@ -81,13 +94,17 @@
       # unless revoked or unused for ~a year. To re-mint: POST
       # github.com/login/device/code with that client_id, approve, poll
       # login/oauth/access_token, then update this secret.
-      sops.secrets."hermes-copilot" = { owner = "hermes"; };
+      sops.secrets."hermes-copilot" = {
+        owner = "hermes";
+      };
       # CLAUDE_CODE_OAUTH_TOKEN for the delegated Claude Code CLI (the bundled
       # autonomous-ai-agents/claude-code skill shells out to `claude`). Uses the
       # Claude Pro/Max subscription — generate once with `claude setup-token`
       # on a logged-in machine, no per-token API billing. REQUIRED before deploy:
       # sops-nix fails activation if this key is missing from secret.yaml.
-      sops.secrets."hermes-claude" = { owner = "hermes"; };
+      sops.secrets."hermes-claude" = {
+        owner = "hermes";
+      };
 
       services.hermes-agent = {
         enable = true;
@@ -101,7 +118,13 @@
         # curl: used by skills that hit HTTP APIs directly (e.g.
         # mimir-alerting) — NOT on the service PATH otherwise, only the
         # system profile has it.
-        extraPackages = [ pkgs.gh pkgs.claude-code pkgs.tmux pkgs.jq pkgs.curl ];
+        extraPackages = [
+          pkgs.gh
+          pkgs.claude-code
+          pkgs.tmux
+          pkgs.jq
+          pkgs.curl
+        ];
         # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
@@ -120,7 +143,10 @@
         # spotify. Auth is a one-time `hermes auth spotify` PKCE flow run on the
         # host; it captures the Spotify app client ID and persists the refresh
         # token in the state dir (~/.hermes), after which Hermes auto-refreshes.
-        settings.platform_toolsets.discord = [ "hermes-discord" "spotify" ];
+        settings.platform_toolsets.discord = [
+          "hermes-discord"
+          "spotify"
+        ];
         # Give Hermes semantic search over the personal-data archive.
         # Registered tool name: mcp_slop_trove_search_personal_data.
         settings.mcp_servers.slop_trove = {
