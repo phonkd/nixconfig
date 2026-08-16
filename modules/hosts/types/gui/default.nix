@@ -104,6 +104,7 @@
         "zen"
         "firefox"
         "android-platform-tools"
+        "android-tools"
         "obsidian"
         "spotify"
         "claude-code@latest"
