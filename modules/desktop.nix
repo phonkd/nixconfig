@@ -227,10 +227,23 @@
         enable = true;
       };
 
-      environment.systemPackages = with pkgs; [
+      environment.systemPackages = [
+        # `deploy <host> [branch]` -- the deploy-rs wrapper from
+        # modules/deploy.nix. Every NixOS desktop gets it, not just g14 (which
+        # carried it per-host until now): the deploy nodes in lib/registry.nix
+        # are tailnet IPs and modules/tailnet.nix enrols nixosDesktop hosts too,
+        # so `deploy 201` resolves from any of them. Nothing here makes a
+        # desktop deployABLE -- that is `deploy.hostname` in the registry, which
+        # no desktop sets; these are deploy *clients*.
+        #
+        # Offload is the other half and it does NOT come with the CLI: see the
+        # `builder-client` import next to each desktop in lib/registry.nix.
+        self.packages.${pkgs.system}.deploy-cli
+      ]
+      ++ (with pkgs; [
         sbctl
         slskd
-      ];
+      ]);
     };
   # Self-gating module: imports stay unconditional, but its config block
   # only activates when the host has an NVIDIA GPU. Safe to import into

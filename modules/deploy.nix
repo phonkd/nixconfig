@@ -20,8 +20,9 @@
 #      builds+deploys that git branch; `deploy --all` does every node;
 #      `deploy <host> --remote-build` builds on the target itself instead of
 #      offloading to 205 (fallback when the builder VM is offline); any other
-#      -flag (e.g. `--hostname`, `--ssh-opts`) is handed to deploy-rs. Wired onto
-#      the Mac in modules/hosts/mac.nix. The package attr is deploy-cli, NOT
+#      -flag (e.g. `--hostname`, `--ssh-opts`) is handed to deploy-rs. Wired
+#      onto the Mac in modules/hosts/mac.nix and onto every NixOS desktop in
+#      modules/desktop.nix (nixosDesktop gate). The package attr is deploy-cli, NOT
 #      deploy, so it doesn't collide with the flake.deploy output (deploy-rs
 #      evaluates `<flake>#deploy` and must get the schema, not this derivation).
 #

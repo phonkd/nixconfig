@@ -138,25 +138,11 @@ usb:v27C6p538D*
         # local SOCKS proxy. The HM `proxy` module is Mac-only now.
         networking.hostName = "g14";
 
-        # `deploy <host> [branch]` — deploy-rs wrapper (modules/deploy.nix),
-        # same CLI the Mac carries (modules/hosts/mac.nix). g14 is already on
-        # the tailnet, so the node hostnames in lib/registry.nix resolve from
-        # here too and `deploy 201` works off this laptop.
-        #
-        # g14 is x86_64-linux so it *can* build every homelab closure natively
-        # -- but "can" turned out to mean "does": running `deploy` from here
-        # compiled all of them on the laptop, which is slow and pointless while
-        # a builder VM sits idle. So the registry now also imports
-        # `builder-client` for g14 (the same module every homelab VM gets
-        # transitively via oldblac-vm), which supplies the nixremote key via
-        # sops and pins 205's host key.
-        #
-        # It targets 205 over the tailnet (100.64.0.2), so offload works from
-        # wherever the laptop is, not just on the home network. It used to
-        # point at the LAN address 192.168.3.205, which meant every off-LAN
-        # `deploy` silently fell back to compiling the closure on the laptop
-        # after the builder failed to answer.
-        environment.systemPackages = [ self.packages.${pkgs.system}.deploy-cli ];
+        # The `deploy` CLI used to be listed here, per-host. It is now part of
+        # the shared NixOS-desktop baseline in modules/desktop.nix, so blac gets
+        # it on the same terms rather than g14 being the one laptop that can
+        # deploy. The build-offload half still lives in lib/registry.nix as the
+        # `builder-client` import (see the comment there).
 
         boot.loader.systemd-boot.enable = false;
         boot.loader.limine = {

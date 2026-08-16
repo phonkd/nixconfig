@@ -47,6 +47,12 @@
       [
         /etc/nixos/hardware-configuration.nix
         self.nixosModules.blac
+        # blac runs `deploy` (the CLI comes from the shared desktop baseline in
+        # modules/desktop.nix). Same reason g14 has this: without it the desktop
+        # compiles every homelab closure itself instead of handing x86_64-linux
+        # off to 205-builder. Supplies the nixremote key via sops and pins 205's
+        # host key.
+        self.nixosModules.builder-client
       ];
   };
 
@@ -71,6 +77,12 @@
         # (they get it transitively via oldblac-vm). g14 runs `deploy` too, and
         # without this the laptop compiles every host's closure itself.
         # Supplies the nixremote key via sops and pins 205's host key.
+        #
+        # It targets 205 over the tailnet (100.64.0.2), so offload works from
+        # wherever the laptop is, not just on the home network. It used to point
+        # at the LAN address 192.168.3.205, which meant every off-LAN `deploy`
+        # silently fell back to compiling the closure on the laptop after the
+        # builder failed to answer.
         self.nixosModules.builder-client
       ];
   };
