@@ -45,6 +45,8 @@
         # AeroSpace's Option-key bindings, on Alt, for KDE. Self-gates on the
         # desktop being KDE, same as aerothemeplasma above.
         self.homeModules.kde-shortcuts
+        # `winver`, by AeroThemePlasma's author. Same self-gate again.
+        self.homeModules.linver
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
       ];
