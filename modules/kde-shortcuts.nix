@@ -36,7 +36,8 @@
 # …), and a global shortcut wins over the focused app. macOS has no such
 # convention, which is why this collision doesn't exist on the AeroSpace side.
 # `mod` below is the single knob: set it to "Meta" and the entire set moves
-# off Alt in one go.
+# off Alt in one go. The one binding that doesn't hang off `mod` is Meta+Q
+# (close window) -- see the note on it in the table.
 { inputs, ... }:
 {
   # Self-gating on KDE the same way modules/aerothemeplasma.nix is: imported
@@ -97,6 +98,11 @@
         "Window Quick Tile Right" = "${mod}+Shift+L";
         # alt-f = fullscreen
         "Window Fullscreen" = "${mod}+F";
+        # Meta+Q = close window. Deliberately *not* on `mod`: this is the
+        # Cmd+Q finger from the Mac landing on the key Windows/KDE users
+        # reach for, and Alt+Q is already a workspace key below. KDE's own
+        # Alt+F4 survives -- setShortcut appends the defaults.
+        "Window Close" = "Meta+Q";
       }
       // perDesktop "" "Switch to Desktop"
       // perDesktop "Shift+" "Window to Desktop";
@@ -126,6 +132,18 @@
         };
       };
 
+      # Bindings KDE ships that would fight one of ours. kglobalacceld keeps
+      # both registrations when two components claim the same key and the
+      # loser is decided at load order, so the collision has to be resolved
+      # here rather than left to chance. Keyed by kglobalshortcutsrc group
+      # (the component), valued by the action names to clear.
+      clearedShortcuts = {
+        # Meta+Q is Plasma's Activity Switcher out of the box, which is what
+        # "Window Close" above wants. Activities are unused here; the switcher
+        # is still reachable from the desktop context menu.
+        plasmashell = [ "manage activities" ];
+      };
+
       kconfig = pkgs.kdePackages.kconfig;
       shortcutsFile = "${config.xdg.configHome}/kglobalshortcutsrc";
       kwinrcFile = "${config.xdg.configHome}/kwinrc";
@@ -134,6 +152,17 @@
         lib.mapAttrsToList (
           action: keys: "  setShortcut ${lib.escapeShellArg action} ${lib.escapeShellArg keys}"
         ) kwinShortcuts
+      );
+
+      clearShortcutCalls = lib.concatStringsSep "\n" (
+        lib.flatten (
+          lib.mapAttrsToList (
+            component:
+            map (
+              action: "  clearShortcut ${lib.escapeShellArg component} ${lib.escapeShellArg action}"
+            )
+          ) clearedShortcuts
+        )
       );
     in
     {
@@ -196,7 +225,27 @@
                 "$merged,''${defaults:-none},$friendly"
             }
 
+            # Same three-field shape, but field 1 becomes the literal "none"
+            # (kglobalacceld's spelling for "unbound"). Fields 2 and 3 are read
+            # back and rewritten so "Reset to Defaults" still restores the key.
+            # A missing entry is left alone: kglobalacceld hasn't written that
+            # component's defaults yet, and inventing an entry with an empty
+            # friendly name is worse than picking it up on the next activation.
+            clearShortcut() {
+              component="$1"
+              action="$2"
+              current="$($kread --file ${shortcutsFile} --group "$component" --key "$action" || true)"
+              [ -n "$current" ] || return 0
+              defaults="$(printf '%s' "$current" | cut -d, -f2)"
+              friendly="$(printf '%s' "$current" | cut -d, -f3-)"
+
+              $kwrite --file ${shortcutsFile} --group "$component" --key "$action" \
+                "none,''${defaults:-none},$friendly"
+            }
+
           ${setShortcutCalls}
+
+          ${clearShortcutCalls}
 
             # The workspace keys above address nine virtual desktops, and KDE
             # ships with one -- without this most of them would be dead keys.
