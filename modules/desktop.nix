@@ -110,6 +110,32 @@
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
       services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
 
+      # --- KDE logs in to an empty desktop ------------------------------
+      # Plasma's default is loginMode=restorePreviousLogout: it saves the
+      # window list on logout and reopens the lot at the next login. Turned
+      # off here -- a login should start clean, not resurrect whatever was on
+      # screen when the machine was shut down.
+      #
+      # Values are ksmserver's own (`emptySession`, `restorePreviousLogout`,
+      # `restoreSavedSession`), verified against the strings in
+      # plasma-workspace's ksmserver and plasma-fallback-session-restore
+      # binaries rather than from memory -- the latter is the Wayland path
+      # that actually does the reopening in Plasma 6.
+      #
+      # /etc/xdg, not ~/.config, for the same reason as dolphinrc in
+      # modules/aerothemeplasma.nix: ksmserverrc is an ordinary KConfig file
+      # and cascades through XDG_CONFIG_DIRS, so this is a *default* that
+      # System Settings' "Desktop Session" page can still override into
+      # ~/.config/ksmserverrc. It also stays out of ksmserver's way: that
+      # file is rewritten at every logout with the saved-session groups, and
+      # a home.file symlink into the store would make it read-only.
+      environment.etc."xdg/ksmserverrc" = lib.mkIf (de == "kde") {
+        text = ''
+          [General]
+          loginMode=emptySession
+        '';
+      };
+
       # --- Quiet boot ---------------------------------------------------
       # Desktops boot behind Plymouth (aerothemeplasma.nix turns it on), so
       # the kernel/udev/stage-1 chatter underneath just flickers past the
