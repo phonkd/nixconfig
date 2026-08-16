@@ -110,6 +110,27 @@
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
       services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
 
+      # --- Quiet boot ---------------------------------------------------
+      # Desktops boot behind Plymouth (aerothemeplasma.nix turns it on), so
+      # the kernel/udev/stage-1 chatter underneath just flickers past the
+      # splash -- nobody reads it, and on a failed boot you drop to a console
+      # anyway. Deliberately NOT applied to servers: when one of those fails
+      # to come up, the verbose console is the entire diagnosis.
+      #
+      # The recipe is upstream's, from the boot.initrd.verbose docs. Note the
+      # two params NixOS already emits for us: `loglevel=` comes from
+      # boot.consoleLogLevel (kernel.nix), and `splash` from boot.plymouth
+      # (plymouth.nix) -- writing either here by hand would duplicate it.
+      boot.kernelParams = [
+        "quiet"
+        "udev.log_level=3"
+      ];
+      # 3 = KERN_ERR, not upstream's 0: silences the boot narration but still
+      # lets a real error reach the console. Also becomes the kernel.printk
+      # sysctl (mkDefault), so it governs runtime dmesg-to-console too.
+      boot.consoleLogLevel = 3;
+      boot.initrd.verbose = false;
+
       # --- Shared Linux-desktop baseline (was duplicated per host) ------
       networking.networkmanager.enable = true;
       networking.nameservers = [
