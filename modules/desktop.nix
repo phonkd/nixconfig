@@ -22,7 +22,6 @@
         cool-retro-term
         yubikey-manager
         wireguard-tools
-        affine
       ];
       xdg.enable = true;
       #news.display = "silent";
@@ -41,6 +40,13 @@
       home.packages = with pkgs; [
         dracula-theme
         yt-dlp
+        # AFFiNE desktop client for the self-hosted server on 201 (see
+        # plans/affine.md). Linux-only on purpose: on the Mac, HM apps are
+        # symlinks into /nix/store under ~/Applications/Home Manager Apps,
+        # and Spotlight indexes neither symlinks nor the store -- the app
+        # installs but is unlaunchable. The Mac gets the homebrew cask
+        # instead (modules/hosts/types/gui/default.nix).
+        affine
         # Latest Claude Code from the claude-code-nix flake, not the lagging
         # nixpkgs claude-code (see the input comment in flake.nix).
         inputs.claude-code-nix.packages.${pkgs.system}.default

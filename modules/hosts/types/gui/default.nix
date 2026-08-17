@@ -111,6 +111,13 @@
         "firefox"
         "android-platform-tools"
         "obsidian"
+        # Client for the self-hosted AFFiNE on 201 (plans/affine.md). A cask,
+        # not the nixpkgs `affine` in modules/desktop.nix: HM links apps as
+        # store symlinks under ~/Applications/Home Manager Apps, which
+        # Spotlight will not index, so a nix-installed GUI app is invisible in
+        # the Applications view on Tahoe. The cask also tracks 0.27.3, the
+        # version the server actually runs -- nixpkgs is on 0.26.6.
+        "affine"
         "spotify"
         "claude-code@latest"
         "codex"
