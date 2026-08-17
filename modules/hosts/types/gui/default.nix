@@ -88,6 +88,13 @@
         # sing-box SOCKS proxy: Mac-only (bedag work VPN + Spotify). NixOS
         # desktops don't import this -- they ride the tailnet.
         self.homeModules.proxy
+        # Spotlight-launchable nix apps. Reads ~/Applications/Home Manager Apps
+        # (the linkApps output) and writes a trampoline .app per bundle into
+        # ~/Applications/Home Manager Trampolines, on the boot volume where
+        # Spotlight will actually index it. Requires linkApps to stay enabled
+        # -- mac.nix sets it, and it is this module's *input*, not a rival to
+        # it. The nix-darwin half is in modules/builder.nix.
+        inputs.mac-app-util.homeManagerModules.default
         {
           # cava on macOS: portaudio can only read *input* devices, so system
           # audio is captured through the BlackHole loopback driver (cask

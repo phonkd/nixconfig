@@ -88,11 +88,20 @@ let
   ];
 
   # Darwin-side: cross-host feature modules.
-  alwaysImportDarwin = with self.darwinModules; [
-    gui-darwin # gated on host.is.darwinDesktop
-    aerospace # gated on host.is.darwinDesktop
-    dns # scoped /etc/resolver for *.w.phonkd.net → 201 over the tailnet
-  ];
+  alwaysImportDarwin =
+    (with self.darwinModules; [
+      gui-darwin # gated on host.is.darwinDesktop
+      aerospace # gated on host.is.darwinDesktop
+      dns # scoped /etc/resolver for *.w.phonkd.net → 201 over the tailnet
+    ])
+    ++ [
+      # Trampolines for /Applications/Nix Apps, so system-level nix apps are
+      # reachable from Spotlight. The home-manager half (for ~/Applications/
+      # Home Manager Apps) is imported next to the other HM modules in
+      # modules/hosts/types/gui/default.nix. See the input comment in flake.nix
+      # for why linkApps alone leaves apps unindexed.
+      inputs.mac-app-util.darwinModules.default
+    ];
 
   # Always-on Home Manager wiring. Safe on hosts with no HM users
   # (the user-import list stays empty and HM activation is a no-op).

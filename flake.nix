@@ -44,6 +44,22 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Makes nix-installed .app bundles launchable on the Mac. home-manager's
+    # `targets.darwin.linkApps` symlinks each bundle into ~/Applications/Home
+    # Manager Apps, but the symlink target lives on the /nix volume, which the
+    # nix installer mounts `nobrowse` -- the flag that tells Spotlight and
+    # Finder to skip a volume entirely. So the apps install correctly and are
+    # simply never indexed, and on Tahoe (where the Applications view is
+    # Spotlight-driven) they are unreachable. mac-app-util generates a
+    # "trampoline" -- a small real .app on the boot volume that launches the
+    # store one -- which Spotlight does index. Upstream is explicit that
+    # copying, symlinking and macOS aliases all fail here; the trampoline is
+    # the thing that works.
+    #
+    # Deliberately NOT following our nixpkgs: it is a Common Lisp program and
+    # its pinned nixpkgs gives a cached sbcl + ASDF closure (~20s to build).
+    # Repointing it at nixos-26.05 rebuilds that whole stack for no gain.
+    mac-app-util.url = "github:hraban/mac-app-util";
     # AeroThemePlasma -- the Windows 7 shell for Plasma 6 -- packaged for
     # NixOS. Sole consumer: modules/aerothemeplasma.nix.
     #
