@@ -22,7 +22,7 @@
         cool-retro-term
         yubikey-manager
         wireguard-tools
-        affine-bin
+        affine
       ];
       xdg.enable = true;
       #news.display = "silent";
