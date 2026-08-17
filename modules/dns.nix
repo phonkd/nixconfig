@@ -52,6 +52,11 @@
           "w.phonkd.net" = "100.64.0.5";
           "grafana.phonkd.net" = "100.64.0.5";
           "s3.phonkd.net" = "100.64.0.5";
+          # home.phonkd.net (home-assistant, orphans.nix) has a public A
+          # record pointing at 201's LAN IP (192.168.3.201), which is
+          # unreachable off the home LAN. Route it over the tailnet like the
+          # rest of homelab web.
+          "home.phonkd.net" = "100.64.0.5";
         };
       };
     };

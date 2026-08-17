@@ -137,6 +137,7 @@
         curl
         fd
         ripgrep
+        gh
       ];
       programs.fzf = {
         enable = true;
