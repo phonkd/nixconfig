@@ -14,6 +14,7 @@ in
         "${bedagSetup}/gitconfig.nix"
         "${bedagSetup}/jjconfig.nix"
         "${bedagSetup}/ica-proxy.nix"
+        "${bedagSetup}/tools.nix"
       ];
     };
 }

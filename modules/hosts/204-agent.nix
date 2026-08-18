@@ -124,6 +124,7 @@
           pkgs.tmux
           pkgs.jq
           pkgs.curl
+          pkgs.git
         ];
         # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
