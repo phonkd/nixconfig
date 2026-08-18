@@ -1,6 +1,6 @@
 # S3 browser for the public bucket
 
-**Repo(s):** `nixconfig`   **Status:** in-progress
+**Repo(s):** `nixconfig`   **Status:** done
 
 ## Goal
 
@@ -32,7 +32,7 @@ configured and drops straight into the bucket.
 - [x] Create the read-only Garage key and grant R on `public`.
 - [x] Store `s3-browser-key-id` / `s3-browser-secret-key` in sops.
 - [x] Add `modules/homelab/apps/s3-browser.nix` + register in `builder.nix`.
-- [ ] Deploy 201-mono and verify the listing renders and a download works.
+- [x] Deploy 201-mono and verify the listing renders and a download works.
 
 ## Open decisions
 
