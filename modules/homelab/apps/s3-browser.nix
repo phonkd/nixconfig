@@ -20,6 +20,24 @@
 # bridge to that. Host networking also means :3904 binds all interfaces, which
 # is fine -- 201's firewall opens only 22/80/443, so traefik reaches it on
 # loopback and nothing off-box can.
+#
+# Public at browse.s3.phonkd.net, not gated behind ipfilter/auth: the bucket's
+# objects are already world-readable one-by-one through the website endpoint,
+# so a browsable index of the same keys is not a new access grant. DNS is a
+# CNAME to ddns.phonkd.net (the record the cron in ddns.nix actually keeps
+# live) rather than copying `s3.phonkd.net`'s own CNAME to the bare apex --
+# the apex A record is not part of that cron and only happens to be current.
+#
+# The in-app "Public link" / "Download link" modal buttons on each object are
+# broken and CANNOT be fixed by reconfiguring this module: they build a raw,
+# unsigned `ENDPOINT/bucket/key` URL (s3manager's public_access.go), which
+# assumes a backend with an anonymous-read bucket policy. Garage has no such
+# mode -- every request to its S3 API is auth'd, website-serving is a
+# separate unauthenticated listener (see the top comment), so that URL 403s
+# no matter what ENDPOINT points at. The real, working public URL for any
+# object listed here is Garage's own website endpoint:
+# `https://s3.phonkd.net/<key>` (exact key, no bucket segment) -- that's what
+# to hand out instead of the button.
 {
   self,
   inputs,
@@ -46,12 +64,8 @@
           traefik = {
             enable = true;
             auth = false;
-            # Internal by default: the bucket's *contents* are public, but a
-            # listing of every key in it is new information. Flip to a
-            # `*.w.phonkd.net` domain with ipfilter = false to make the index
-            # itself public.
-            domain = "s3.home.phonkd.net";
-            ipfilter = true;
+            domain = "browse.s3.phonkd.net";
+            ipfilter = false;
           };
         };
       };
