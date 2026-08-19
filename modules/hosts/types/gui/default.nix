@@ -24,6 +24,10 @@
         # secretspec + the Bitwarden CLI, pointed at our Vaultwarden. Lives on
         # `gui` rather than `desktop-nixos-specific` so the Mac gets it too.
         self.homeModules.secretspec
+        # `claude-zai`: Claude Code pointed at Z.AI's GLM models. Same
+        # placement reasoning as secretspec above -- and it depends on it for
+        # the API key, so the two belong on the same module.
+        self.homeModules.claude-zai
       ];
       home.packages = with pkgs; [
         android-tools
