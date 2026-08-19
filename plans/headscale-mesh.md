@@ -156,16 +156,54 @@ _Update (2026-07-25) — everything homelab off sing-box; only work + Spotify le
 
 Net: sing-box carries **only** the bedag work VPN (additionalConfigFile) +
 Spotify. Everything homelab (ssh/deploy, obs, SMB, web) is on the tailnet.
+(Spotify since dropped as well — see "sing-box is now work-only" below.)
 
-**Pending the Mac `darwin-rebuild` (user-run) to apply + verify.** Check:
-`deploy observability` + `ssh observability` over the tailnet; a homelab web app
-in the browser (e.g. `https://dashboard.w.phonkd.net`) and `curl -I
-https://immich.w.phonkd.net` resolve to 100.64.0.5 and load; work DNS/ssh + a
-Spotify play still go via sing-box unchanged. Watch the browser path specifically
-— if a browser is configured to use sing-box as a system proxy (rather than the
-env vars), it may need a proxy bypass for `.phonkd.net`; the `/etc/resolver`
-scoping covers the resolver side but not a hard system-proxy setting. Roll back
-the darwin generation if anything's off.
+**APPLIED (verified 2026-08-19).** The Mac rebuild landed. The config the running
+sing-box actually loaded had exactly one route rule (the Spotify suffixes → `wg`),
+`proxy.ipRanges = []`, and no `.w.phonkd.net` — i.e. the homelab cutover above is
+live, not pending. Earlier "pending the Mac `darwin-rebuild`" notes in this plan
+are stale in the same way; treat the running config as the source of truth.
+
+## sing-box is now work-only (2026-08-19)
+
+Spotify-via-home is **dropped** (user directive: "nah dont need spotify"). That
+was the last non-work rule, so `modules/proxy.nix` no longer builds any route
+rules at all and the WireGuard outbound is retired: `~/.config/wg-endpoint.json`
+is no longer passed as a `--config`, and the `secretsFile` / `domains` /
+`ipRanges` / `wgLocalAddress` wrapper options and the dead `proxy.ipRanges`
+option + its generated `ProxyCommand` matchBlocks are all gone.
+
+What the module still exists for is narrow and worth stating, because it's the
+reason this can't just become privoxy: `~/git/bedag-setup/singbox.json` (the WORK
+repo, not this one) supplies six SOCKS outbounds and 18 routing rules but has **no
+`inbounds` and no `route.final`**. This repo supplies exactly those — the mixed
+HTTP+SOCKS listener on 127.0.0.1:2080 and a direct fallback.
+
+_Why not privoxy (checked against the privoxy 4.1.0 manual, not memory):_
+- Privoxy is **HTTP-only, no SOCKS inbound**. The work repo's `Host *` ssh
+  catch-all reaches port 2080 via `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`,
+  which would break outright.
+- Privoxy target patterns are **globbing, not CIDR** (the CIDR syntax in the docs
+  is only for `permit-access` ACLs), so the work rules on `172.29.187.0/24`,
+  `10.252.12.0/22`, `172.19.41.0/24` have no clean translation. Privoxy also
+  matches the hostname the client *sent*, where sing-box matches the *resolved*
+  destination IP.
+- Privoxy has no WireGuard — which is moot now that the wg outbound is gone, but
+  was the blocker while Spotify was in play. A `wg-quick` interface can't split by
+  domain, and a tailnet exit node is `0.0.0.0/0` all-or-nothing, forbidden on the
+  Mac by the HARD RULE below.
+
+_Verified before commit:_ `nix-instantiate --parse` on all three changed files
+(repo rule: no full evals); repo-wide grep for dangling refs to the removed
+options is clean; and `sing-box merge` of the new base + the work config diffed
+against the old three-file merge shows the **only** changes are the dropped
+Spotify rule and the dropped `wg` endpoint — all six work SOCKS outbounds, all 18
+work rules, the `mixed-in` inbound and `final: direct` are identical.
+
+**Pending the Mac `darwin-rebuild` (user-run — `deploy` only covers the 5 NixOS
+nodes).** After it: `curl -x http://localhost:2080` a work host still routes; `ssh`
+to a work host through the `Host *` catch-all still works; homelab web + `ssh
+201-mono` unaffected. Spotify will simply egress direct instead of via home.
 
 ## P2P / DERP-relay debugging (2026-07-26)
 
