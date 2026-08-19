@@ -39,17 +39,14 @@
             copyApps.enable = false;
             linkApps.enable = true;
           };
-          # sing-box now carries ONLY work + Spotify (user directive): the bedag
-          # work VPN (additionalConfigFile) and the Spotify suffixes (the
-          # `domains` list in the sing-box wrapper). Everything HOMELAB rides the
-          # headscale tailnet instead — hosts for ssh/deploy (Tailscale SSH by
-          # identity), observability, SMB, AND homelab web: `.w.phonkd.net` is
-          # out of the sing-box `domains` list and resolved to 201's tailnet IP
-          # (100.64.0.5) by the Mac's scoped dnsmasq (modules/dns.nix), reaching
-          # traefik over the mesh. Hence proxy.ipRanges is empty: no IP-CIDR
-          # splits, no generated ProxyCommand matchBlocks. Non-enrolled LAN boxes
-          # (Proxmox 192.168.3.47) are reached by ssh-jump through 203 — below.
-          proxy.ipRanges = [ ];
+          # sing-box now carries ONLY the bedag work setup — see modules/proxy.nix.
+          # Everything HOMELAB rides the headscale tailnet: hosts for ssh/deploy
+          # (Tailscale SSH by identity), observability, SMB, AND homelab web
+          # (`.w.phonkd.net` resolves to 201's tailnet IP 100.64.0.5 via the Mac's
+          # scoped dnsmasq in modules/dns.nix, reaching traefik over the mesh).
+          # Spotify-via-home was the last non-work rule and is gone too, which
+          # retired the WireGuard outbound. Non-enrolled LAN boxes (Proxmox
+          # 192.168.3.47) are reached by ssh-jump through 203 — below.
           # Finder SMB to 203 is now direct over the tailnet — no local forward:
           #   Finder > Cmd+K > smb://100.64.0.3
           # (203's samba `hosts allow` includes 100.64.0.0/10; see 203-media.nix.)
@@ -58,9 +55,9 @@
           # 100.64.0.4; see lib/registry.nix. Its non-tailnet break-glass
           # blocks are further down.)
           # ext-mail — same Hetzner :5432 + id_rsa. NB: 10.0.0.2 is the Hetzner
-          # private range and is NOT in proxy.ipRanges above, so sing-box only
-          # reaches it if the wg outbound already carries 10.0.0.0/8; if not,
-          # this fixes the port/key but the connection still won't route.
+          # private range, and sing-box no longer has any tunnel outbound at all,
+          # so this fixes the port/key but the connection only works from a
+          # network that can already route there.
           programs.ssh.matchBlocks."10.0.0.2" = {
             port = 5432;
             identityFile = "~/.ssh/id_rsa";

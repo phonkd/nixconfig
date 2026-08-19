@@ -85,8 +85,8 @@
     lib.mkIf config.noughty.host.is.darwinDesktop {
       home-manager.users.${config.noughty.user.name}.imports = [
         self.homeModules.gui
-        # sing-box SOCKS proxy: Mac-only (bedag work VPN + Spotify). NixOS
-        # desktops don't import this -- they ride the tailnet.
+        # sing-box SOCKS proxy: Mac-only, and now work-only (the bedag setup).
+        # NixOS desktops don't import this -- they ride the tailnet.
         self.homeModules.proxy
         # Spotlight-launchable nix apps. Reads ~/Applications/Home Manager Apps
         # (the linkApps output) and writes a trampoline .app per bundle into
