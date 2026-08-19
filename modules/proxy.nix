@@ -19,19 +19,58 @@
 # The SOCKS half of that listener is load-bearing: the work repo's `Host *` ssh
 # catch-all reaches it via `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`. That
 # is why this cannot simply become privoxy, which is HTTP-only.
+#
+# It runs as a launchd user agent rather than being started by hand. The
+# home-manager `launchd.agents` route is used, NOT `brew services`: brew's
+# sing-box formula does ship a service, but its plist hardcodes a single
+# `--config /opt/homebrew/etc/sing-box/config.json` and offers no way to add
+# arguments, so it cannot express the two-file merge above. Nothing about the
+# homebrew package is needed here — the nixpkgs build is the same 1.13.18.
 
 {
   flake.homeModules.proxy =
     { pkgs, config, ... }:
+    let
+      # bound once: the same derivation backs both the CLI on PATH and the agent,
+      # so the plist always points at the generation being activated.
+      sing-box-work = self.wrappers.sing-box-sel.wrap {
+        inherit pkgs;
+        additionalConfigFile = "${config.home.homeDirectory}/git/bedag-setup/singbox.json";
+      };
+    in
     {
       home.packages = [
-        (self.wrappers.sing-box-sel.wrap {
-          inherit pkgs;
-          additionalConfigFile = "${config.home.homeDirectory}/git/bedag-setup/singbox.json";
-        })
+        sing-box-work
         # for the work ssh catch-all's SOCKS ProxyCommand (see above)
         pkgs.socat
       ];
+
+      # The wrapper already carries `run --config … --config …`, so the agent
+      # only needs the binary itself.
+      launchd.agents.sing-box = {
+        enable = true;
+        config = {
+          ProgramArguments = [ "${sing-box-work}/bin/sing-box" ];
+          RunAtLoad = true;
+          # Restart on crash, but not on a clean exit. NB this is also what
+          # makes `http_proxy` below honest: it is exported into every shell
+          # unconditionally, so before this agent existed any shell opened while
+          # sing-box wasn't hand-started had its proxy pointing at a dead port.
+          KeepAlive = {
+            Crashed = true;
+            SuccessfulExit = false;
+          };
+          # If ~/git/bedag-setup/singbox.json is missing, sing-box exits at
+          # startup; back off instead of spinning.
+          ThrottleInterval = 30;
+          # Deliberately no `ProcessType = "Background"`, unlike the syncthing
+          # agent next door: this proxy sits in the interactive path (browsers,
+          # ssh) and should not take launchd's background I/O throttling.
+          StandardOutPath = "${config.home.homeDirectory}/Library/Logs/sing-box.log";
+          StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/sing-box.log";
+        };
+      };
+
       home.sessionVariables = {
         http_proxy = "http://localhost:2080";
         https_proxy = "http://localhost:2080";

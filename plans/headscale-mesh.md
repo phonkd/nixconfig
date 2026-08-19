@@ -200,10 +200,32 @@ against the old three-file merge shows the **only** changes are the dropped
 Spotify rule and the dropped `wg` endpoint — all six work SOCKS outbounds, all 18
 work rules, the `mixed-in` inbound and `final: direct` are identical.
 
+### …and it finally runs as a service
+
+sing-box had **never** been a service here — it was started by hand in a terminal
+(it was found running foreground on a tty), which also meant the unconditional
+`http_proxy=http://localhost:2080` in every shell pointed at a dead port whenever
+it wasn't. It is now a home-manager `launchd.agents.sing-box` user agent:
+`RunAtLoad`, `KeepAlive` on crash/non-zero exit, `ThrottleInterval = 30` so a
+missing work config backs off instead of spinning, logs to
+`~/Library/Logs/sing-box.log`. No `ProcessType = "Background"` (unlike the
+syncthing agent) — this one is in the interactive path.
+
+_Why not `brew services`, the original question that started this:_ the Homebrew
+formula **does** ship a service, but its plist hardcodes a single
+`--config /opt/homebrew/etc/sing-box/config.json` with no way to add arguments,
+so it cannot express the two-file merge (ours + the work repo's). Homebrew brings
+nothing else either — its sing-box is the same 1.13.18 as nixpkgs. Option names
+verified against the real home-manager launchd module source, and the four
+existing `org.nix-community.home.*` agents on this Mac prove the mechanism.
+
 **Pending the Mac `darwin-rebuild` (user-run — `deploy` only covers the 5 NixOS
-nodes).** After it: `curl -x http://localhost:2080` a work host still routes; `ssh`
-to a work host through the `Host *` catch-all still works; homelab web + `ssh
-201-mono` unaffected. Spotify will simply egress direct instead of via home.
+nodes).** One transition step: a hand-started sing-box is still holding
+127.0.0.1:2080, so kill it before/after activating or the agent can't bind
+(`launchctl list | grep sing-box`, check the log). After it: `curl -x
+http://localhost:2080` a work host still routes; `ssh` to a work host through the
+`Host *` catch-all still works; homelab web + `ssh 201-mono` unaffected. Spotify
+will simply egress direct instead of via home.
 
 ## P2P / DERP-relay debugging (2026-07-26)
 
