@@ -52,7 +52,6 @@
           "w.phonkd.net" = "100.64.0.5";
           "grafana.phonkd.net" = "100.64.0.5";
           "s3.phonkd.net" = "100.64.0.5";
-          "browse.s3.phonkd.net" = "100.64.0.5";
         };
       };
     };
@@ -176,8 +175,6 @@
             "/.w.phonkd.net/::"
             "/s3.phonkd.net/192.168.3.201"
             "/s3.phonkd.net/::"
-            "/browse.s3.phonkd.net/192.168.3.201"
-            "/browse.s3.phonkd.net/::"
             # Serve the coordinator's PUBLIC IP authoritatively to homelab
             # clients (89.167.83.90 = hs.phonkd.net's real A record). This is
             # what un-poisons STUN: VMs now resolve the public IP and STUN over
