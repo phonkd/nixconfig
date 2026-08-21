@@ -70,7 +70,6 @@ let
     homelab-ocis
     homelab-immich
     homelab-garage
-    homelab-s3-browser
     homelab-notes
     homelab-affine
     homelab-hermes
