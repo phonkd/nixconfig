@@ -2,7 +2,7 @@
 
 **Repo(s):** `nixconfig` (`modules/hosts/mac.nix`, later `modules/hosts/204-agent.nix`),
 plus possibly a small new harness repo for the benchmark set.
-**Status:** draft — written 2026-08-19, execution deferred.
+**Status:** draft — written 2026-08-24, execution deferred.
 
 ## Goal
 
@@ -72,10 +72,52 @@ that sleeps and roams cannot be a dependency of an always-on Discord agent. If
 routing goes hybrid: cheap/mechanical turns local, hard ones escalate to
 OpenRouter/Claude. The existing keys stay as the fallback path, not the default.
 
-**Model candidates** (4-bit, sized for the Mac): Qwen3.5 30B-A3B MoE (~17 GB,
-~3B active so fast, needs the wired-limit raise), Qwen3.5 14B (~8 GB, the likely
-daily driver), Qwen3.5 4B as the floor. All config strings — cheap to swap,
-which is exactly what phase 0 buys.
+## Model candidates
+
+4-bit, sized for the Mac: Qwen3.5 30B-A3B MoE (~17 GB, ~3B active so fast, needs
+the wired-limit raise), Qwen3.5 14B (~8 GB, the likely daily driver), Qwen3.5 4B
+as the floor. All config strings — cheap to swap, which is exactly what phase 0
+buys.
+
+### Evaluated and parked: Qwen3.8-27B + DFlash2 speculative decoding
+
+`z-lab/Qwen3.8-27B-DFlash2` (Apache-2.0, Aug 2026) is **not a standalone model** —
+it is a 2B *draft* model for speculative decoding against `Qwen/Qwen3.8-27B`
+(dense, 27B). DFlash2 is a block-diffusion drafter: it predicts a whole block of
+tokens per pass, and decoding is **lossless** — greedy output matches the target
+exactly, sampling preserves its distribution. So the speedup is genuinely free in
+quality terms, which is why it's worth recording rather than dismissing.
+
+It does not fit this hardware, for a reason worth writing down:
+
+| Component | Q4_K_M |
+|---|---|
+| `ggml-org/Qwen3.8-27B-GGUF` target | **~19 GB** |
+| `Qwen3.8-27B-DFlash2-GGUF` drafter | 1.1 GB |
+| + KV cache | — |
+
+That is >20 GB on a 24 GB machine whose default GPU wired limit is ~18 GB. Even
+after raising `iogpu.wired_limit_mb` it leaves ~3 GB for macOS *and* the daily
+driver work this laptop exists to do. It does not fit `blac` either — 19 GB does
+not go into 16 GB of VRAM. **Speculative decoding buys latency, not footprint:
+it adds a second model.** Our binding constraint here is memory, so this is the
+right technique aimed at the wrong bottleneck.
+
+Two further cautions found while checking:
+
+- The headline "4.6× / 70 tok/s" is from an **M5 Max**. llama.cpp PR #27342's own
+  Apple-Silicon benchmark — M5 Pro, Qwen3.8-27B Q4_K_M — reports **1.81×**.
+  Assume the ~1.8× figure, not the marketing one.
+- llama.cpp support is **PR #27342, still open** — a patched build, not upstream,
+  so not in nixpkgs and not declaratively installable today. The GGUF card's
+  `ollama run hf.co/z-lab/Qwen3.8-27B-DFlash2-GGUF` line is misleading: run alone
+  that serves the 2B *drafter* as if it were a chat model. Upstream DFlash docs
+  don't list ollama as a supported runtime at all.
+
+**Revisit when** any of: the llama.cpp PR merges and lands in nixpkgs; a DFlash2
+drafter ships for a model in the 14B class (only two exist today —
+Muse-Glimmer-30B and Qwen3.8-27B); or the local-model host becomes a box with
+≥32 GB. Until then it changes nothing about phases 0–3.
 
 ## Steps
 
@@ -96,7 +138,10 @@ which is exactly what phase 0 buys.
   uniform with the two NixOS hosts). Alternative: MLX (`mlx_lm.server`) for
   materially better Apple-Silicon throughput, at the cost of a bespoke,
   non-declarative launchd job. Revisit only if ollama's Metal speed is the
-  measured blocker.
+  measured blocker. Note that *any* speculative-decoding path (see DFlash2 above)
+  forces patched llama.cpp or MLX and gives up the declarative ollama route — so
+  treat "we want spec-decode" as the trigger to re-open this decision, not a
+  detail to bolt on later.
 - **Harness** — recommend **hermes-agent**; alternative is a purpose-built loop
   like `llm-NOOBservability`, which is right only if the task turns out narrow
   enough to hard-code.
