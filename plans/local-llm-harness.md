@@ -31,11 +31,63 @@ the experiment that tests that claim.
 | Host | Silicon | Usable for a model | Always on? |
 |---|---|---|---|
 | `Eliss-MacBook-Pro` | Apple M4 Pro, 24 GB unified | ~18 GB (default `iogpu.wired_limit_mb` ≈ 75%) | no — sleeps, roams |
-| `blac` | RTX 5080, 16 GB VRAM | 16 GB, best local silicon | **no** (noted at `203-media.nix:99`) |
+| `blac` | RTX 5080, 16 GB VRAM | 16 GB, best local silicon | **no** (noted at `203-media.nix:99`) — but see WoL below |
+| `blac` *(potential)* | 5080 16 GB **+ RTX 3080 10 GB** | **26 GB** — the only local box that clears 20 GB | on demand, via WoL |
 | `203-media` | RTX 3060 Ti, 8 GB | 8 GB, shared with Jellyfin NVENC | yes |
 
 That table is the whole tension: the two fast options are not always on, and the
 always-on option is small and already busy. It decides phase 4, not phase 1.
+
+### Wake-on-LAN to blac — the way out of that tension
+
+"Always on" and "on demand" are not the same requirement, and this plan
+conflated them. blac doesn't need to *stay* up; it needs to *come* up when a
+request arrives. That reframes it from disqualified to the strongest candidate.
+
+Two things make it interesting:
+
+- **A second GPU is on the table.** An RTX 3080 (10 GB) exists but is **not
+  installed — it doesn't fit the current small case.** With it, blac has
+  **26 GB of VRAM**, the only local hardware that clears 20 GB. That is the
+  difference between "14B is our ceiling" and "a 27B-class target plus a
+  speculative drafter fits" — it directly un-parks the DFlash2 option below.
+- **No WoL anywhere in this repo yet.** blac's NIC is `enp9s0`
+  (`modules/hosts/blac.nix:37`); the NixOS side is one option,
+  `networking.interfaces.enp9s0.wakeOnLan.enable = true`, plus enabling WoL in
+  firmware. The magic packet wants an always-on sender on the same LAN —
+  `203-media` is the natural one (`pkgs.wakeonlan`), and it already talks to
+  `204-agent` over `192.168.3.0/24`.
+
+Costs to weigh honestly before building on this:
+
+- **Physical work, not just config.** A bigger case (or a riser), PSU headroom
+  for two cards (~680 W of GPU alone, roughly), and slot spacing/thermals with
+  two cards sandwiched. None of that is a `deploy` — and the case is the reason
+  the 3080 isn't already in.
+- **PCIe lanes are a non-issue here, despite appearances.** AM5 (Ryzen X3D)
+  gives 24 usable CPU lanes — x16 PEG + 4 for a CPU-fed M.2 + 4 more — plus a
+  Gen4 x4 chipset uplink. Realistically the 5080 drops to Gen5 x8 (bifurcated)
+  and the 3080 lands on a chipset-fed x4, sharing that uplink with USB/SATA.
+  For **layer-split** inference that barely matters: weights are transferred
+  once at load, and per-token inter-GPU traffic is a few KB of activations.
+  Expect a slightly slower model load and essentially unchanged tokens/s. It
+  *would* matter for tensor parallelism (all-reduce every layer), which is
+  another reason the mismatched-card layer-split path is the right one. A Gen5
+  NVMe normally has its own CPU lanes, but on many boards populating the second
+  CPU-fed M.2 forces the PEG to x8 — check that board's shared-slot table
+  rather than assuming.
+- **Mismatched cards.** Blackwell + Ampere means two CUDA arches. llama.cpp /
+  ollama layer-splitting across unlike GPUs is fine; vLLM-style tensor
+  parallelism really wants matched pairs. Assume layer-split, and expect the
+  3080's layers to run at the 3080's pace.
+- **Cold-start latency is the real UX cost.** Wake (~30–60 s) *plus* paging
+  ~20 GB of weights into VRAM. For a Discord agent that answers in seconds
+  today, a cold first token is a visible regression — so pair WoL with tiered
+  routing (small always-on model on `203` for trivial turns, wake blac for the
+  heavy ones, cloud as the instant escape hatch) rather than treating it as a
+  drop-in replacement.
+- **Keeping it awake.** Whatever wakes blac also needs an idle-suspend policy,
+  or the "on demand" saving evaporates.
 
 Useful precedent: home-manager's `services.ollama` has a `launchd.agents.ollama`
 branch, so the Mac can serve **declaratively** — the same launchd-user-agent
@@ -116,8 +168,16 @@ Two further cautions found while checking:
 
 **Revisit when** any of: the llama.cpp PR merges and lands in nixpkgs; a DFlash2
 drafter ships for a model in the 14B class (only two exist today —
-Muse-Glimmer-30B and Qwen3.8-27B); or the local-model host becomes a box with
-≥32 GB. Until then it changes nothing about phases 0–3.
+Muse-Glimmer-30B and Qwen3.8-27B); or the local-model host gains the memory.
+
+**That last condition now has a live candidate.** blac with the 3080 added is
+26 GB — 19 GB target + 1.1 GB drafter + KV fits with room to spare, and it is
+the *only* local hardware that does. So DFlash2 is parked on **memory**, not on
+merit, and the blac two-GPU build is exactly what would un-park it. It still
+carries the two cautions above (expect ~1.8× on Apple Silicon and unknown-but-
+better on CUDA; llama.cpp support is an unmerged PR, so this path is a patched
+build either way). Nothing here changes phases 0–3, which stay on the Mac at
+14B.
 
 ## Steps
 
@@ -145,10 +205,15 @@ Muse-Glimmer-30B and Qwen3.8-27B); or the local-model host becomes a box with
 - **Harness** — recommend **hermes-agent**; alternative is a purpose-built loop
   like `llm-NOOBservability`, which is right only if the task turns out narrow
   enough to hard-code.
-- **Always-on host for anything hermes depends on** — `blac` (fastest, needs a
-  wake/always-on decision) vs `203` (always on, 8 GB shared with Jellyfin) vs
-  staying cloud. Deliberately deferred to phase 4; the phase 0–3 results should
-  decide it.
+- **Host for anything hermes depends on** — now leaning **`blac` woken by WoL**
+  rather than a permanently-on box, since "on demand" is the actual requirement
+  (see above). Alternatives: `203` (always on, but 8 GB shared with Jellyfin) vs
+  staying cloud. Deferred to phase 4; phase 0–3 results decide it.
+- **Whether to install the 3080 in blac** — a real hardware purchase (case,
+  possibly PSU), justified only if phases 0–3 show a local model earning its
+  keep at 14B. Decide *after* the benchmark, not before: 26 GB is the
+  prerequisite for the 27B+DFlash2 tier, so the sequencing is
+  measure → justify → buy, never the reverse.
 - **All-local vs hybrid routing** — recommend hybrid, given the deepseek scar.
 - **Tailnet exposure** — recommend never for the Mac endpoint; localhost only.
 
