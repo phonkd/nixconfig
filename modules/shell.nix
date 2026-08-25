@@ -138,6 +138,7 @@
         fd
         ripgrep
         gh
+        iftop
       ];
       programs.fzf = {
         enable = true;

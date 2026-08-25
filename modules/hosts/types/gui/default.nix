@@ -161,6 +161,7 @@
         "tailscale"
         "kde-connect"
         "bitwarden"
+        "orbstack"
       ];
       homebrew.brews = [
         "yt-dlp"
