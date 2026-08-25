@@ -61,6 +61,23 @@
 
       users.users.phonkd.extraGroups = [ "hermes" ];
 
+      # ALIBABA_CODING_PLAN_API_KEY — the Alibaba Cloud Model Studio "Coding
+      # Plan" subscription key, and the main model path since it replaced the
+      # metered OpenRouter one. Hermes ships the provider profile built in as
+      # `alibaba-coding-plan`: OpenAI-compatible endpoint
+      # https://coding-intl.dashscope.aliyuncs.com/v1, key read from
+      # ALIBABA_CODING_PLAN_API_KEY (or DASHSCOPE_API_KEY), base URL
+      # overridable with ALIBABA_CODING_PLAN_BASE_URL. Mint the key in the
+      # Model Studio console under the coding plan — a classic pay-as-you-go
+      # DashScope key belongs to dashscope-intl.aliyuncs.com and 401s here.
+      sops.secrets."hermes-alibaba" = {
+        owner = "hermes";
+      };
+      # OPENROUTER_API_KEY — no longer the model path (see settings.model
+      # below), kept only because the vision/image tools fall back to
+      # OpenRouter when the main provider can't serve them. Safe to drop this
+      # secret and its environmentFiles line once the coding plan has proven
+      # itself.
       sops.secrets."hermes-openrouter-key" = {
         owner = "hermes";
       };
@@ -126,7 +143,12 @@
           pkgs.curl
           pkgs.git
         ];
-        # Main model: deepseek-v4-flash on OpenRouter (hermes-openrouter-key).
+        # Main model: qwen3-coder-plus on the Alibaba coding plan
+        # (hermes-alibaba). Replaced deepseek-v4-flash on OpenRouter, which
+        # billed per token; the coding plan is a flat subscription. Other
+        # models the same key serves, if this one disappoints: qwen3.7-plus /
+        # qwen3.6-plus (general), qwen3-coder-next, kimi-k2.5, glm-5,
+        # MiniMax-M2.5 — swap `default` below, nothing else changes.
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
         # api.githubcopilot.com — but Hermes' credential pool in
@@ -134,7 +156,13 @@
         # GITHUB_TOKEN PAT, which outranks the OAuth token and 400s. To retry:
         # delete the credential_pool.copilot entries from auth.json, set
         # provider copilot / model gpt-5.4 here again, restart hermes-agent.
-        settings.model = "deepseek/deepseek-v4-flash";
+        # Hermes takes `model` as a bare string or as a mapping; the mapping is
+        # what pins the provider, so the model name stays unprefixed (the
+        # `vendor/model` form is OpenRouter routing syntax and would 404 here).
+        settings.model = {
+          default = "qwen3-coder-plus";
+          provider = "alibaba-coding-plan";
+        };
         settings.discord.require_mention = false;
         settings.approvals.mode = "auto";
         # Enable the native Spotify toolset for Discord (default-off). Hermes
@@ -155,6 +183,7 @@
           tools.include = [ "search_personal_data" ];
         };
         environmentFiles = [
+          config.sops.secrets."hermes-alibaba".path
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
           config.sops.secrets."hermes-discord-users".path
