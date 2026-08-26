@@ -143,11 +143,13 @@
           pkgs.curl
           pkgs.git
         ];
-        # Main model: qwen3-coder-plus on the Alibaba coding plan
+        # Main model: qwen3.7-plus on the Alibaba coding plan
         # (hermes-alibaba). Replaced deepseek-v4-flash on OpenRouter, which
-        # billed per token; the coding plan is a flat subscription. Other
-        # models the same key serves, if this one disappoints: qwen3.7-plus /
-        # qwen3.6-plus (general), qwen3-coder-next, kimi-k2.5, glm-5,
+        # billed per token; the coding plan is a flat subscription. The
+        # general-purpose flagship rather than a coder model, because this
+        # agent mostly answers on Discord and drives tools, and delegates
+        # actual code to the `claude` CLI. Other models the same key serves:
+        # qwen3.6-plus, qwen3-coder-plus / qwen3-coder-next, kimi-k2.5, glm-5,
         # MiniMax-M2.5 — swap `default` below, nothing else changes.
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
@@ -160,7 +162,7 @@
         # what pins the provider, so the model name stays unprefixed (the
         # `vendor/model` form is OpenRouter routing syntax and would 404 here).
         settings.model = {
-          default = "qwen3-coder-plus";
+          default = "qwen3.7-plus";
           provider = "alibaba-coding-plan";
         };
         settings.discord.require_mention = false;
