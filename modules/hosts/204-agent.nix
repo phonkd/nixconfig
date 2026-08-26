@@ -143,14 +143,17 @@
           pkgs.curl
           pkgs.git
         ];
-        # Main model: qwen3.7-plus on the Alibaba coding plan
-        # (hermes-alibaba). Replaced deepseek-v4-flash on OpenRouter, which
-        # billed per token; the coding plan is a flat subscription. The
-        # general-purpose flagship rather than a coder model, because this
-        # agent mostly answers on Discord and drives tools, and delegates
-        # actual code to the `claude` CLI. Other models the same key serves:
-        # qwen3.6-plus, qwen3-coder-plus / qwen3-coder-next, kimi-k2.5, glm-5,
+        # Main model: glm-5 on the Alibaba coding plan (hermes-alibaba).
+        # Replaced deepseek-v4-flash on OpenRouter, which billed per token; the
+        # coding plan is a flat subscription. GLM is one of the third-party
+        # models the plan resells alongside Alibaba's own — same key, same
+        # endpoint. Others it serves: qwen3.7-plus / qwen3.6-plus,
+        # qwen3-coder-plus / qwen3-coder-next, kimi-k2.5, glm-4.7,
         # MiniMax-M2.5 — swap `default` below, nothing else changes.
+        # Quirk to expect: Hermes carries a workaround for this API reporting
+        # "glm-4.7" as the model name whatever you asked for, but it only fires
+        # for provider `alibaba`, not `alibaba-coding-plan` — so if the agent
+        # ever misnames itself in chat, that's cosmetic, not a misrouted call.
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
         # api.githubcopilot.com — but Hermes' credential pool in
@@ -162,7 +165,7 @@
         # what pins the provider, so the model name stays unprefixed (the
         # `vendor/model` form is OpenRouter routing syntax and would 404 here).
         settings.model = {
-          default = "qwen3.7-plus";
+          default = "glm-5";
           provider = "alibaba-coding-plan";
         };
         settings.discord.require_mention = false;
