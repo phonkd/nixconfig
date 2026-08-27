@@ -162,6 +162,7 @@
         "kde-connect"
         "bitwarden"
         "orbstack"
+        "stats"
       ];
       homebrew.brews = [
         "yt-dlp"
