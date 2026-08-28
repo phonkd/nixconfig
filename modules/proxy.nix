@@ -12,9 +12,10 @@
 # repo — `~/git/bedag-setup/singbox.json` supplies six SOCKS outbounds
 # (127.0.0.1:30001-30006, the ssh -D gateway tunnels) plus the domain/ip_cidr
 # rules that pick between them. It has no `inbounds` and no `route.final`, so
-# this module's whole remaining job is to supply those: the mixed (HTTP+SOCKS)
-# listener on 127.0.0.1:2080 and a direct fallback. sing-box merges the two
-# files given as repeated `--config`.
+# this module's remaining job is to supply those: the mixed (HTTP+SOCKS)
+# listener on 127.0.0.1:2080 and a direct fallback — plus one homelab
+# concession, the `.phonkd.net` DNS route explained at the `dns` block below.
+# sing-box merges the two files given as repeated `--config`.
 #
 # The SOCKS half of that listener is load-bearing: the work repo's `Host *` ssh
 # catch-all reaches it via `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`. That
@@ -100,6 +101,35 @@
       config = {
         constructFiles.singBoxConfig.content = builtins.toJSON {
           log.level = "info";
+
+          # sing-box does its own name resolution, and its `local` server reads
+          # /etc/resolv.conf — which on macOS is the legacy file holding the
+          # work nameservers, NOT the scoped /etc/resolver/<domain> entries
+          # modules/dns.nix installs. Only mDNSResponder clients (Safari, curl
+          # without a proxy, anything going through getaddrinfo) see those. So
+          # every homelab name sent through this proxy resolved via public DNS
+          # to 192.168.3.201 — 201's LAN address, unroutable from anywhere but
+          # home — and the dial timed out, while the same URL in a proxy-less
+          # browser resolved 100.64.0.5 and worked over the tailnet.
+          #
+          # Fix: hand `.phonkd.net` to the local dnsmasq (127.0.0.1), which
+          # answers 100.64.0.5 for the internal zones and forwards the rest.
+          # Everything else keeps the system resolver, so work DNS is untouched.
+          dns = {
+            servers = [
+              {
+                type = "local";
+                tag = "local";
+              }
+              {
+                type = "udp";
+                tag = "homelab";
+                server = "127.0.0.1";
+              }
+            ];
+            final = "local";
+          };
+
           inbounds = [
             {
               type = "mixed";
@@ -109,11 +139,36 @@
             }
           ];
           outbounds = [
-            { type = "direct"; tag = "direct"; }
+            {
+              type = "direct";
+              tag = "direct";
+            }
+            # Dial-time resolution is a per-outbound field since sing-box 1.12
+            # and does NOT consult `dns.rules` — a `dns.rules` entry for
+            # `.phonkd.net` is silently ignored here (verified: still resolved
+            # 192.168.3.201). A second direct outbound carrying
+            # `domain_resolver` is the route that actually works.
+            {
+              type = "direct";
+              tag = "direct-homelab";
+              domain_resolver = "homelab";
+            }
           ];
-          # No rules here — the work config brings its own. Anything they don't
-          # match goes straight out.
-          route.final = "direct";
+          route = {
+            # Mandatory once a `dns` block exists (1.12 deprecation, hard error
+            # in 1.14). "local" is the implicit behaviour this config had before.
+            default_domain_resolver = "local";
+            # The only rule here — the work config brings its own and nothing in
+            # it touches phonkd.net. Anything neither set matches goes straight
+            # out.
+            rules = [
+              {
+                domain_suffix = [ ".phonkd.net" ];
+                outbound = "direct-homelab";
+              }
+            ];
+            final = "direct";
+          };
         };
         constructFiles.singBoxConfig.relPath = "etc/sing-box/config.json";
 
