@@ -105,7 +105,13 @@
               traefik = {
                 enable = true;
                 domain = "seerr.home.phonkd.net";
-                auth = false;
+                # Jellyseerr has its own login (and its own Jellyfin-backed
+                # accounts), so authelia is the outer lock only: bypassed from
+                # `internal`, deny otherwise. See the access_control rule
+                # naming this domain in authelia.nix. The rest of the *arr
+                # stack stays auth = false — same reasoning, they all carry
+                # their own auth, and none of them is reachable from outside.
+                auth = true;
                 ipfilter = true;
               };
             };

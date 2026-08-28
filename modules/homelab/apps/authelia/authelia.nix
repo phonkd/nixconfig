@@ -101,6 +101,16 @@
             # priv.s3.w, which never moved domain. Same reasoning, and the same
             # trap, as the tailnet entry in traefik's `ip-filter` allow-list.
             "100.64.0.0/10"
+            # These two exist purely to keep this list in step with that
+            # `ip-filter` allow-list (traefik.nix). A source that ip-filter
+            # calls "home" but this list does not is the worst case available:
+            # the request passes the firewall, matches no `networks =
+            # [ "internal" ]` rule, and falls through to
+            # default_policy = "deny" — a 403 with no login prompt and no way
+            # in. Harmless while a route is `auth = false`, which is why it
+            # went unnoticed; it bites the moment one is flipped on.
+            "192.168.2.0/24"
+            "10.8.0.0/16"
           ];
 
           access_control = {
@@ -117,6 +127,28 @@
               {
                 domain = "auth.home.phonkd.net";
                 policy = "bypass";
+              }
+              # Apps that carry their OWN login. Authelia is attached to them
+              # (`auth = true`) for one reason only: to be the second lock on
+              # the outside. From `internal` it must get out of the way, or
+              # every visit costs two logins for one session — Authelia's, then
+              # the app's — which is the opposite of single sign-on. Rules are
+              # first-match-wins, so this has to stay ABOVE the generic
+              # *.home.phonkd.net rule below.
+              #
+              # From anywhere else there is deliberately no rule: the request
+              # falls through to default_policy = "deny". traefik's ip-filter
+              # already 403s those sources, so this is defence in depth — it is
+              # what keeps them shut if a route is ever flipped to
+              # `ipfilter = false` by accident.
+              {
+                domain = [
+                  "paperless.home.phonkd.net"
+                  "seerr.home.phonkd.net"
+                  "affine.home.phonkd.net"
+                ];
+                policy = "bypass";
+                networks = [ "internal" ];
               }
               # Internal subdomain - one factor from internal network
               {

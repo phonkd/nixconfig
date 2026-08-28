@@ -16,7 +16,12 @@
           };
           traefik = {
             enable = true;
-            auth = false;
+            # Paperless has its own login, so authelia is here as the outer
+            # lock, not as a sign-on: bypassed from `internal`, deny otherwise
+            # (see the access_control rule naming this domain in authelia.nix).
+            # Belt and braces with ipfilter, which blocks the same sources one
+            # layer down.
+            auth = true;
             domain = "paperless.home.phonkd.net";
             ipfilter = true;
           };

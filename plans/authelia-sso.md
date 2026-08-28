@@ -1,6 +1,13 @@
 # Authelia SSO: feasibility + a secret-generation workflow
 
-**Repo(s):** nixconfig   **Status:** proposed
+**Repo(s):** nixconfig   **Status:** in-progress
+
+_Decisions locked (2026-08-28):_ **forward-auth is rejected as an SSO
+mechanism** — see "Why not forward-auth" below. Real OIDC is worth it for
+**Grafana and Immich only**; phonkd is configuring those two directly. Everything
+else either keeps its own login untouched, or gets `auth = true` purely as an
+outer lock with a `bypass` policy on the home net (paperless, seerr, affine —
+**done**, see "Lockdown" below).
 
 ## TL;DR
 
@@ -17,9 +24,15 @@ SSO is feasible and the groundwork is better than expected:
   routes. Turning on the OIDC provider is additive: forward-auth keeps working
   unchanged for everything that can't speak OIDC.
 
-The split is what matters. Of the routed apps, roughly a third can do **real
-OIDC**, a third can only do **forward-auth**, and a third **must not be touched
-at all** (API/protocol endpoints that break under a login redirect).
+But the useful scope is much narrower than "which apps support it". The
+question that decides each app is not *can it do SSO* — it's **does it have a
+login of its own already**. If it does, putting Authelia in front adds a
+login rather than removing one, and OIDC is only worth wiring if the app will
+treat the OIDC identity as its own account.
+
+That leaves **Grafana and Immich** as the entire SSO shortlist. Everything else
+either keeps its own login untouched, or gets Authelia attached purely as an
+outer deny layer that is bypassed at home.
 
 ## Where auth stands right now
 
@@ -40,10 +53,15 @@ pile of separate passwords.** Authelia's `access_control` already has the right
 shape for it (the `internal` network definition already includes the tailnet),
 it's just that almost no router is wired to the middleware.
 
-## Tier 1 — real OIDC (worth doing)
+## Tier 1 — real OIDC
 
 These speak OIDC natively and can be configured declaratively from this repo.
 Ordered by effort/reward.
+
+**Only the first two are being done** (and phonkd is configuring them directly
+— see the decision note at the top). The rest are recorded because "does this
+app support OIDC?" is the question that keeps getting re-asked, not because
+they are queued. See "Why not forward-auth" for why the list narrows to two.
 
 | app | how | notes |
 |---|---|---|
@@ -57,33 +75,86 @@ Ordered by effort/reward.
 | **AFFiNE** | OAuth provider config in `AFFINE_*` env | Support exists but has moved between releases; verify against the pinned version before committing to it. |
 | **Jellyfin** | `9p4/jellyfin-plugin-sso` | Plugin is not in nixpkgs — installed through Jellyfin's own catalogue, so it lives outside the config and survives rebuilds only because plugin state is in `/var/lib`. Works, but it's the one Tier-1 entry that makes the config less reproducible. |
 
-## Tier 2 — forward-auth only (no OIDC, but SSO-able today)
+## Why not forward-auth — the decision
 
-No OIDC support upstream, but they're plain web UIs behind traefik, so flipping
-`traefik.auth = true` gives single sign-on *right now* with zero new Authelia
-config. This is the cheapest real improvement in the whole document.
-
+An earlier draft of this plan called forward-auth "the cheapest real
+improvement in the document" and proposed flipping `traefik.auth = true` across
 `sonarr`, `radarr`, `lidarr`, `prowlarr`, `sabnzbd`, `slskd`, `syncthing`,
-`snapcast`, `hermes-dashboard`, `noobservability`, and the traefik dashboard.
+`snapcast`, `hermes-dashboard`, `noobservability` and the traefik dashboard.
 
-**The catch, and it's a real one:** forward-auth applies to the whole route,
-including `/api`. In principle that breaks:
+**That was wrong, and the reason is the thing forward-auth cannot do.**
 
-- Prowlarr → Sonarr/Radarr sync, and Seerr → Sonarr/Radarr
-- the homepage widgets (`HOMEPAGE_VAR_*_KEY` in `dashboard.nix`)
-- mobile clients (nzb360, LunaSea) and any script using the API key
+Forward-auth is a gate *in front of* an app. It does not log you *into* the
+app. So on any app that has its own account system, the result is:
 
-In practice they all talk to the backends by **LAN IP and port**
-(`192.168.3.203:8989`), not through traefik — every widget `url` in
-`arr-slime.nix` is a raw `http://192.168.3.203:PORT`. So they bypass traefik
-entirely and forward-auth never sees them. That should be **verified per app
-before flipping**, not assumed; the failure mode is silent (a sync quietly
-stops).
+1. Authelia's login page, then
+2. the app's own login page.
 
-Belt-and-braces alternative if something does break: an Authelia
-`access_control` rule with `resources = [ "^/api(/.*)?$" ]` and
-`policy = "bypass"` for that domain, leaving the API on its own API-key auth
-exactly as today.
+Two logins for one session — the exact opposite of single sign-on. And it
+isn't fixable per app, because **most of these tools have no way to turn their
+own auth off**. Jellyseerr, AFFiNE and Paperless all insist on an account;
+the *arr apps can drop to "no authentication" only by also opening themselves
+to anything that can reach the port. Trading a working app login for a
+different login in front of it buys nothing.
+
+Forward-auth is therefore kept for exactly two jobs, both of which it is
+genuinely good at:
+
+- **Apps with no auth of their own** — where it supplies the only login there
+  is. Today: the homepage dashboard, `priv.s3.w`.
+- **As an outer lock with a `bypass` policy** — attached to a route so that
+  *external* requests hit `default_policy = "deny"`, while the home net passes
+  straight through with no prompt. This is what the lockdown below does. It
+  adds a deny layer without adding a login.
+
+The `/api` problem that the earlier draft worried about is real but moot now:
+forward-auth applies to the whole route including `/api`, which would break
+Prowlarr→Sonarr sync, the homepage widgets and mobile clients. In practice
+those all reach the backends by raw LAN IP and port (`192.168.3.203:8989` —
+every widget `url` in `arr-slime.nix`), never through traefik, so they would
+have been unaffected. It stopped mattering the moment the flips were dropped.
+
+**Net effect on Tier 1:** the OIDC list narrows sharply too, for the same
+reason. OIDC is only worth the wiring where the app can then treat the OIDC
+identity as *its own* account — which is why **Grafana and Immich** are the
+whole shortlist. Paperless, Jellyseerr and AFFiNE technically support OIDC, but
+each would be a second identity source bolted onto an app whose local accounts
+already work; the payoff doesn't cover the config.
+
+## Lockdown — paperless, seerr, affine
+
+**Done.** These three keep their own logins and are now double-locked from
+outside, with nothing extra to type at home:
+
+| | |
+|---|---|
+| `traefik.ipfilter = true` | already set; traefik 403s any source outside the LAN/tailnet allow-list |
+| `traefik.auth = true` | *new* — attaches authelia as a second, independent deny layer |
+| authelia `access_control` | *new* — an explicit `bypass` rule naming the three domains for `networks = [ "internal" ]`, placed **above** the generic `*.home.phonkd.net` `one_factor` rule (first match wins) |
+
+From the home net: authelia returns 200 without a prompt, and you land on the
+app's own login. One login. From outside: ip-filter blocks it, and if that
+allow-list were ever misconfigured, authelia still falls through to
+`default_policy = "deny"`.
+
+### The trap this uncovered
+
+traefik's `ip-filter` allow-list and authelia's `definitions.network.internal`
+had **drifted apart**:
+
+| | ip-filter | authelia `internal` |
+|---|---|---|
+| `192.168.3.0/24`, `192.168.1.0/24`, `100.64.0.0/10` | yes | yes |
+| `192.168.2.0/24` | yes | **no** |
+| `10.8.0.0/16` | yes | **no** |
+
+A client on either of those two ranges passes the firewall, then matches no
+`networks = [ "internal" ]` rule, and falls through to
+`default_policy = "deny"` — a 403 with no login prompt and no way in. It was
+invisible while every `*.home` route was `auth = false`; the first flip would
+have surfaced it as "paperless is broken for some devices". Both ranges are now
+in `definitions.network.internal`, so "home" means the same thing to both
+layers. Keep them in step.
 
 ## Tier 3 — leave alone
 
@@ -229,12 +300,19 @@ a two-second paste and stays reviewable.
    so no host closure changed and there is nothing to deploy. Verified by
    creating a per-app file, adding a second key to it, decrypting it back, and
    running the full `sso-secret` flow.
-2. **Flip `traefik.auth = true`** on the Tier-2 internal apps, one at a time,
-   verifying each app's API consumers still work. Zero new Authelia config.
-3. **Enable the OIDC provider** (hmac + jwks secrets, empty client list).
+2. ~~Flip `traefik.auth = true` on the Tier-2 internal apps.~~ **Dropped** —
+   see "Why not forward-auth". The *arr stack, sabnzbd, slskd, syncthing,
+   snapcast, hermes-dashboard, noobservability and the traefik dashboard all
+   stay `auth = false`; they are already unreachable from outside via
+   `ipfilter`, and adding authelia in front would only add a second login.
+3. ~~**Lockdown of paperless / seerr / affine.**~~ **Done** — `auth = true` +
+   `ipfilter = true` + an internal `bypass` rule, and the
+   ip-filter/`internal` network drift fixed. See "Lockdown" above.
+4. **Enable the OIDC provider** (hmac + jwks secrets, empty client list).
    Deploy 201, confirm
    `https://auth.w.phonkd.net/.well-known/openid-configuration` answers.
-4. **Grafana, then Immich** — the two with the cleanest declarative story.
-   Proves the loop end to end.
-5. Paperless, Headscale, Proxmox, Jellyseerr as appetite allows.
-6. oCIS only if the payoff is worth a day of client-side debugging.
+   `sso-secret <app>` generates the per-client material from there.
+5. **Grafana, then Immich.** phonkd is doing these directly.
+6. Nothing else is queued. Headscale, Proxmox and oCIS remain documented in
+   Tier 1 in case the appetite ever returns; oCIS specifically is only worth it
+   if a day of client-side debugging is acceptable.

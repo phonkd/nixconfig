@@ -100,7 +100,10 @@
           };
           traefik = {
             enable = true;
-            auth = false;
+            # AFFiNE has its own account system, so authelia is the outer lock
+            # only: bypassed from `internal`, deny otherwise (see the
+            # access_control rule naming this domain in authelia.nix).
+            auth = true;
             inherit domain;
             ipfilter = true;
           };
