@@ -1,0 +1,32 @@
+# go-task wrapper around the tools the devshell already puts on PATH.
+#
+# The commands work bare too -- `sops-secret hermes.openrouterkey` is the same
+# thing with less typing. This file exists so `task --list` is a discoverable
+# index of them.
+#
+# go-task only forwards positional arguments after a `--`:
+#   task sso-secret -- grafana --redirect https://grafana.phonkd.net/...
+version: "3"
+
+tasks:
+  default:
+    cmds: [task --list]
+    silent: true
+
+  secret:
+    desc: "Add/update a sops secret: task secret -- <app>.<key> [value|--generate]"
+    cmds: ["sops-secret {{.CLI_ARGS}}"]
+
+  sso-secret:
+    desc: "Mint an Authelia OIDC client: task sso-secret -- <app> --redirect <uri>"
+    cmds: ["sso-secret {{.CLI_ARGS}}"]
+
+  fmt:
+    desc: "Format every .nix file in the repo"
+    cmds: ["nixfmt $(git ls-files '*.nix')"]
+
+  check:
+    desc: "Parse-check every .nix file (no evaluation -- see CLAUDE.md)"
+    cmds:
+      - for f in $(git ls-files '*.nix'); do nix-instantiate --parse "$f" >/dev/null || exit 1; done
+      - echo "all .nix files parse"

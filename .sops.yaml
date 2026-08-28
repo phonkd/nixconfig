@@ -4,3 +4,18 @@ creation_rules:
     age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"
   - path_regex: modules/homelab/global-secrets
     age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"
+  # Per-app secret files, one per app, written by `sops-secret <app>.<key>`
+  # (modules/devshell.nix). Without a rule here sops refuses to create a new
+  # file at all -- "no matching creation rules found" -- which is why
+  # modules/homelab/apps/authelia/authelia-secret.yaml had to be encrypted by
+  # hand. Same single age recipient as everything else -- one shared key, held
+  # by the Mac at ~/.config/sops/age/keys.txt and by every server at
+  # /home/phonkd/.config/sops/age/keys.txt (modules/homelab/sops.nix). So a new
+  # file needs no per-host re-encryption; this one recipient is enough.
+  - path_regex: modules/homelab/secrets/.*\.yaml$
+    age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"
+  # The older layout: <app>/<app>-secret.yaml next to the module. Kept so
+  # `sops` can re-encrypt the existing authelia file without a hand-built
+  # command line.
+  - path_regex: modules/homelab/apps/.*-secret\.yaml$
+    age: "age1jsnygd7gl62hzt06khdqkkjwa66v3snttmkep4wa5kl33luelfksdzytc6"
