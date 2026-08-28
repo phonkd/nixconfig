@@ -72,7 +72,6 @@ let
     homelab-ocis
     homelab-immich
     homelab-garage
-    homelab-notes
     homelab-affine
     homelab-hermes
 
