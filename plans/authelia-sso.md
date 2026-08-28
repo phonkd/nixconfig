@@ -23,13 +23,12 @@ at all** (API/protocol endpoints that break under a login redirect).
 
 ## Where auth stands right now
 
-Extracted from every `phonkds.modules.*` entry in the repo — 20 routed apps.
-Only three have `traefik.auth = true`:
+Extracted from every `phonkds.modules.*` entry in the repo — 19 routed apps.
+Only two have `traefik.auth = true`:
 
 | route | auth today |
 |---|---|
 | `dashboard.w.phonkd.net` (homepage) | forward-auth |
-| `easyeffects.home.phonkd.net` | forward-auth |
 | `priv.s3.w.phonkd.net` | forward-auth |
 
 Everything else is `auth = false`. The internal ones lean on `ipfilter = true`

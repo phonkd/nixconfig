@@ -1,5 +1,5 @@
 # Routing entries for services that don't run on the homelab itself --
-# external boxes (router, easyeffects on 203, oldblac PVE, etc.)
+# external boxes (router, oldblac PVE, etc.)
 # Belongs on the reverse-proxy host because these are pure routing
 # declarations consumed by traefik / dashboard.
 {
@@ -25,22 +25,6 @@
           dashboard = {
             enable = true;
             icon = "traefik";
-          };
-        };
-        easyeffects = {
-          ip = "192.168.3.203";
-          port = 8085;
-          dashboard = {
-            enable = true;
-            icon = "https://s3.phonkd.net/icons/ezfx.svg";
-          };
-          traefik = {
-            enable = true;
-            auth = true;
-            domain = "easyeffects.home.phonkd.net";
-            ipfilter = true;
-            extraMiddlewares = [ "vnc-root-rewrite" ];
-            transport = "insecureTransport";
           };
         };
         oldblac = {

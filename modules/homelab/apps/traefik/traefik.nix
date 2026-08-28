@@ -124,12 +124,6 @@
                 ];
               };
             };
-            vnc-root-rewrite = {
-              replacePathRegex = {
-                regex = "^/$";
-                replacement = "/vnc.html";
-              };
-            };
           };
           serversTransports = {
             insecureTransport = {
