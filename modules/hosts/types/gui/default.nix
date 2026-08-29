@@ -58,6 +58,9 @@
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
       ];
+      home.packages = [
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.opencode
+      ];
     };
   # NixOS-side GUI: gated on host.is.nixosDesktop (desktop set AND linux).
   # No `imports` needed -- system-minimal lives in alwaysImport directly.
