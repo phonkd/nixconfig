@@ -53,6 +53,10 @@
         # AeroSpace's Option-key bindings, on Alt, for KDE. Self-gates on the
         # desktop being KDE, same as aerothemeplasma above.
         self.homeModules.kde-shortcuts
+        # Wallpaper slideshow + panel visibility, driven through plasmashell's
+        # scripting API at login. Same self-gate again; the per-host knobs are
+        # `noughty.kde.*`, declared by the NixOS half in alwaysImport.
+        self.homeModules.kde-plasma-shell
         # `winver`, by AeroThemePlasma's author. Same self-gate again.
         self.homeModules.linver
         inputs.nix-index-database.homeModules.default
