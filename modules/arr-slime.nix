@@ -223,6 +223,18 @@
           sops.secrets."jellyfin-admin-password" = { };
           systemd.tmpfiles.rules = [
             "d /mnt/solo-sata/nixflix/downloads/usenet 0755 root root -"
+            # SABnzbd only creates a category's complete/ folder once a download
+            # of that category has actually finished, so an *arr that has never
+            # had a successful grab probes a path that isn't there and reports
+            # it as the generic "cannot see this directory / permissions error"
+            # health warning — what lidarr was hitting. Create them up front.
+            # sabnzbd:media 0775 matches the dirs sabnzbd made itself, and lets
+            # the *arr (all gid media) import and clean up afterwards.
+            "d /mnt/solo-sata/nixflix/downloads/usenet/complete 0775 sabnzbd media -"
+            "d /mnt/solo-sata/nixflix/downloads/usenet/complete/lidarr 0775 sabnzbd media -"
+            "d /mnt/solo-sata/nixflix/downloads/usenet/complete/sonarr 0775 sabnzbd media -"
+            "d /mnt/solo-sata/nixflix/downloads/usenet/complete/radarr 0775 sabnzbd media -"
+            "d /mnt/solo-sata/nixflix/downloads/usenet/complete/prowlarr 0775 sabnzbd media -"
             "d /mnt/solo-sata/nixflix/music 0775 slskd media -"
             "d /mnt/solo-sata/nixflix/downloads/slskd 0755 slskd slskd -"
             "d /mnt/solo-sata/nixflix/downloads/slskd/complete 0755 slskd slskd -"
