@@ -31,6 +31,13 @@
       ];
       networking.hostName = "blac";
 
+      # blac's screen is OLED, so the one permanently-lit element on it -- the
+      # taskbar -- gets hidden until the pointer asks for it. g14 is an LCD and
+      # deliberately keeps its panel; see modules/kde-plasma-shell.nix, which
+      # also drives the wallpaper slideshow (the other half of the same
+      # burn-in story, and on by default for every KDE host).
+      noughty.kde.panelAutoHide = true;
+
       networking.enableIPv6 = false;
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 

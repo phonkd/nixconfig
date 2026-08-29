@@ -47,6 +47,7 @@ let
     gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
     aerothemeplasma # gated on host.is.nixosDesktop AND desktop == "kde"
+    kde-plasma-shell # declares `noughty.kde.*`; the work is in the HM half
 
     # Server baseline (gated on host.is.server).
     server-globalconfig
