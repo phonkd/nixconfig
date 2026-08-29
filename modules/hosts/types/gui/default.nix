@@ -32,6 +32,7 @@
       home.packages = with pkgs; [
         android-tools
         unzip
+        heimdall
       ];
     };
   flake.homeModules.gui-nixos =
