@@ -65,6 +65,8 @@
       ];
       home.packages = [
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.opencode
+        pkgs.distrobox
+        pkgs.distrobox-tui
       ];
     };
   # NixOS-side GUI: gated on host.is.nixosDesktop (desktop set AND linux).

@@ -1,4 +1,9 @@
-{ withSystem, inputs, self, ... }:
+{
+  withSystem,
+  inputs,
+  self,
+  ...
+}:
 
 {
   flake.homeModules.work =
@@ -15,15 +20,12 @@
   #     self.modules.darwin.work-privoxy
   #   ];
   # };
-  flake.module.nixos."work" = { pkgs, lib, ...}: {
+  flake.module.nixos."work" = { pkgs, lib, ... }: {
     services.pcscd.enable = lib.mkForce true;
     programs.yubikey-manager.enable = lib.mkForce true;
     services.udev.packages = [ pkgs.yubikey-personalization ];
     environment.systemPackages = with pkgs; [
       yubioath-flutter
-      distrobox
-      distrobox-tui
-
     ];
   };
 }
