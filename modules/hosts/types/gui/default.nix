@@ -62,6 +62,7 @@
         self.homeModules.linver
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
+        self.homeModules.zed-editor
       ];
       home.packages = [
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.opencode
@@ -126,6 +127,7 @@
             };
           };
         }
+        self.homeModules.zed-editor
       ];
       homebrew.casks = [
         "zen"
@@ -142,7 +144,6 @@
         "spotify"
         "claude-code@latest"
         "codex"
-        "zed"
         "utm"
         "eqmac"
         "microsoft-teams"
