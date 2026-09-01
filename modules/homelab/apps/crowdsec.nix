@@ -12,7 +12,7 @@
       # see enroll note below) and in Grafana via the metrics scrape.
       services.crowdsec = {
         enable = true;
-        autoUpdateService = true;
+        autoUpdateService = false;
         # nixpkgs only builds crowdsec + cscli; the notification plugins
         # are separate go packages in the same repo that never get built,
         # so the plugin dir the module configures stays empty. Add the
