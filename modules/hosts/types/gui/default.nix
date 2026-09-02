@@ -127,6 +127,21 @@
             };
           };
         }
+        {
+          # Xcode itself can't be a nix package (proprietary, ~20 GB, and
+          # Apple gates the download behind an Apple ID login). `xcodes` is
+          # the installer CLI: `xcodes install --latest` authenticates,
+          # downloads, unxips and drops it in /Applications, and can hold
+          # several versions side by side. aria2 is optional but xcodes uses
+          # it for a much faster parallel download when present.
+          #
+          # Needed here because the yubioath-flutter Spotlight build shells
+          # out to xcodebuild -- Command Line Tools alone are not enough.
+          home.packages = [
+            pkgs.xcodes
+            pkgs.aria2
+          ];
+        }
         self.homeModules.zed-editor
       ];
       homebrew.casks = [
