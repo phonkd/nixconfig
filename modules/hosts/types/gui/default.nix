@@ -155,7 +155,20 @@
         "clipbook"
         "betterdisplay"
         "shottr"
-        "yubico-authenticator"
+        # No yubico-authenticator cask on purpose. The app in use is a local
+        # build of yubioath-flutter carrying a macOS 26 Spotlight / App Intents
+        # patch (find accounts from Spotlight, copy a code without opening the
+        # app), which the upstream cask does not have -- and both want
+        # /Applications/Yubico Authenticator.app, same bundle id.
+        #
+        # It can't be nix-managed either: nixpkgs' yubioath-flutter is
+        # x86_64-linux/aarch64-linux only, and the macOS build shells out to
+        # xcodebuild, which nix has no sandboxed way to provide.
+        #
+        # To (re)install: with Xcode 26+ selected, from the yubioath-flutter
+        # checkout run ./build-helper.sh then `flutter build macos`, and copy
+        # "build/macos/Build/Products/Release/Yubico Authenticator.app" into
+        # /Applications. See that repo's doc/MacOS_Spotlight.adoc.
         "caffeine"
         "linearmouse"
         "blackhole-2ch"
