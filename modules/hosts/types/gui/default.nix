@@ -174,6 +174,7 @@
         "bitwarden"
         "orbstack"
         "stats"
+        "vlc"
       ];
       homebrew.brews = [
         "yt-dlp"
