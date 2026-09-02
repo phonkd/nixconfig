@@ -33,6 +33,7 @@
           kn = "kubens";
           kgp = "kubectl get pods";
           kgpw = "watch kubectl get pods";
+          zed = "zeditor";
         };
         siteFunctions = {
           cpp = ''
