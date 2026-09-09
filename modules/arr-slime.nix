@@ -325,6 +325,19 @@
               enable = true;
               settings.misc.port = 8080;
               settings.misc.host_whitelist = "sabnzbd.home.phonkd.net";
+              # SABnzbd's own `inet_exposure` guard (default 0 = no external
+              # access) reads the *forwarded* client IP, not the TCP peer, so a
+              # request arriving through traefik is judged by whoever started
+              # it. With `local_ranges` empty it falls back to "is this a
+              # private address?", and the tailnet's 100.64.0.0/10 is CGNAT
+              # space rather than RFC1918 — so a tailnet client is treated
+              # exactly like 8.8.8.8 and gets a bare "External internet access
+              # denied" 403. Verified live from 201: X-Forwarded-For
+              # 192.168.3.50 -> 200, 100.64.0.6 -> 403, 8.8.8.8 -> 403.
+              # Spell out the ranges we consider local instead. These are
+              # startswith prefixes, not CIDRs — SABnzbd does string matching.
+              # Mirrors the tailnet entry in traefik's `ip-filter` middleware.
+              settings.misc.local_ranges = "192.168.,100.64.,10.,127.0.0.1";
               settings.misc.api_key = {
                 _secret = "/run/secrets/sabnzbd-api-key";
               };
