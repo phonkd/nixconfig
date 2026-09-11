@@ -50,9 +50,23 @@ deploy --list         # show deployable hosts
   deploy-rs too — e.g. `--ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"`
   if that block is ever missing (spell the key path out — `~` does not expand
   inside the quotes).
+  **It is not only tailscale bumps.** On 2026-09-11 `deploy 201` died the same
+  way with tailscale at 1.98.10 on both sides: `main` carried enough
+  undeployed changes that activation restarted `tailscaled.service` (plus
+  systemd, sshd, journald) anyway. If 201 hasn't been deployed in a while,
+  deploy it off-tailnet from the start: `deploy 201 --hostname 192.168.3.201`
+  (the `192.168.3.*` block jumps via 203's tailscale, not 201's — verified
+  working that day).
 - **Magic rollback is on**: if a host drops off the network after activating
   (e.g. you break its networking or the reverse proxy), it auto-reverts to the
   previous generation. This is the safety net for 201, which fronts everything.
+  **But a rollback does not restart what the failed activation stopped.** After
+  the 2026-09-11 failure above, 201 came back with traefik, dnsmasq,
+  authelia, vaultwarden, garage, syncthing, paperless, crowdsec and alloy all
+  `inactive` — everything behind the reverse proxy was down. After any failed
+  deploy, check `ssh 201-mono systemctl is-active traefik dnsmasq` immediately;
+  the fix is to redeploy the same ref over the non-tailnet path, which starts
+  them all.
 - **Git flake semantics — commit first.** `deploy 201` reads the flake at
   `~/git/nixconfig` = the *committed* HEAD; **uncommitted working-tree changes
   are NOT deployed**. Commit (to `main`, per the repo's workflow) before

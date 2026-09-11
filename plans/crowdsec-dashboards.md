@@ -1,7 +1,7 @@
 # crowdsec: Grafana dashboards instead of Discord pings
 
 **Repo(s):** nixconfig
-**Status:** draft
+**Status:** done (2026-09-11 — `bc8a6b2`, deployed to 201 + observability)
 
 ## Goal
 
