@@ -1,7 +1,9 @@
 # slop-trove: file storage sources (S3 / Samba / oCIS)
 
 **Repo(s):** `slop-trove` (code, packaging, NixOS module) + `nixconfig` (host wiring,
-secrets, mount). **Status:** approved
+secrets, mount). **Status:** on hold (2026-09-11) — file crawling is proposed
+to move to a nightly file index instead, see `plans/search-launcher.md`
+("one store or two"). Revisit if that plan keeps files in slop-trove.
 
 ## Goal
 
