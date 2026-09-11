@@ -38,7 +38,7 @@ carry `kind`, `platform`, `tags`, `extraModules`.
 | 201-mono | reverse-proxy, homelab-server, observability-sender | tailnet 100.64.0.5; LAN 192.168.3.201. Traefik :443 (api :8080, metrics :8083), homepage :8082, authelia :9091, vaultwarden :8000, paperless :28981, open-webui :11111, syncthing, garage, DNS |
 | 203-media | media-server, gigaplayer-server, observability-sender | tailnet 100.64.0.3; LAN 192.168.1.203 (ens18, default gw) + 192.168.3.203 (ens19, policy-routed table 203). nixflix *arr stack, jellyfin :8096 (NVENC, RTX 3060 Ti passthrough), sabnzbd :8080, slskd :5030, ollama :11434, oCIS :9200, samba shares. nftables firewall: everything open to 192.168.3.201 only |
 | 204-agent | observability-sender | tailnet 100.64.0.1. slop-trove; reaches 203's ollama over 192.168.3.0/24 |
-| observability (Hetzner) | observability-server, headscale coordinator (`hs.phonkd.net`) | tailnet 100.64.0.4 (ssh/deploy ride this). Loki :3100, Mimir :9009, Grafana :3000 still served on 10.9.0.1 over wg-obs (site-to-site via home router), which remains the metrics/log DATA plane |
+| observability (Hetzner) | observability-server, headscale coordinator (`hs.phonkd.net`) | tailnet 100.64.0.4 (ssh/deploy ride this). Loki :3100, Mimir :9009, Grafana :3000 served on the tailnet too — the metrics/log data plane moved there when wg-obs (`10.9.0.1`) was retired (`plans/retire-wg-obs.md`) |
 
 ## Exposing an app: the phonkds.modules registry
 
@@ -94,10 +94,10 @@ Senders (tag `observability-sender`) run Alloy: journal → Loki push, embedded
   reference `prometheus.remote_write.nixvms.receiver` directly. Gate it on
   `observability-sender` so the reference can't dangle (traefik.nix does this).
 - **Logs without journald**: Loki ingests OTLP natively at
-  `http://10.9.0.1:3100/otlp/v1/logs` (traefik ships app+access logs this way;
+  `http://100.64.0.4:3100/otlp/v1/logs` (traefik ships app+access logs this way;
   `experimental.otlpLogs = true` still required as of traefik 3.7).
-- **Reading Loki** (debugging): query API at `http://10.9.0.1:3100`
-  (`/loki/api/v1/query_range`, `.../labels`), reachable over wg-obs. Labels:
+- **Reading Loki** (debugging): query API at `http://100.64.0.4:3100`
+  (`/loki/api/v1/query_range`, `.../labels`), reachable over the tailnet. Labels:
   `component, hostname, job, service_name, unit`. Journal lines are
   `{service_name="loki.source.journal"}` filtered by `unit="foo.service"`.
   Traefik access logs are `{service_name="traefik"}` with each access-log field

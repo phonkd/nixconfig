@@ -44,10 +44,12 @@ deploy --list         # show deployable hosts
   reached "start units", leaving headscale/grafana/loki/mimir/alloy down. So
   when `git diff` on the lock/inputs touches tailscale, deploy over a
   non-tailnet path: `deploy 203 --hostname 192.168.1.203`,
-  `deploy observability --hostname 10.9.0.1` (wg-obs). Any other unrecognised
-  flag is forwarded to deploy-rs too — notably `--ssh-opts` for the obs rescue
-  path: `--ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"`
-  (spell the key path out — `~` does not expand inside the quotes).
+  `deploy observability --hostname 89.167.83.90` (obs's public IP — the
+  `obs-rescue-public` block in `mac.nix` matches it and supplies port 5432, the
+  key and `ProxyCommand none`). Any other unrecognised flag is forwarded to
+  deploy-rs too — e.g. `--ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"`
+  if that block is ever missing (spell the key path out — `~` does not expand
+  inside the quotes).
 - **Magic rollback is on**: if a host drops off the network after activating
   (e.g. you break its networking or the reverse proxy), it auto-reverts to the
   previous generation. This is the safety net for 201, which fronts everything.
@@ -106,7 +108,7 @@ so `deploy` rides the tailnet too.
   the WireGuard data session: a working `tailscale ping` with dead `ping`/ssh
   means a stale session — fix with `sudo systemctl restart tailscaled` on the
   far host (has happened live on obs).
-- Non-ssh traffic goes **direct, no proxy**: `curl http://10.9.0.1:3100/ready`.
+- Non-ssh traffic goes **direct, no proxy**: `curl http://100.64.0.4:3100/ready`.
 - In scripts use `ssh -o ConnectTimeout=8 -o BatchMode=yes` so an offline host
   fails fast instead of hanging.
 - **SMB**: `smb://100.64.0.3` directly (203's samba `hosts allow` includes
@@ -117,12 +119,12 @@ so `deploy` rides the tailnet too.
 - **sing-box still runs, but only for work + Spotify** (the bedag work VPN and
   the `domains` list in `modules/proxy.nix`). It is irrelevant to homelab ops —
   if it's down, homelab access is unaffected.
-- **Break-glass when the tailnet is broken**: obs's real sshd is on **:5432**,
-  reachable two non-tailnet ways, both wired up as aliases in `mac.nix` —
-  `ssh obs-rescue` (over wg-obs, `10.9.0.1`) and `ssh obs-rescue-public`
-  (obs's public IP `89.167.83.90`, works with wg-obs down too). The raw IPs
-  match the same blocks, so `ssh 10.9.0.1` / `ssh 89.167.83.90` work as well.
-  The blocks exist because those addresses otherwise fall through to the bedag
+- **Break-glass when the tailnet is broken**: obs's real sshd is on **:5432**
+  at its public IP — `ssh obs-rescue-public` (alias in `mac.nix`; the raw
+  `ssh 89.167.83.90` matches the same block). That is the only non-tailnet
+  path: the wg-obs tunnel (`10.9.0.1`) and its `obs-rescue` alias are gone
+  (`plans/retire-wg-obs.md`), so `10.9.0.1` answers 502 or nothing.
+  The block exists because that address otherwise falls through to the bedag
   `Host *` **socat SOCKS catch-all** (work repo, `modules/work/external.nix`)
   and fail as `peer might not be a socks4 server` / `Connection closed by
   UNKNOWN port 65535` — hence `ProxyCommand none`, plus the key obs actually
@@ -158,15 +160,17 @@ that's what lets deploy-rs and `systemctl restart` work non-interactively.
 Prefer Loki over ssh-journalctl when comparing across hosts or time ranges:
 
 ```
-curl -s 'http://10.9.0.1:3100/loki/api/v1/query_range' \
-  --data-urlencode 'query={host="203-media", unit="jellyfin.service"}' \
+curl -s 'http://100.64.0.4:3100/loki/api/v1/query_range' \
+  --data-urlencode 'query={hostname="203-media", unit="jellyfin.service"}' \
   --data-urlencode 'since=1h'
 ```
 
-(No proxy — 10.9.0.1 is the wg-obs tunnel and is reachable directly from the
-Mac. Mimir is `:9009` on the same host.)
+(No proxy — `100.64.0.4` is obs's tailnet IP, reachable from the Mac like any
+peer. The old wg-obs address `10.9.0.1` is gone. Mimir's PromQL API is
+`http://100.64.0.4:9009/prometheus/api/v1/query` on the same host.)
 
-(Label names unverified — check with `.../loki/api/v1/labels` first.)
+(Loki labels: `component, hostname, job, service_name, unit` — see
+`.../loki/api/v1/labels`.)
 
 ## Secrets hygiene (ops side — wiring is in the `nixconfig` skill)
 

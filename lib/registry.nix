@@ -15,8 +15,8 @@
 #   deploy      : { hostname = "<ip>"; }  (optional)
 #       Opt a NixOS host into `deploy <host>` (deploy-rs, modules/deploy.nix).
 #       Only entries that set this become deploy-rs nodes. hostname is the
-#       address the Mac reaches it at (LAN .3.x go through the sing-box SOCKS
-#       proxy via ~/.ssh/config; 10.9.0.1 over WireGuard). Per-host ssh quirks
+#       address the Mac reaches it at — the host's tailnet IP (100.64.0.x).
+#       Per-host ssh quirks
 #       (e.g. the hetzner VMs' :5432 sshd + id_rsa key) live in that host's
 #       programs.ssh.matchBlocks, not here — deploy-rs honors ~/.ssh/config.
 #
@@ -237,15 +237,14 @@
       "hetzner-vm"
       "observability-server"
       # Monitor the monitoring host itself: the sender module's push
-      # endpoints (10.9.0.1) are this host's own wg-obs address, so the
+      # endpoints (100.64.0.4) are this host's own tailnet address, so the
       # traffic just loops back locally.
       "observability-sender"
     ];
     username = "phonkd";
     # Management (deploy + ssh) now rides the headscale tailnet like every other
-    # host — Tailscale SSH by identity, no wg-obs, no sing-box. wg-obs still
-    # exists purely as the metrics/log DATA plane (senders push to this host's
-    # own 10.9.0.1) until Phase 3 retires it. Was 10.9.0.1 via WireGuard.
+    # host — Tailscale SSH by identity, no sing-box. The metrics/log data plane
+    # moved onto the tailnet too and wg-obs is gone (plans/retire-wg-obs.md).
     deploy.hostname = "100.64.0.4";
 
     extraModules =
