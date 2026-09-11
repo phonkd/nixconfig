@@ -131,11 +131,6 @@
       url = "github:phonkd/slop-trove";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # llm-noobservability: NL -> LogQL/PromQL querier against Loki/Mimir (own repo).
-    llm-noobservability = {
-      url = "github:phonkd/llm-NOOBservability";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs =

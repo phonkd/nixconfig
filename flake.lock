@@ -455,26 +455,6 @@
         "type": "github"
       }
     },
-    "llm-noobservability": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1786105600,
-        "narHash": "sha256-93wOhwlOVCaqAX3dBDNWjGLkVP4dP8eSU+uSli1HLws=",
-        "owner": "phonkd",
-        "repo": "llm-NOOBservability",
-        "rev": "bfaaa5914fdfb8fc1a5d99107f2273da90e2d4f2",
-        "type": "github"
-      },
-      "original": {
-        "owner": "phonkd",
-        "repo": "llm-NOOBservability",
-        "type": "github"
-      }
-    },
     "mac-app-util": {
       "inputs": {
         "cl-nix-lite": "cl-nix-lite",
@@ -1020,7 +1000,6 @@
         "home-manager-android": "home-manager-android",
         "import-tree": "import-tree",
         "kubectl-aliases": "kubectl-aliases",
-        "llm-noobservability": "llm-noobservability",
         "mac-app-util": "mac-app-util",
         "nix-darwin": "nix-darwin",
         "nix-index-database": "nix-index-database",

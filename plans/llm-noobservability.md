@@ -2,10 +2,10 @@
 
 **Repo(s):** new repo `llm-noobservability` (service code, package, NixOS module,
 flake) + `nixconfig` (flake input, host wiring on `204-agent`, traefik/dashboard
-entries). **Status:** in-progress — phase 1 and the phase-2 UI are deployed;
-0.2.5 repairs UI startup/rendering, stream UX, query normalization, stale
-asset delivery, and the first live PromQL quality failure found during browser
-testing (an empty CPU ratio caused by mismatched vector labels).
+entries). **Status:** retired (2026-09-11) — removed from nixconfig (flake
+input, 204-agent service, traefik route) because it was barely used. The repo
+still exists; re-adding means reverting that commit. History below: phase 1 and
+the phase-2 UI were deployed, last at 0.2.5.
 Code: github.com/phonkd/llm-NOOBservability.
 
 ## Goal

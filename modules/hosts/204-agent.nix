@@ -27,37 +27,10 @@
         }
       ];
       security.sudo.wheelNeedsPassword = false;
-      networking.firewall.allowedTCPPorts = [
-        22
-        8095 # noobservability API
-      ];
+      networking.firewall.allowedTCPPorts = [ 22 ];
       environment.systemPackages = [
         pkgs.claude-code
       ];
-
-      # llm-NOOBservability: natural-language questions -> LogQL/PromQL directly
-      # against Loki/Mimir on the obs host, translated by qwen3.5:9b on 203's
-      # ollama. API on :8095 (POST /api/ask, GET /api/health).
-      services.noobservability = {
-        enable = true;
-        lokiUrl = "http://100.64.0.4:3100";
-        mimirUrl = "http://100.64.0.4:9009/prometheus";
-        ollamaUrl = "http://192.168.3.203:11434";
-        model = "qwen3.5:9b";
-        extraContext = ''
-          Hosts (hostname label): 201-mono = reverse proxy (traefik, authelia,
-          vaultwarden, paperless, DNS), 203-media = media server (jellyfin,
-          *arr stack, sabnzbd, ollama), 204-agent = AI agents, observability =
-          Loki/Mimir/Grafana host.
-          Journal logs live in service_name="loki.source.journal"; select them
-          by unit + hostname.
-          Traefik access logs are service_name="traefik"; useful structured
-          fields: RequestHost, RequestPath, RouterName, ClientHost,
-          DownstreamStatus (sent to client), OriginStatus (what the backend
-          returned) - the two diverging isolates a backend fault from a
-          routing fault.
-        '';
-      };
 
       users.users.phonkd.extraGroups = [ "hermes" ];
 
