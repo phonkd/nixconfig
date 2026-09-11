@@ -1,0 +1,70 @@
+# Weekly flake.lock bump, opened as a PR whose body says what actually changes
+# version on the hosts (paperless-ngx 2.14.1 → 2.15.0) rather than which input
+# revs moved. scripts/flake-versions.sh evaluates every host's enabled services
+# and packages before and after the update -- evaluation only, nothing is built
+# here, so this says nothing about whether the new lock *builds*.
+#
+# Needs Settings → Actions → General → "Allow GitHub Actions to create and
+# approve pull requests", or the last step fails with a 403.
+name: flake-update
+
+on:
+  schedule:
+    - cron: "0 4 * * 1" # Mondays 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: flake-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Snapshot versions (current lock)
+        run: |
+          cp flake.lock "$RUNNER_TEMP/old.lock"
+          scripts/flake-versions.sh snapshot "$RUNNER_TEMP/before.json"
+
+      - name: Update flake.lock
+        id: update
+        run: |
+          nix flake update
+          if git diff --quiet flake.lock; then
+            echo "changed=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >>"$GITHUB_OUTPUT"
+          fi
+
+      - name: Snapshot versions (updated lock)
+        if: steps.update.outputs.changed == 'true'
+        run: scripts/flake-versions.sh snapshot "$RUNNER_TEMP/after.json"
+
+      - name: Write PR body
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          scripts/flake-versions.sh report \
+            "$RUNNER_TEMP/before.json" "$RUNNER_TEMP/after.json" \
+            "$RUNNER_TEMP/old.lock" flake.lock >"$RUNNER_TEMP/body.md"
+          cat "$RUNNER_TEMP/body.md" >>"$GITHUB_STEP_SUMMARY"
+
+      - uses: peter-evans/create-pull-request@v8
+        if: steps.update.outputs.changed == 'true'
+        with:
+          branch: flake-update
+          delete-branch: true
+          add-paths: flake.lock
+          commit-message: "flake.lock: weekly update"
+          title: "flake.lock: weekly update"
+          body-path: ${{ runner.temp }}/body.md
