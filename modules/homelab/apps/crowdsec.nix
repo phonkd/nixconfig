@@ -9,17 +9,12 @@
       # No phonkds.modules registry entry: the LAPI on 8081 is a
       # machine-to-machine REST API with no web UI, so a traefik route
       # would 404 forever. Dashboards live at app.crowdsec.net (console,
-      # see enroll note below) and in Grafana via the metrics scrape.
+      # see enroll note below) and in Grafana ("CrowdSec Metrics" and
+      # "CrowdSec Firewall Bouncer", modules/grafana-dashboards) via the
+      # Alloy scrapes at the bottom of this file.
       services.crowdsec = {
         enable = true;
         autoUpdateService = true;
-        # nixpkgs only builds crowdsec + cscli; the notification plugins
-        # are separate go packages in the same repo that never get built,
-        # so the plugin dir the module configures stays empty. Add the
-        # slack one (Discord speaks slack-webhook on a /slack suffix).
-        package = pkgs.crowdsec.overrideAttrs (old: {
-          subPackages = old.subPackages ++ [ "cmd/notification-slack" ];
-        });
         hub.collections = [
           "crowdsecurity/linux"
           "crowdsecurity/sshd"
@@ -93,19 +88,12 @@
         # script is broken too: the existence check on the token file is
         # inverted, and enroll would still hit the store path.)
         settings.general.api.server.console_path = "/var/lib/crowdsec/state/console.yaml";
-        # Notification plugins are spawned by crowdsec's plugin broker.
-        # Empty user/group makes the broker skip its setuid/setgid step so
-        # plugins simply inherit the crowdsec user — required here, since
-        # crowdsec runs non-root and can't switch uid (the upstream
-        # nobody/nogroup default only works for root deployments).
-        settings.general.plugin_config = {
-          user = "";
-          group = "";
-        };
         # The module ships NO profiles (upstream warns about this at eval),
         # which means alerts never become ban decisions — detection worked
         # but local remediation was a no-op. This is upstream's stock
-        # default_ip_remediation, plus the Discord notification hook.
+        # default_ip_remediation. No notifications: bans are watched in
+        # Grafana instead (a per-ban Discord ping used to live here and was
+        # dropped as noise).
         localConfig.profiles = [
           {
             name = "default_ip_remediation";
@@ -116,7 +104,6 @@
                 duration = "4h";
               }
             ];
-            notifications = [ "slack_default" ];
             on_success = "break";
           }
         ];
@@ -164,30 +151,6 @@
       # nothing new to pick up. Drop the broken post-hook.
       systemd.services.crowdsec-update-hub.serviceConfig.ExecStartPost = lib.mkForce [ ];
 
-      # The notification config embeds the Discord webhook URL, so it can't
-      # be a nix-store file (which localConfig.notifications would produce).
-      # Render it via sops-nix templating instead — same shared secret the
-      # Grafana alerting contact point uses — and symlink it into the
-      # notification dir below. Discord's slack-compatible endpoint is the
-      # plain webhook URL with /slack appended.
-      sops.secrets."discord_webhook_url" = { };
-      sops.templates."crowdsec-slack.yaml" = {
-        owner = config.services.crowdsec.user;
-        content = ''
-          type: slack
-          name: slack_default
-          log_level: info
-          format: |
-            {{range . -}}
-            {{$alert := . -}}
-            {{range .Decisions -}}
-            crowdsec {{$alert.MachineID}}: {{.Value}} gets {{.Type}} for {{.Duration}} after {{.Scenario}} — https://app.crowdsec.net/cti/{{.Value}}
-            {{end -}}
-            {{end -}}
-          webhook: ${config.sops.placeholder."discord_webhook_url"}/slack
-        '';
-      };
-
       # cscli loads the whole config on EVERY invocation and hard-fails if
       # the CAPI credentials file above doesn't exist yet - which deadlocks
       # the setup script's own `machine add` step, since `capi register`
@@ -213,32 +176,6 @@
           group = config.services.crowdsec.group;
           mode = "0600";
         };
-        # The plugin broker refuses plugin binaries not OWNED by the user
-        # crowdsec runs as — a symlink into the (root-owned) nix store
-        # fails that check, so copy the binary out and own it as crowdsec.
-        # C+ re-copies on every tmpfiles run, so package updates propagate.
-        #
-        # Set owner/mode as arguments ON the C+ line, NOT via a separate z
-        # line: the module owns the parent /etc/crowdsec/plugins as crowdsec,
-        # so a root-owned leaf (what C+ produces when mode/uid/gid are "-")
-        # is a crowdsec-dir → root-file "unsafe path transition". Modern
-        # systemd-tmpfiles aborts the WHOLE run (exit 73) on that, so the
-        # follow-up z never chowns, the plugin stays root-owned, and the
-        # crowdsec LAPI crash-loops refusing to load it (taking the firewall
-        # bouncer down with connection-refused). Copying straight to
-        # crowdsec:crowdsec keeps parent and leaf owners equal — no
-        # transition, one atomic op.
-        "/etc/crowdsec/plugins/notification-slack"."C+" = {
-          argument = "${config.services.crowdsec.package}/bin/notification-slack";
-          user = config.services.crowdsec.user;
-          group = config.services.crowdsec.group;
-          mode = "0750";
-        };
-        # Webhook config with the secret inline (see sops.templates above).
-        # Configs, unlike plugin binaries, may be symlinks.
-        "/etc/crowdsec/notifications/slack.yaml"."L+" = {
-          argument = config.sops.templates."crowdsec-slack.yaml".path;
-        };
       };
 
       # Enforcement: drops LAPI-banned IPs in the INPUT chain, ahead of
@@ -255,9 +192,26 @@
       # on the host after the first successful crowdsec start:
       #   sudo cscli bouncers add firewall-bouncer \
       #     --key "$(sudo cat /run/secrets/crowdsec-bouncer-api-key)"
-      # Ship crowdsec's own telemetry to Mimir: the nixpkgs module enables
-      # the Prometheus endpoint by default (127.0.0.1:6060, level "full"),
-      # but nothing scrapes it. Alloy (observability-sender, which this
+      sops.secrets."crowdsec-bouncer-api-key" = { };
+      services.crowdsec-firewall-bouncer = {
+        enable = true;
+        registerBouncer.enable = false;
+        secrets.apiKeyPath = config.sops.secrets."crowdsec-bouncer-api-key".path;
+        # Without this nothing listens on :60601 (checked on 201,
+        # 2026-09-11) — the nixpkgs module writes only what's set here. The
+        # fw_bouncer_* series (banned IPs, dropped packets/bytes per origin)
+        # feed the "CrowdSec Firewall Bouncer" Grafana dashboard.
+        settings.prometheus = {
+          enabled = true;
+          listen_addr = "127.0.0.1";
+          listen_port = "60601";
+        };
+      };
+
+      # Ship crowdsec's and the bouncer's telemetry to Mimir: the nixpkgs
+      # crowdsec module enables its Prometheus endpoint by default
+      # (127.0.0.1:6060, level "full"), the bouncer's is switched on above,
+      # but nothing scrapes either. Alloy (observability-sender, which this
       # host also is) loads every /etc/alloy/*.alloy file and cross-file
       # references work, so forward straight to the remote_write defined
       # in config.alloy — same pattern as pve.alloy in observability.nix.
@@ -270,13 +224,14 @@
           job_name   = "crowdsec"
           forward_to = [prometheus.remote_write.nixvms.receiver]
         }
-      '';
 
-      sops.secrets."crowdsec-bouncer-api-key" = { };
-      services.crowdsec-firewall-bouncer = {
-        enable = true;
-        registerBouncer.enable = false;
-        secrets.apiKeyPath = config.sops.secrets."crowdsec-bouncer-api-key".path;
-      };
+        prometheus.scrape "crowdsec_firewall_bouncer" {
+          targets = [{
+            "__address__" = "127.0.0.1:60601",
+          }]
+          job_name   = "crowdsec-firewall-bouncer"
+          forward_to = [prometheus.remote_write.nixvms.receiver]
+        }
+      '';
     };
 }
