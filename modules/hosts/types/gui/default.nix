@@ -203,6 +203,7 @@
         "orbstack"
         "stats"
         "vlc"
+        "citrix-workspace"
       ];
       homebrew.brews = [
         "yt-dlp"

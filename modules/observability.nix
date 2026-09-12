@@ -135,7 +135,10 @@
             replication_factor = 1;
           };
 
-          store_gateway.sharding_ring.replication_factor = 1;
+          store_gateway.sharding_ring = {
+            replication_factor = 1;
+            instance_addr = "127.0.0.1";
+          };
 
           # "filesystem" (not "local") so Mimir's own DynamicUser owns the whole
           # tree it writes into. The ruler config API (used by mimirtool, and by
