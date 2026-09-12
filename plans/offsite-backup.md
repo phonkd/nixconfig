@@ -1,10 +1,12 @@
 # offsite backup
 
-**Repo(s):** nixconfig   **Status:** draft
+**Repo(s):** nixconfig   **Status:** draft — target decided, not yet built
 
-_Decisions to lock before implementation:_ backup **level** (file-level restic vs
-image-level PBS), **target** (Infomaniak Swiss Backup vs a NAS at a second
-address), and the **capacity to order** — see *Open decisions*.
+_Decisions locked (2026-09-12):_ a **second location is available**, so the
+primary target is a **NixOS box there running `restic.server` in append-only
+mode**, ~CHF 500 for 2× 12 TB mirrored plus the box. Everything is
+**client-side encrypted by restic** (AES-256) regardless of target. A small
+Infomaniak Swiss Backup tier carries the crown jewels as a third copy.
 
 ## Goal
 
@@ -14,9 +16,7 @@ description. A dead disk on 203, a bad `rm`, or ransomware on the Samba share
 currently loses ~1.7 TB of irreplaceable files with no second copy anywhere.
 
 Target state: every irreplaceable byte lands **encrypted, incremental, weekly**
-in a second location, with the Jellyfin/*arr media pile deliberately excluded
-(it is re-downloadable and it is also the fastest-growing thing on the box).
-Cheap enough to not think about — budget on the order of CHF 10–20/month.
+in a second physical location, cheap enough to stop thinking about.
 
 ## What is actually there (measured, not estimated)
 
@@ -33,22 +33,21 @@ Pulled from Mimir (`node_filesystem_*`, 2026-09-12), so these are live figures:
 | 204-agent | `/` | 21 GB | 105 GB | — |
 
 **The estimate of "about 4 TB" is high.** Total used across the data mounts is
-3.4 TB, but that number *includes* the nixflix media. Excluding it, the backup
-set is Samba 1.66 TB + Garage 54 GB + Syncthing 63 GB + Immich + oCIS + a few GB
-of `/var/lib` service state — realistically **2–2.6 TB**.
+3.4 TB, but that includes the nixflix media. Excluding it, the backup set is
+Samba 1.66 TB + Garage 54 GB + Syncthing 63 GB + Immich + oCIS + a few GB of
+`/var/lib` service state — realistically **2–2.6 TB**.
 
-The one number still missing is the immich / oCIS / nixflix split inside
-`/mnt/solo-sata` (1 617 GB total). Measure it first — it decides the capacity to
-order, and it is one command:
+With 12 TB of usable space on the NAS, though, the exclusion stops being a
+budget question — see *Capacity*. The number still missing is the
+immich / oCIS / nixflix split inside `/mnt/solo-sata` (1 617 GB total):
 
 ```
 ssh 203-media 'du -shx /mnt/solo-sata/* /mnt/Shares/*'
 ```
 
-(Could not be run from this session: ssh from the background job fails at
+(Not runnable from the background job that wrote this: ssh there fails at
 `No user exists for uid 501` — macOS directory services do not answer in that
-context. Mimir over the tailnet did answer, which is where the table above comes
-from.)
+context. Mimir over the tailnet did, which is where the table comes from.)
 
 ### Finding that shapes the design
 
@@ -57,225 +56,260 @@ from.)
 
 - `/mnt/solo-sata/immich` — keep (irreplaceable photos)
 - `/mnt/solo-sata/ocis` — keep
-- `/mnt/solo-sata/nixflix/{tv,music,downloads}` — drop (re-downloadable, +191 GB/mo)
+- `/mnt/solo-sata/nixflix/{tv,music,downloads}` — re-downloadable, +191 GB/mo
 
 So "exclude the Jellyfin disk" **cannot be done at disk granularity** — the
-photos are on the same disk as the media. Any image-level scheme (Proxmox
-vzdump / PBS with `backup=0` on a disk) either backs up the whole 1.6 TB
-including the media, or needs the media moved to a new dedicated disk first.
-File-level backup selects by path and sidesteps this entirely.
+photos share a disk with the media. Any image-level scheme (Proxmox vzdump or
+PBS with `backup=0`) either stores the whole 1.6 TB or needs the media moved to
+its own disk first. File-level restic selects by path and sidesteps it.
 
 ## Approach
 
-**Phase 1 (recommended, do this first): file-level restic to S3, declared in this repo.**
+**restic, file-level, pushing to a NixOS NAS at the second location over the
+existing tailnet.**
 
-restic is the right tool here: content-defined chunking (true incrementals, only
-changed blocks upload), AES-256 client-side encryption by default, zstd
-compression, native S3 backend, and a first-class NixOS module
-(`services.restic.backups.<name>`, verified present in this flake's nixpkgs —
-`paths`, `exclude`, `passwordFile`, `environmentFile`, `initialize`,
-`pruneOpts`, `checkOpts`, `backupPrepareCommand`, `extraBackupArgs`,
-`timerConfig`).
+restic is the right tool: content-defined chunking (true incrementals — only
+changed blocks move), AES-256 client-side encryption *by default*, zstd
+compression, and a first-class NixOS module on both ends. All option names below
+are verified against this flake's nixpkgs.
 
-Why file-level rather than image-level, for *this* homelab specifically: every
-host's OS is fully declared in this flake and rebuilt by `deploy <host>`. The
-bytes of a NixOS root filesystem are reproducible; backing them up is paying to
-store something git already holds. What is *not* reproducible is the data. A
-disaster recovery here is `deploy <host>` + `restic restore` — and the first half
-of that is exercised every time anything ships, which is the only kind of
-restore path that is actually known to work.
+Why file-level rather than image-level, for *this* homelab: every host's OS is
+declared in this flake and rebuilt by `deploy <host>`. The bytes of a NixOS root
+filesystem are reproducible — backing them up pays to store what git already
+holds. What is *not* reproducible is the data. Disaster recovery here is
+`deploy <host>` + `restic restore`, and the first half of that is exercised
+every time anything ships, which is the only kind of restore path known to work.
 
-Two backup sets per host, because the data has two very different tempos:
+### The append-only trick (this is why a self-hosted target wins)
+
+The NAS runs `services.restic.server` with **`appendOnly = true`**. Hosts can
+create and read snapshots but **cannot delete them**. A root compromise on 201
+or 203 — the scenario where ransomware encrypts the Samba share and then goes
+looking for the backups — cannot destroy backup history. No S3 provider in the
+earlier comparison offers this as simply.
+
+Pruning still has to happen, and this is where the key handling matters:
+
+- **Hosts** push over `rest:http://<nas>:8000/<host>` — append-only, so their
+  credentials are useless for destruction.
+- **The Mac** prunes, checks and restores over `sftp:nas:/srv/restic/<host>`,
+  bypassing rest-server entirely with full rights, gated on its SSH key.
+
+The consequence worth stating plainly: **the NAS never holds the restic
+password.** If the box is stolen from the second location, the thief gets
+encrypted blobs and nothing else. That falls out of the design rather than
+needing full-disk encryption bolted on.
+
+### Backup sets
+
+Two per host, because the data has two very different tempos:
 
 | Set | Contents | Schedule | Size |
 |---|---|---|---|
 | `critical` | service state + DB dumps: `/var/lib/{vaultwarden,paperless,authelia-main,crowdsec,affine}`, `/var/lib/traefik/acme.json`, the *arr configs, `/var/lib/slop-trove/exports`, `/etc/ssh/ssh_host_*` | **daily** 03:00 | a few GB |
 | `bulk` | `/mnt/Shares`, `/mnt/solo-sata/{immich,ocis}`, `/mnt/syncthing/data`, `/mnt/s3/{data,meta}` | **weekly** Sun 02:00 | ~2–2.5 TB |
 
-Excluded everywhere: `/mnt/solo-sata/nixflix/**`, `/nix/store`, `/var/cache`,
-container image layers, Ollama models (re-downloadable, large), and
-`/var/lib/{loki,mimir}` on the observability host (regenerable telemetry).
+Excluded: `/nix/store`, `/var/cache`, container image layers, Ollama models
+(re-downloadable, large), `/var/lib/{loki,mimir}` (regenerable telemetry), and —
+for now — `/mnt/solo-sata/nixflix/**`.
 
 **Databases must be dumped, not copied.** restic walking a live Postgres data
-directory produces a torn, unrestorable backup. Per host:
+directory produces a torn, unrestorable backup.
 
-- **203-media** runs Postgres (Immich, and Affine shares that instance —
+- **203-media** runs Postgres (Immich; Affine shares that instance —
   `modules/homelab/apps/affine.nix:117`). `backupPrepareCommand` runs
-  `pg_dumpall --clean --if-exists` into a staging dir that `critical` then
-  picks up. Immich caveat: its vector extension means the restore path is
-  dump + reindex, not a raw file copy — verify against Immich's current
-  documented dump flags at implementation time.
-- **201-mono** is all SQLite (Vaultwarden, Paperless — this repo does not set
-  `database.createLocally`, whose nixpkgs default is `false`, so Paperless is
-  on SQLite, not Postgres — and Authelia at
-  `/var/lib/authelia-main/db.sqlite3`). Use `sqlite3 … ".backup"`, never a
-  plain copy. For Vaultwarden, prefer the module's own
-  `services.vaultwarden.backupDir` (it ships a daily SQLite `.backup` timer)
-  and point restic at that directory.
-- **Garage** (`/mnt/s3`, LMDB metadata) wants a consistent meta+data pair.
-  Simplest: stop `garage.service` for the seconds the snapshot takes in
-  `backupPrepareCommand`, restart in `backupCleanupCommand`. Alternative if
-  that downtime is unwanted: `rclone sync` the buckets out through Garage's own
-  S3 API into a staging dir instead.
+  `pg_dumpall --clean --if-exists` into a staging dir that `critical` picks up.
+  Immich caveat: its vector extension makes the restore path dump + reindex,
+  not a raw file copy — check Immich's current documented dump flags when
+  implementing.
+- **201-mono** is all SQLite (Vaultwarden; Paperless — this repo does not set
+  `database.createLocally`, whose nixpkgs default is `false`, so Paperless is on
+  SQLite; Authelia at `/var/lib/authelia-main/db.sqlite3`). Use
+  `sqlite3 … ".backup"`, never a plain copy. For Vaultwarden prefer the module's
+  own `services.vaultwarden.backupDir`, which already ships a daily SQLite
+  `.backup` timer, and point restic at that directory.
+- **Garage** (`/mnt/s3`, LMDB metadata) needs a consistent meta+data pair. Stop
+  `garage.service` for the seconds the snapshot takes in `backupPrepareCommand`,
+  restart in `backupCleanupCommand`. Alternative if that downtime is unwanted:
+  `rclone sync` the buckets out through Garage's own S3 API into a staging dir.
 
-**Phase 2 (optional, decide later): Proxmox Backup Server → S3 for whole-VM images.**
-PBS 4.2 (April 2026) promoted S3-backed datastores out of tech preview, so PBS
-can push deduplicated, encrypted, incremental VM images straight to the same
-Swiss Backup bucket. What it buys over Phase 1: click-to-restore an entire VM,
-and coverage of the Proxmox host itself, which is the one machine in the fleet
-*not* declared in this repo. What it costs: a Debian VM to maintain (non-
-declarative, against the grain here), a local cache disk, and either backing up
-the 1.6 TB media pile or first splitting it onto its own disk. Note PBS does not
-support S3 Object Lock — enabling it on the bucket corrupts the datastore.
+### Third copy: crown jewels to Infomaniak
 
-A cheap middle ground that captures most of Phase 2's value for ~nothing: have
-`critical` on 201 also pick up a nightly `vzdump`-style dump of the **Proxmox VM
-configs** (`/etc/pve`, a few KB of text). VM configs plus this flake plus the
-restored data is a complete rebuild recipe without storing a single OS image.
+The NAS gives two copies in two places. It does not cover *both* failing — the
+NAS dying unnoticed, then something happening at home. The fix is cheap: a
+**200 GB Infomaniak Swiss Backup tier at CHF 2.40/month** (CHF 29/year) holding
+only the small irreplaceable things — Vaultwarden, Paperless documents, the
+Immich database dump, Authelia, sops secrets, personal documents. Same restic,
+same encryption, second repo, monthly.
+
+That is a real 3-2-1: three copies, two media, one offsite (two, in fact).
+
+## Encryption
+
+Asked for explicitly, and the answer is that it is not optional — **restic has
+no unencrypted repository format.** Every blob is AES-256 encrypted with
+Poly1305-AES authentication before it leaves the host; the repository key is
+derived from the password via scrypt. Infomaniak, and anyone holding the NAS,
+sees only ciphertext plus coarse structure (how many blobs, roughly how large).
+This is identical for the NAS and the cloud tier — one mechanism, both targets.
+
+Full-disk encryption on the NAS (LUKS or ZFS native) is **not recommended on
+top**: the contents are already encrypted, the only extra gain is hiding
+snapshot metadata, and the cost is real — a headless box at someone else's
+address either needs a passphrase typed at every boot (it will eventually reboot
+when you are not there) or a keyfile on the boot disk, which defeats the theft
+protection it was added for. The design above already keeps the password off the
+NAS, which is the protection that actually matters.
+
+**The password is the whole ballgame.** Lose it and the repository is
+unrecoverable by design. It cannot live in Vaultwarden — Vaultwarden is *inside*
+the backup, so that is a circular dependency that fails exactly when needed.
+Printed copy plus the Mac's password manager, both off every machine being
+backed up.
 
 ## Cost
 
-**Infomaniak Swiss Backup** is a good fit and the published rates support the
-instinct: capacity-based billing with **unmetered traffic** (no egress or
-per-request fees), S3 + Swift + SFTP endpoints, restic explicitly documented as
-supported, Swiss jurisdiction, and a **90-day free trial** — which is long
-enough to cover the initial 2.5 TB seed for free.
+Using the quoted CHF 500 (2× 12 TB ≈ CHF 300, box ≈ CHF 200), plus electricity
+at CHF 0.32/kWh:
 
-Quoted rates are inconsistent across sources and must be confirmed in the
-Manager order flow: CHF 2.40/mo for the 200 GB entry tier, ~EUR 3.75–4.18/mo per
-TB at the 1 TB tier, while one 2026 review lists EUR 8.49 for 1 TB. Budget
-**CHF 4–8 per TB per month** until confirmed.
+| | capex | power/yr | 3-year | 5-year |
+|---|---|---|---|---|
+| **NAS, low-power box + disk spindown** (~12–15 W avg) | 500 | ~38 | **~615** | **~690** |
+| NAS, older MicroServer-class (~35 W) | 500 | ~98 | ~795 | ~990 |
+| Cloud only, 2.5 TB Swiss Backup | 0 | 120–250 | 360–760 | 600–1 260 |
+| **Recommended: NAS + 200 GB cloud tier** | 500 | ~67 | **~700** | **~835** |
 
-At ~2.5 TB, storage only, roughly converted:
+Break-even against cloud-only is roughly **2.5 years** at the midpoint — but
+that framing undersells it, because the two sides do not buy the same thing.
+CHF 500 buys **12 TB usable**, about five times the 2.5 TB the cloud figure is
+priced for, and it keeps being yours afterwards. The cloud bill never stops and
+grows with the data.
 
-| Option | ~CHF/mo | 3-year | Notes |
-|---|---|---|---|
-| **Infomaniak Swiss Backup** | **10–21** | **360–760** | unmetered restore, Swiss, restic-documented, 90-day trial |
-| Backblaze B2 | ~14 | ~500 | $6.95/TB, egress free up to 3× stored |
-| Storj | ~9 + egress | ~350+ | $4/TB + $7/TB egress |
-| Wasabi | ~16 | ~580 | 90-day minimum retention — penalizes prune/churn |
-| Scaleway One Zone IA | ~19 | ~700 | EUR 8.03/TB + EUR 0.01/GB egress over 75 GB |
-| Scaleway Glacier | ~6 | ~230 | EUR 2.54/TB **but** restic cannot read it directly (objects need restoring first) and restore costs EUR 0.009/GB |
-| Cloudflare R2 | ~35 | ~1 270 | $15/TB, zero egress |
+The power line matters more than it looks: an old MicroServer-class box burns
+CHF 98/year and eats most of the advantage. Spend the CHF 200 on something
+modern and idle-efficient.
 
-Unmetered restore is worth more than it looks: it makes `restic check
---read-data-subset` — the only thing that proves the backup is actually
-readable — free to run monthly. On B2 or Scaleway that verification costs money
-every time, which in practice means it never gets run.
+### Capacity
 
-**NAS, 3-year total cost of ownership** (~4 TB usable):
+2× 12 TB as a **ZFS mirror = 12 TB usable**, surviving one disk failure. Mirror
+rather than stripe: 24 TB is more space than this will ever need, and a disk
+failure on a striped backup target means re-seeding 2.5 TB from scratch. ZFS
+also scrubs, which catches bit rot in data that sits unread for years — exactly
+the failure mode a backup archive has.
 
-- enclosure or mini-PC: CHF 150–400
-- disks: 1× 8 TB ≈ CHF 160, or 2× 8 TB mirrored ≈ CHF 300–400
-- power at ~10 W average, CHF 0.32/kWh: ~CHF 28/yr → **CHF 84 over 3 years**
-- **3-year total: CHF 400–650 single disk, CHF 530–880 mirrored**
+With 12 TB usable against a 2.5 TB need, **the nixflix media stops being worth
+excluding**. Adding it costs nothing but disk that is already bought, and turns
+a re-download measured in weeks into a restore measured in hours. Recommendation:
+exclude it from the initial seed to keep that seed short, then add it as a third
+`media` set once everything else is verified.
 
-So the NAS does **not** clearly win on a 3-year horizon — it lands in the same
-CHF 400–900 band as the cloud, with capex up front, a device to maintain, and no
-Swiss-datacentre durability. It only pulls clearly ahead past ~5 years.
+## Hardware
 
-The decisive point is not cost, it is **location**: a NAS in the same flat is
-not a backup against fire, flood, burglary, or a lightning strike on the same
-power bus — it is a second copy of a single failure domain. A NAS only becomes
-a real answer if it lives at a **second address**. That is genuinely attractive
-here, because the headscale mesh already exists: a small box at a relative's or
-the office, joined to the tailnet, running `rest-server` or plain SSH, is a
-restic target one config line away — and restic's repository format is identical
-across backends, so switching is a one-line change with a re-seed, not a
-redesign.
+Roughly CHF 200 for something that takes two 3.5" drives and runs NixOS:
 
-**Recommendation:** start on Swiss Backup during the free 90-day trial (zero
-capex, genuinely offsite from day one, and the trial covers the slow initial
-seed). Revisit the NAS at the end of the trial with a real bill in hand and, if
-it goes ahead, put it at a second address rather than next to the Proxmox box.
+- **Preferred:** a used small-form-factor desktop with two SATA ports (Dell
+  OptiPlex SFF, HP ProDesk SFF, Lenovo ThinkCentre SFF, ~CHF 100–150 with an
+  8th-gen i5). Idles around 10–15 W with disks spun down, SATA-attached, ZFS
+  is happy.
+- **Avoid:** USB dual-bay enclosures for a ZFS mirror. Cheap USB-SATA bridges
+  drop under load and a USB reset can fault the pool. If it has to be USB,
+  pick an ASMedia ASM1352R bridge and use mdraid rather than ZFS.
+- **Avoid:** HP MicroServer Gen8 class. Cheap and four bays, but ~35 W idle is
+  CHF 98/year — it costs more in three years than it saves.
+
+It runs NixOS, is declared in this repo, and joins the tailnet like every other
+host. No port forwarding at the second location.
 
 ## Steps
 
-1. **Measure the split** — `ssh 203-media 'du -shx /mnt/solo-sata/* /mnt/Shares/*'`.
-   Decides the capacity tier and confirms whether anything large is hiding in the
-   private share (the Jellyfin `clips` library lives under `/mnt/Shares`, so if it
-   is big it belongs on the exclude list too).
-2. **Order Swiss Backup** at the measured size + ~30 % headroom, start the 90-day
-   trial, create a Cloud device → S3 credentials (endpoint is
-   `https://s3.swiss-backup0N.infomaniak.com`, N varies by cluster).
-3. **Secrets** — add `restic-password` (generate long and random),
-   `restic-s3-access-key`, `restic-s3-secret-key` to
-   `modules/homelab/global-secrets/secret.yaml` via `sops set`; compose
+1. **Check the second location's connectivity first** — this is a prerequisite,
+   not a detail. The NAS must reach the tailnet *directly*, not via DERP. There
+   is a known open item where Sunrise/Yallo's symmetric CGNAT forces
+   `tailscale ping 201-mono` through `via DERP(headscale)` at ~800 ms
+   (`plans/tailnet-p2p.md`, and the pending UniFi UDP 41641 forward). If the
+   second location is on mobile or CGNAT internet, weekly incrementals will
+   crawl. Verify with `tailscale ping` from there before buying anything.
+2. **Measure the split** — `ssh 203-media 'du -shx /mnt/solo-sata/* /mnt/Shares/*'`.
+   Confirms the seed size and whether anything large hides in the private share
+   (the Jellyfin `clips` library lives under `/mnt/Shares`).
+3. **Buy and build the NAS.** NixOS, ZFS mirror on the two 12 TB drives at
+   `/srv/restic`, joined to the tailnet, new host entry in `lib/registry.nix`.
+   `services.restic.server` with `appendOnly = true`, `privateRepos` per host,
+   listening on the tailnet interface only. Monthly ZFS scrub.
+4. **Secrets** — `restic-password` (long and random),
+   `restic-rest-user`/`-password` per host, and later the Infomaniak S3 keys,
+   into `modules/homelab/global-secrets/secret.yaml` via `sops set`; compose
    `sops.templates."restic.env"` for restic's `environmentFile`.
-4. **Escrow the keys, on paper.** The restic password and the sops age key must
-   exist somewhere outside every machine being backed up. They cannot live in
-   Vaultwarden — Vaultwarden is *inside* the backup, so that is a circular
-   dependency that fails exactly when it is needed. Printed copy plus the Mac's
-   password manager.
-5. **New module** `modules/backup.nix` → `flake.nixosModules.homelab-backup`,
-   self-gated on a `backup-client` tag (or `config.noughty.host.is.server`),
-   added to `alwaysImport` in `modules/builder.nix`. It declares the per-host
-   `critical` / `bulk` path sets and maps them onto `services.restic.backups.*`.
-   Tag 201-mono, 203-media, 204-agent in `lib/registry.nix`.
-6. **Seed, bandwidth-capped.** Set `extraBackupArgs = [ "--limit-upload=<KiB/s>" ]`
-   so the first pass does not saturate the household uplink. Seeding 2.5 TB takes
-   **~12 days at 20 Mbit/s, ~5 days at 50, ~2.5 days at 100, ~7 h at 1 Gbit/s** —
-   this is the single biggest practical risk in the whole plan. restic resumes
-   cleanly across interruptions; seed `critical` first, then `bulk` path by path
-   so each run completes on its own.
-7. **Retention & prune.** `critical`: `--keep-daily 14 --keep-weekly 8
+5. **Escrow the password on paper.** See *Encryption*. Not optional.
+6. **Client module** `modules/backup.nix` → `flake.nixosModules.homelab-backup`,
+   self-gated on a `backup-client` tag, added to `alwaysImport` in
+   `modules/builder.nix`. Declares the per-host `critical` / `bulk` sets and maps
+   them onto `services.restic.backups.*`. Tag 201-mono, 203-media, 204-agent.
+7. **Seed over the LAN, then move the box.** This is the big practical win over
+   any cloud target: keep the NAS at home for the first pass and 2.5 TB takes
+   **10–14 hours on gigabit**, not the 5–12 days it would take over a
+   residential uplink. Only after the seed verifies does it go to the second
+   location, where it only ever has to carry weekly deltas.
+8. **Retention & prune.** `critical`: `--keep-daily 14 --keep-weekly 8
    --keep-monthly 12`. `bulk`: `--keep-weekly 5 --keep-monthly 6 --keep-yearly 2`.
-   Prune monthly, staggered so the two sets never run at once.
-8. **Alerting, via the wiring that already exists.** Senders already run Alloy
-   with node_exporter's `systemd` and `textfile` collectors enabled
-   (`modules/observability.nix:586`), so no new plumbing is needed:
+   Prune runs **from the Mac over sftp** (append-only blocks it from the hosts),
+   monthly, staggered so the two sets never overlap.
+9. **Monitoring.** `services.prometheus.exporters.restic` (port 9753, free in
+   this repo's allocation — checked) on 201, pointed at the rest-server repo:
+   reads are permitted in append-only mode, and it exports snapshot ages
+   directly. Alert on:
    - failure: `node_systemd_unit_state{name=~"restic-backups-.*",state="failed"} == 1`
-   - staleness (catches the worse failure — a timer that silently stopped firing):
+   - staleness — the worse failure, a timer that quietly stopped firing:
      `time() - node_systemd_timer_last_trigger_seconds{name="restic-backups-bulk.timer"} > 9*24*3600`
+   - the NAS itself being unreachable or its pool degraded
 
-   Add both to the rules pushed by `mimir-rules-sync` — and scope the sync with
-   `--namespaces=` as always, or it deletes every other rule group in the tenant.
-9. **Verify + drill.** Monthly `restic check --read-data-subset=10%` (free on
-   unmetered Swiss Backup). Quarterly, restore a real file to `/tmp` and diff it.
-   A backup that has never been restored is a hypothesis, not a backup.
-10. **Document the restore** in the plan or the `nixconfig-ops` skill: rebuild
-    host via `deploy <host>`, then `restic restore latest --target /`. Mark this
-    plan `done`.
+   Senders already run Alloy with node_exporter's `systemd` and `textfile`
+   collectors (`modules/observability.nix:586`), so no new plumbing. Add the
+   rules to the set pushed by `mimir-rules-sync` — and scope the sync with
+   `--namespaces=`, or it deletes every other rule group in the tenant.
+10. **Add the 200 GB Infomaniak tier** for the crown jewels (see *Approach*),
+    monthly, second repo, same password handling.
+11. **Verify + drill.** Monthly `restic check --read-data-subset=10%` from the
+    Mac. Quarterly, restore a real file and diff it. A backup that has never
+    been restored is a hypothesis, not a backup.
+12. **Then add the media set** (`/mnt/solo-sata/nixflix`) now that the disk is
+    there and everything else is proven. Mark this plan `done`.
 
 ## Open decisions
 
-- **File-level (restic) vs image-level (PBS).** Recommending restic: declarative,
-  no extra VM, selects by path (which the shared `solo-sata` disk forces), and
-  stores only what git cannot regenerate. The alternative — PBS 4.2 → S3 — buys
-  click-to-restore whole VMs and covers the Proxmox host, at the price of a
-  hand-maintained Debian VM and either storing the media pile or splitting the
-  disk first. The literal reading of "VM backups incremental" is PBS; the thing
-  that actually protects the data for less money is restic. Both can coexist —
-  restic now, PBS later if whole-VM restore turns out to be missed.
-- **Cloud now vs NAS now.** Recommending cloud first: zero capex, offsite
-  immediately, free 90-day trial covers the seed. Revisit with a real bill.
-  If a NAS happens, **put it at a second address** — otherwise it is a second
-  copy, not a backup.
-- **Capacity to order.** Recommending 3 TB after measuring, on a ~2–2.6 TB set.
-  Drop to 2 TB if Immich turns out small.
-- **Ransomware / credential blast radius.** A root compromise on 201 or 203 can
-  `restic forget --prune` the repository with the same credentials it backs up
-  with. The clean mitigation is append-only credentials on the hosts with prune
-  run separately from the Mac — feasibility depends on whether Swiss Backup's S3
-  supports per-prefix policies, which needs checking during the trial. If it does
-  not, accept the risk explicitly or keep a second copy.
-- **One repo per host vs one shared repo.** Recommending per-host: independent
-  locking and prune, no cross-host contention. Shared would dedup across hosts,
-  but under capacity-based billing that saves nothing meaningful.
+- **Does the media get backed up too?** Recommending yes, in phase 12 — 12 TB
+  usable against a 2.5 TB need makes the exclusion pointless, and it converts a
+  multi-week re-download into an afternoon. Excluded from the *initial seed*
+  only, to keep that seed short.
+- **Who pays the electricity at the second location, and do they know?** ~40 W
+  while running, ~12–15 W the rest of the week; call it CHF 40/year. Worth
+  settling up front rather than discovering it as a grievance later.
+- **ZFS mirror vs mdraid.** Recommending ZFS for scrub and checksumming. mdraid
+  only if the drives end up USB-attached, where ZFS is fragile.
+- **Image-level backups, later.** PBS 4.2 (April 2026) can back up whole VMs
+  incrementally to S3 or local storage, which would also cover the Proxmox host
+  — the one machine in the fleet not declared in this repo. Not needed for the
+  data, and it cannot exclude the media disk (see *Finding*). Revisit only if
+  click-to-restore-a-VM turns out to be missed. The cheap 90 % of it: have
+  `critical` also pick up `/etc/pve` (VM configs, a few KB of text). Configs
+  plus this flake plus restored data is a complete rebuild recipe with no OS
+  images stored at all.
 
 ## Risks / rollout
 
-- **The seed is long.** Days of upload at a residential uplink. Bandwidth-cap it
-  and expect the first `bulk` snapshot to span several nights. Nothing else in
-  the plan can be verified until it lands.
-- **Silent DB corruption** is the classic failure: backups run green for a year,
-  then the Postgres restore fails. Mitigated by dumping rather than copying, and
-  caught only by step 9's restore drill. Do not skip step 9.
-- **Losing the restic password loses everything** — the repository is
-  unrecoverable without it, by design. Step 4 is not optional.
+- **A backup target at someone else's address can quietly stop existing.** It
+  gets unplugged, moved, put behind a new router, or the household changes ISP.
+  This is the main new failure mode the NAS introduces over cloud, and it is
+  exactly what step 9's staleness alert is for. Do not skip it.
+- **The second location's uplink.** Weekly deltas are small, but the first
+  post-move `check --read-data` pulls real volume. See step 1.
+- **Silent DB corruption** — backups run green for a year, then the Postgres
+  restore fails. Mitigated by dumping rather than copying, and caught only by
+  step 11's drill.
+- **Losing the restic password loses everything.** Step 5 is not optional.
 - **Garage stop/start window** briefly interrupts S3 during the weekly run.
-  Seconds, at 02:00 Sunday; call it acceptable or take the rclone route.
-- **Rollout** is per-host and additive: `deploy 204-agent` first (smallest,
-  lowest stakes), then `deploy 203-media`, then `deploy 201-mono` last since it
-  fronts everything. Backing out is deleting the module and the timers; nothing
-  else in the system depends on it.
+  Seconds, at 02:00 Sunday; acceptable, or take the rclone route.
+- **Rollout** is per-host and additive: NAS first, then `deploy 204-agent`
+  (smallest, lowest stakes), then `deploy 203-media`, then `deploy 201-mono`
+  last since it fronts everything. Backing out is deleting the module and the
+  timers; nothing else depends on it.
