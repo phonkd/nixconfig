@@ -1,192 +1,190 @@
-# search-launcher — one search box over everything, Enter opens it
+# search-launcher — homelab results inside Spotlight
 
-**Repo(s):** new repo `search-launcher` (nightly indexer + NixOS module +
-Raycast extension) + `slop-trove` (paperless + mail sources) + `nixconfig`
-(204 wiring, Garage read key, Samba mount, Mac cask + pull job).
-**Status:** draft — written 2026-09-11, reshaped the same day after review
-(two stores, nightly batch, local index).
+**Repo(s):** new repo `trove` (macOS app: Spotlight indexer + open router) +
+`search-launcher` indexer on 204 (nightly crawl → SQLite + thumbnails) +
+`nixconfig` (204 wiring, Garage read key, Samba mount incl. private, Mac
+install + pull job) + `slop-trove` (paperless/mail text for Hermes, optional).
+**Status:** draft — written 2026-09-11, reshaped 2026-09-12 to Spotlight-native
+rich results (no Raycast, no "open the app's search page" handoff).
 
 ## Goal
 
-A global hotkey on the Mac opens a search box. Typing finds things across the
-Samba shares, Garage S3, oCIS, Immich, paperless and mail (`phonkd@phonkd.net`),
-and **Enter opens the result where it belongs**:
+Hit ⌘Space, type, and homelab things appear **as real rows in Spotlight**:
+an Immich photo shows its thumbnail, an S3 object shows its name and bucket, a
+Samba file shows its filename and path, a paperless document shows its title
+and OCR snippet. Enter opens the thing itself — never a search-results page.
 
-| Source | Enter | Locator stored in the index |
+| Source | Row shows | Enter |
 |---|---|---|
-| paperless | browser → `https://paperless.home.phonkd.net/documents/<id>/details` | document id |
-| oCIS | browser → `https://ocis.w.phonkd.net/f/<fileid>` (oCIS private link) | oCIS file id |
-| Immich | browser → `https://immich.w.phonkd.net/photos/<assetId>` | asset id |
-| mail | Apple Mail → `open "message://%3c<Message-ID>%3e"` | `Message-ID` header |
-| Samba | Finder → mount `smb://100.64.0.3/<share>` if needed, then `open -R /Volumes/<share>/<path>` | share + path |
-| S3 | download → presign on the Mac, `open` the URL (browser saves it) | bucket + key |
+| Immich | thumbnail, date, album/people | browser → `https://immich.w.phonkd.net/photos/<assetId>` |
+| Samba (incl. **private**) | filename, share + path, file icon | Finder → mount if needed, `open -R` |
+| S3 (Garage) | key, bucket, size | presign locally → `open` (browser downloads) |
+| oCIS | filename, space/path | browser → `https://ocis.w.phonkd.net/f/<fileid>` |
+| paperless | title, correspondent, OCR snippet | browser → `https://paperless.home.phonkd.net/documents/<id>/details` |
+| mail | **already native** — Apple Mail indexes into Spotlight | Mail (nothing to build) |
 
-Secondary actions: ⌘↵ copy link, ⌥↵ reveal / alternative open. Always-present
-fallback rows: "Search Immich for '<q>'" and "Search paperless for '<q>'"
-open those apps' own web search. That gets you Immich's CLIP search without an
-API call at query time.
+## Why this needs an app (the question asked)
 
-**Freshness contract (accepted):** the index is rebuilt nightly. Something
-created today isn't findable until tomorrow; something deleted today still
-shows up and errors when opened. No incremental sync, no delete tracking.
+Spotlight only shows third-party content that an **installed app bundle has put
+into its index**. There is no file, daemon or config that injects rows from
+outside. So the deliverable is a small macOS app (`trove.app`) that does two
+jobs and nothing else:
+
+1. **Index:** donate items to Spotlight with title, description, keywords and
+   **thumbnail**, in bulk, once a night.
+2. **Route the open:** when a row is selected, the system launches the app with
+   the item's identifier; the app then opens the browser URL, reveals the file
+   in Finder, or presigns and downloads the S3 object. The app itself has no
+   window beyond a menu-bar status item and a preferences pane.
+
+Two Apple APIs can carry this, and step 1 of the plan is a spike to pick one:
+
+- **Core Spotlight** (`CSSearchableIndex` / `CSSearchableItem` +
+  `CSSearchableItemAttributeSet`): the bulk-indexing path, explicitly supports
+  `thumbnailData` / `thumbnailURL`, per-source `domainIdentifier` (so a nightly
+  rebuild is "delete domain, re-add"), and selection arrives as an
+  `NSUserActivity` of type `CSSearchableItemActionType`.
+- **App Intents `IndexedEntity`** (`indexAppEntities`): the macOS 26 layer, adds
+  meaning-based matching and Spotlight **Actions**; in 26 Xcode extracts index
+  metadata at build time, so entities are findable without launching the app.
+  This is the same family as the yubioath-flutter Spotlight patch already in
+  use here (`modules/hosts/types/gui/default.nix`).
+
+*Recommendation:* Core Spotlight for the bulk rows (it is the one with
+first-class thumbnails and batch delete), and `IndexedEntity` later for Actions
+("download to Downloads", "copy link") and semantic matching. The spike decides
+whether macOS 26's redesigned Spotlight ranks CoreSpotlight items visibly
+enough; if it buries them under files, the App Intents path is the fallback.
 
 ## Approach
 
-**Two stores, one search box.**
+**Crawl on the server, index on the Mac.**
 
-- **slop-trove = information.** It gains `paperless` and `mail` as sources
-  (full text, chunked, embedded) so Hermes can answer questions about them.
-  Each record also gets `title`, `subtitle` and an `open` locator in
-  `metadata`. That costs slop-trove little and makes the next point possible.
-- **The file index = files.** A new nightly job crawls Samba, S3, oCIS and
-  Immich for **metadata only** (name, path, size, mtime, mime; for Immich:
-  date, city, people, albums, filename). File paths don't need embeddings, and
-  whole-file text extraction is out of scope for v1.
-- **One output.** The same nightly job reads the paperless and mail rows
-  (title/subtitle/open only) out of slop-trove's Postgres and writes
-  everything into a single **SQLite file with an FTS5 table**. That file is
-  the whole search backend.
-- **Search runs on the Mac.** A launchd job pulls the SQLite file from 204
-  over the tailnet (rsync/ssh, the same path `deploy` uses) once a day and on
-  wake. The Raycast extension queries it locally through `@raycast/utils`
-  `useSQL`, which uses the system `sqlite3` (FTS5 is built in). Search is
-  local-disk fast, works offline, and needs no HTTP service, no auth and no
-  traefik route.
+- **Nightly indexer on 204** (unchanged idea from the previous draft, still the
+  right split): walks Samba (via read-only CIFS mount, **private share
+  included**), Garage S3, oCIS and Immich, and writes `index.sqlite` plus a
+  **thumbnail directory** (Immich thumbs, and optionally Quick Look-able icons
+  for files). Full rebuild each night, atomic rename, a failed source keeps
+  yesterday's rows. Nothing is embedded; this is metadata only.
+  The Mac can't do this job: it sleeps, roams, and has no CIFS mount.
+- **`trove.app` on the Mac** pulls that bundle over the tailnet (rsync/ssh,
+  daily + at login), then re-donates every source to Spotlight. Thumbnails are
+  referenced from the local cache via `thumbnailURL`.
+- **Opening is local and credential-light**: browser URLs need nothing, Finder
+  reveal mounts `smb://100.64.0.3/<share>` on demand, S3 presigns with a
+  read-only Garage key from the Keychain.
+- **Freshness stays nightly** (accepted): new things appear tomorrow; deleted
+  things linger a day and error on open.
 
-Why not one store: slop-trove's shape (chunked text + 1024-dim embeddings,
-agent Q&A) is expensive per record and has incremental-upsert semantics. The
-file index is cheap, keyword-only and rebuilt from scratch. Forcing hundreds
-of thousands of file paths through bge-m3 buys nothing. The launcher merges the
-two at build time, so from the Mac it looks like one index anyway.
-
-**Full rebuild each night.** The indexer builds `index.sqlite.new`, then
-atomically renames it. A source that fails keeps its rows from yesterday's
-file (copy them across) and gets logged, so one broken crawler doesn't empty
-the launcher.
-
-Phases, each usable on its own:
-
-- **Phase 1 — Samba + paperless end to end** (paperless read straight from
-  its API in phase 1, then switched to slop-trove in phase 3).
-- **Phase 2 — S3, oCIS, Immich** in the file index.
-- **Phase 3 — slop-trove gets paperless + mail**; the indexer reads them from
-  Postgres; mail shows up in the launcher.
+**Mail drops out of the launcher entirely** — Apple Mail already puts messages
+in Spotlight, so indexing them again would only duplicate rows. Mail (and
+paperless full text) into slop-trove stays worthwhile for *Hermes*, but it is
+now an independent, optional phase, not part of this interface.
 
 ## Steps
 
+### Phase 0 — spike (half a day, decides everything)
+1. Throwaway Swift app: donate ~100 fake items to Core Spotlight with
+   thumbnails across two `domainIdentifier`s, plus one `IndexedEntity` variant.
+   Check in macOS 26 Spotlight: do rows show the thumbnail, how are they
+   ranked/grouped, does selection reach the app, does domain-delete work.
+   Outcome: Core Spotlight vs App Intents, and whether thumbnails render.
+
 ### Phase 1 — Samba + paperless, end to end
-**search-launcher repo (new):**
-1. Scaffold: flake with package, NixOS module (`services.search-launcher`:
-   sources, output path, `OnCalendar` timer), dev shell. Python, stdlib
-   `sqlite3`.
-2. Schema: `items(id, source, title, subtitle, path, mtime, size, mime,
-   open_json)` + `items_fts` (FTS5 over title, subtitle, path; `unicode61`
-   tokenizer with `tokenchars` tuned so `space-wallpaper.png` splits). Build to
-   `.new`, rename on success, carry over rows for failed sources.
-3. `sources/samba.py`: walk the read-only mount, skip video/audio mimetypes
-   and dot-dirs, `open = {kind: smb, host: 100.64.0.3, share, path}`.
-4. `sources/paperless.py` (temporary, replaced in step 16): page
-   `/api/documents/`, title + correspondent + tags,
-   `open = {kind: url, url: …/documents/<id>/details}`.
-5. `raycast/`: List view with throttled `useSQL` queries (prefix match
-   `term*`, bm25 ranking), per-source icons, open actions for `url` and
-   `smb` (check `/Volumes/<share>`, else `open smb://…`, poll for the mount,
-   `open -R`), fallback search rows.
+**`search-launcher` indexer (204):**
+2. Flake + NixOS module (`services.search-launcher`: sources, output dir,
+   nightly `OnCalendar`), Python + stdlib `sqlite3`.
+3. Schema `items(id, source, title, subtitle, detail, path, mtime, size, mime,
+   thumb, open_json)`; build to `.new`, atomic rename, carry over failed
+   sources.
+4. `sources/samba.py`: walk the read-only mount (Public, SemiPublic **and
+   private**), skip video/audio blobs by mime, `open = {kind: smb, host, share,
+   path}`.
+5. `sources/paperless.py`: `/api/documents/`, title + correspondent + tags +
+   OCR text (first ~2 kB as the Spotlight description), `open = {kind: url}`.
 
-**nixconfig:**
-6. Flake input + `services.search-launcher` on `204-agent`, nightly timer,
-   output under `/var/lib/search-launcher/index.sqlite`.
-7. Read-only CIFS mount of the Samba shares on 204 (credentials via sops).
-   Public + SemiPublic only; private excluded until asked.
-8. Paperless API token in sops for 204.
-9. Mac: `raycast` cask in `modules/hosts/types/gui/default.nix`; a launchd
-   agent (home-manager) that rsyncs the index from 204 daily and at login/wake.
-10. `deploy 204-agent`, Mac rebuild; verify: after one timer run, type a
-    share filename → Finder reveals it (starting with the share unmounted);
-    type a paperless title → Enter opens the doc.
+**`trove` app (new repo):**
+6. Menu-bar app skeleton; rsync pull of `index.sqlite` + thumbs; a
+   `CSSearchableIndex` donor that maps one SQLite row → one searchable item
+   (one `domainIdentifier` per source).
+7. Open router for `url` and `smb` (check `/Volumes/<share>`, else
+   `open smb://…`, poll for mount, then `open -R`).
+8. Build/install: Xcode build → copy `trove.app` into `/Applications`
+   (a nix-store symlink is invisible to Spotlight — same reason the affine and
+   yubioath entries in `gui/default.nix` are casks/local builds). Ship a
+   `make install` and document it in the repo.
 
-### Phase 2 — S3, oCIS, Immich
-11. `sources/s3.py`: list objects with a **read-only, bucket-scoped** Garage key
-    (endpoint `https://api.s3.w.phonkd.net`, virtual-hosted, `us-east-1`);
+**`nixconfig`:**
+9. Flake input + `services.search-launcher` on `204-agent` (nightly timer,
+   output `/var/lib/search-launcher/`).
+10. Read-only CIFS mount of **all three** shares on 204, credentials via sops.
+11. Paperless API token in sops.
+12. Mac: launchd agent (home-manager) that rsyncs the bundle daily/at login;
+    the app itself installed manually per step 8 (documented, not nix-managed).
+13. `deploy 204-agent`; verify in Spotlight: type a private-share filename →
+    row with path → Enter reveals it in Finder (share initially unmounted);
+    type a paperless title → Enter opens the document.
+
+### Phase 2 — Immich, S3, oCIS
+14. `sources/immich.py`: page all assets (filename, taken date, city, people,
+    albums); download a thumbnail per asset into the thumb dir (bounded, see
+    open decisions); `open = {kind: url, url: …/photos/<id>}`.
+15. `sources/s3.py`: list objects with a read-only bucket-scoped Garage key;
     `open = {kind: s3, bucket, key}`.
-12. `sources/ocis.py`: WebDAV `PROPFIND` (depth-walk) requesting `oc:fileid`;
-    `open = {kind: url, url: https://ocis.w.phonkd.net/f/<fileid>}`. A
-    dedicated oCIS app password in sops.
-13. `sources/immich.py`: page all assets via the API (filename, taken date,
-    city/country, people, albums); `open = {kind: url, url: …/photos/<id>}`.
-    Immich API key in sops.
-14. Raycast `s3` action: presign locally with the read-only key (small SigV4
-    signer or `aws s3 presign`), `open` the URL; secondary action downloads to
-    `~/Downloads` and reveals. The key reaches the Mac via secretspec.
-15. **nixconfig:** Garage key grant on 201 (`deploy 201`), the three secrets,
-    `deploy 204-agent`.
+16. `sources/ocis.py`: WebDAV `PROPFIND` with `oc:fileid`;
+    `open = {kind: url, url: …/f/<fileid>}`.
+17. `trove`: thumbnails wired to `thumbnailURL`; `s3` open action — SigV4
+    presign with the key from Keychain, `open` the URL; ⌥ variant downloads to
+    `~/Downloads` and reveals.
+18. **nixconfig:** Garage read-only key grant (`deploy 201`), oCIS app password
+    and Immich API key in sops, `deploy 204-agent`.
 
-### Phase 3 — slop-trove: paperless + mail
-**slop-trove:**
-16. Records get `title`, `subtitle`, `open` in `metadata` (additive, no schema
-    change). `ingest/paperless.py`: document text (already OCR'd) chunked +
-    embedded, incremental by `modified`.
-17. `ingest/mail.py`: IMAP over TLS to `mail.phonkd.net`, all folders except
-    Junk/Trash, incremental by `UIDVALIDITY` + last UID; text = subject +
-    from/to + plain-text body; `open = {kind: mail, message_id}`.
-18. `upsert` → `ON CONFLICT … DO UPDATE` when text/metadata changed (paperless
-    edits), instead of `DO NOTHING`.
+### Phase 3 — Hermes side (optional, independent)
+19. slop-trove gains `paperless` and `mail` sources (full text, embedded) so
+    Hermes can answer questions about them; the launcher doesn't depend on it.
+    Mail there needs an IMAP credential — a Dovecot master user preferred over
+    the account password (see `plans/slop-trove-file-sources.md` for the file
+    side, now on hold).
 
-**search-launcher:**
-19. `sources/slop_trove.py`: read `source IN ('paperless','mail')` rows
-    (title/subtitle/open only, one row per document/message) from 204's
-    Postgres with a read-only role; drop the phase-1 paperless crawler.
-20. Raycast `mail` action (`message://`).
-
-**nixconfig:**
-21. IMAP credential for 204 (see open decisions), read-only Postgres role for
-    the indexer, `deploy 204-agent`.
+### Phase 4 — polish
+20. App Intents Actions ("copy link", "download", "reveal") if the spike says
+    they are worth it; `IndexedEntity` for semantic matching.
+21. Per-source toggles in the app's preferences; a "reindex now" menu item.
 
 ## Open decisions
 
-- **One store or two** — *recommend* **two** (above): slop-trove for
-  information (embedded, agent-facing), a nightly SQLite for files. The
-  launcher merges them at build time. Alternative: put files into slop-trove
-  as in `plans/slop-trove-file-sources.md`. That gives one DB, but embeds
-  every path and needs an online API for the launcher.
-- **What happens to `slop-trove-file-sources.md`** — with this split its
-  crawlers move here. *Recommend* putting it on hold. If Hermes later needs
-  "give me the space wallpaper", give it a tool that queries this SQLite on
-  204 rather than re-crawling into Postgres. Its image-captioning idea could
-  later add a caption column here.
-- **Where the indexer runs** — *recommend* **204** (next to slop-trove's DB,
-  where agents live; Samba via read-only CIFS). Alternative: 203 reads
-  `/mnt/Shares` from disk directly, but then it needs network access to 204's
-  Postgres.
-- **Getting the index to the Mac** — *recommend* a launchd rsync pull over
-  ssh. Alternatives: upload to the Garage priv bucket, or syncthing. Both work
-  and both add a moving part.
-- **Mail credentials** — *recommend* a Dovecot **master user** on the mail VM so
-  204 never holds the real account password. Alternative: the account's
-  plaintext password in sops for 204.
-- **S3 on the Mac** — a read-only Garage key on the Mac (recommended, needed
-  to presign at open time) vs. only indexing buckets that already have a web
-  endpoint and opening `https://<bucket>.s3.w.phonkd.net/<key>` directly.
-- **Launcher** — *recommend* Raycast. Alternatives: Hammerspoon `hs.chooser`
-  or fzf in kitty. With a local SQLite file, the fzf version is about 20 lines,
-  which makes it a good throwaway prototype before the extension exists.
-- **Private share** — excluded by default.
+- **Spotlight API** — Core Spotlight (recommended, thumbnails + batch) vs App
+  Intents `IndexedEntity` (semantic + Actions). Phase 0 decides; they can
+  coexist.
+- **Immich thumbnail scope** — thumbnails are the whole point of Immich rows,
+  but they cost disk on the Mac (~20 kB × asset count). *Recommend* a bounded
+  set (favorites + last N years, configurable) rather than the whole library;
+  the rest still index with metadata and a generic icon.
+- **Immich rows vs Photos** — indexing every asset could crowd Spotlight.
+  *Recommend* starting with a filter (favorites/albums/people) and widening.
+- **Where the app's config lives** — a preferences pane + Keychain
+  (recommended, it's a GUI app) vs a nix-managed config file. The app can't be
+  nix-installed anyway (Spotlight + signing), so nix owns only the pull job.
+- **Indexer language** — Python on 204 (recommended, matches slop-trove) vs
+  writing the crawl in Swift inside the app (fewer moving parts, but then the
+  Mac must reach CIFS/S3/oCIS itself and crawl while awake).
+- **`slop-trove-file-sources.md`** — stays on hold; if Hermes should find files
+  too, give it a tool that reads this SQLite rather than re-crawling.
 
 ## Risks / rollout
 
-- **The index file holds mail subjects/senders and file paths** and ends up on
-  the Mac's disk. It's a local file readable by your user only, similar to
-  Apple Mail's own cache. Mail *bodies* stay in slop-trove on 204 and aren't
-  copied into the SQLite file.
-- **Backfill load on 203's 3060 Ti** (phase 3 only): first-time embedding of
-  the mail archive competes with Jellyfin NVENC and Immich ML. Run it as a
-  throttled oneshot, or point it at `blac`'s ollama while that box is on.
-  The file index needs no GPU at all.
-- **Crawl duration**: a full nightly walk of the shares, S3, oCIS and Immich
-  should be minutes to tens of minutes. The timer runs at night and failures
-  keep the previous day's rows.
-- **Hermes unaffected**: slop-trove changes are additive sources + metadata;
-  its MCP `search` path is untouched.
-- **Rollout**: `deploy 204-agent` for everything server-side, `deploy 201`
-  only for the Garage key grant (phase 2), Mac rebuild for the cask + pull job.
-  Nothing touches 201's traefik. Back out by disabling the timer / sources.
+- **Spotlight may not rank third-party items where you want them.** This is
+  the real project risk and why phase 0 exists before any server work.
+- **The private share is indexed**, so filenames from it land in the Mac's
+  Spotlight index (local, user-readable). File *contents* are never copied —
+  only names, paths and metadata.
+- **App distribution is manual** (Xcode build → `/Applications`), matching the
+  yubioath-flutter precedent. A macOS update or signing change can require a
+  rebuild; document the command in the repo.
+- **Index size**: hundreds of thousands of items is fine for Spotlight, but the
+  nightly full re-donate must batch (delete domain, then chunked adds) to avoid
+  a long CPU spike; run it on the pull, not at login.
+- **Rollout**: `deploy 204-agent` for the indexer, `deploy 201` only for the
+  Garage key, Mac rebuild for the launchd pull job. Nothing touches traefik.
+  Back out by deleting the app (its Spotlight domains go with it) and disabling
+  the timer.
