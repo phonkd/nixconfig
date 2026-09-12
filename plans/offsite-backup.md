@@ -4,7 +4,7 @@
 
 _Decisions locked (2026-09-12):_ a **second location is available**, so the
 primary target is a **NixOS box there running `restic.server` in append-only
-mode**, ~CHF 500 for 2× 12 TB mirrored plus the box. Everything is
+mode**, CHF 400–660 for 2× 12 TB mirrored plus the box. Everything is
 **client-side encrypted by restic** (AES-256) regardless of target. A small
 Infomaniak Swiss Backup tier carries the crown jewels as a third copy.
 
@@ -169,25 +169,28 @@ backed up.
 
 ## Cost
 
-Using the quoted CHF 500 (2× 12 TB ≈ CHF 300, box ≈ CHF 200), plus electricity
-at CHF 0.32/kWh:
+Drives are 2× 12 TB ≈ CHF 300. The box is CHF 100 (used mini-tower) to CHF 360
+(prebuilt NAS) — see *Hardware*; the CHF 200 originally assumed sits between the
+two. Electricity at CHF 0.32/kWh:
 
 | | capex | power/yr | 3-year | 5-year |
 |---|---|---|---|---|
-| **NAS, low-power box + disk spindown** (~12–15 W avg) | 500 | ~38 | **~615** | **~690** |
-| NAS, older MicroServer-class (~35 W) | 500 | ~98 | ~795 | ~990 |
+| **NAS, used mini-tower** (~20 W avg) | ~400 | ~56 | **~570** | **~680** |
+| **NAS, prebuilt N100 4-bay** (~12–15 W avg) | ~660 | ~38 | **~775** | **~850** |
+| NAS, older MicroServer-class (~35 W) | ~500 | ~98 | ~795 | ~990 |
 | Cloud only, 2.5 TB Swiss Backup | 0 | 120–250 | 360–760 | 600–1 260 |
-| **Recommended: NAS + 200 GB cloud tier** | 500 | ~67 | **~700** | **~835** |
+| **Recommended: NAS + 200 GB cloud tier** | 400–660 | ~67–85 | **~640–860** | **~780–950** |
 
-Break-even against cloud-only is roughly **2.5 years** at the midpoint — but
-that framing undersells it, because the two sides do not buy the same thing.
-CHF 500 buys **12 TB usable**, about five times the 2.5 TB the cloud figure is
+Break-even against cloud-only is **~2 years** for the used-tower build and
+**~3.5 years** for the prebuilt, at the midpoint of the cloud range — but that
+framing undersells it, because the two sides do not buy the same thing. The
+hardware buys **12 TB usable**, about five times the 2.5 TB the cloud figure is
 priced for, and it keeps being yours afterwards. The cloud bill never stops and
 grows with the data.
 
 The power line matters more than it looks: an old MicroServer-class box burns
-CHF 98/year and eats most of the advantage. Spend the CHF 200 on something
-modern and idle-efficient.
+CHF 98/year and eats the whole advantage — it is the one thing here where being
+cheap up front actually loses money.
 
 ### Capacity
 
@@ -205,20 +208,62 @@ exclude it from the initial seed to keep that seed short, then add it as a third
 
 ## Hardware
 
-Roughly CHF 200 for something that takes two 3.5" drives and runs NixOS:
+Surveyed 2026-09-12, Swiss retail. **First: the CPU does not matter here.** This
+box accepts restic pushes over a WAN link once a week. An N100 is already far
+past what that needs — every franc spent moving up to an i3-N305 buys nothing.
+Optimise for bays, idle watts, and how little the thing will need hands on it at
+an address that is not yours.
 
-- **Preferred:** a used small-form-factor desktop with two SATA ports (Dell
-  OptiPlex SFF, HP ProDesk SFF, Lenovo ThinkCentre SFF, ~CHF 100–150 with an
-  8th-gen i5). Idles around 10–15 W with disks spun down, SATA-attached, ZFS
-  is happy.
-- **Avoid:** USB dual-bay enclosures for a ZFS mirror. Cheap USB-SATA bridges
-  drop under load and a USB reset can fault the pool. If it has to be USB,
-  pick an ASMedia ASM1352R bridge and use mdraid rather than ZFS.
-- **Avoid:** HP MicroServer Gen8 class. Cheap and four bays, but ~35 W idle is
-  CHF 98/year — it costs more in three years than it saves.
+| Option | CPU | Bays | ~CHF | Verdict |
+|---|---|---|---|---|
+| **TerraMaster F4-424** | N95/N100 | 4× 3.5" | **~357** | 4 bays, AMI Aptio UEFI, documented third-party-OS path |
+| **UGREEN NASync DXP2800** | N100 | 2× 3.5" + 2× M.2 | **~312** | a published NixOS config exists for its DXP4800 sibling |
+| Topton N18 / CWWK M8 board | N150 / i3-N305 | 6–8 SATA | ~115–165 board, ~270–320 built | the literal "SoC mainboard" ask |
+| Used OptiPlex / ProDesk **mini-tower** | i3/i5 8–9th gen | 2–4 SATA | ~80–150 | cheapest, zero hardware quirks |
+| ~~ODROID-H4+~~ | N97 | 4× SATA | — | **ruled out — production suspended on Intel supply, still out of stock May 2026** |
+| ~~TerraMaster F4-424 **Pro**~~ | i3-N305 | 4 | ~768 | paying for CPU this workload cannot use |
+| ~~Synology~~ | — | — | — | DSM lock-in and the drive allowlist |
 
-It runs NixOS, is declared in this repo, and joins the tailnet like every other
-host. No port forwarding at the second location.
+**The prebuilts cost more than the CHF 200 budgeted** — CHF 310–360 rather than
+200, so the total lands near CHF 620–660 instead of 500. What the extra buys is
+a case, PSU, backplane, and fans that already fit the drives.
+
+**The deciding practical risk is fan control, not performance.** On both
+prebuilts the fans are driven by an embedded controller their stock OS talks to;
+under a third-party Linux you get community out-of-tree code or nothing. Fans
+stuck at 100 % means a noisy box your host eventually unplugs; fans stuck at 0 %
+means cooked drives. Known state:
+
+- **TerraMaster F4-424** — IT8613E chipset, community PID fan-control script
+  (Nikotine1 / rcarmo forks of the Xpenology one), tested on the 424 Pro/Max
+  under Proxmox. Works, but it is a script to package and keep alive.
+- **UGREEN DXP** — needs the out-of-tree `led-ugreen` module for the front LEDs
+  and a separate DKMS fan driver. There is a full public NixOS config for the
+  DXP4800 Plus (`daskladas/nasdots`, plus a NixOS Discourse write-up) covering
+  disko, smartmontools and `hdparm` spindown — the best starting point of
+  anything surveyed, though it uses mdadm + btrfs rather than ZFS.
+- **Used mini-tower** — standard PWM off the Super I/O, driven by in-tree
+  `nct6775` + `fancontrol`. Nothing to package. For a box that must never need
+  a visit, this is a genuine advantage, and it is the reason the boring option
+  is still on the list.
+
+Other notes:
+
+- On a DIY board, **check the SATA controller**: ASM1166 or JMB585 are fine
+  under Linux; a JMB575 *port multiplier* is not, and behaves badly under ZFS.
+- **Do not count on ECC.** Intel lists the N100 without it, and In-Band ECC is
+  inconsistently exposed in this class. ZFS checksums still catch corruption on
+  disk, and this is a backup target — the exposure is bounded.
+- **Avoid USB dual-bay enclosures** for a ZFS mirror; a USB reset can fault the
+  pool. If USB is unavoidable, pick an ASM1352R bridge and use mdraid.
+- **Avoid HP MicroServer Gen8 class.** Four bays and cheap, but ~35 W idle is
+  CHF 98/year — it costs more over three years than it saves.
+
+**Pick:** the F4-424 at ~CHF 357 if four bays and a documented conversion are
+worth CHF 250 over a used tower; the used mini-tower at ~CHF 100 if holding the
+CHF 500 total matters more, accepting a louder box and ~10 W more idle draw.
+Either way it runs NixOS, is declared in this repo, and joins the tailnet like
+every other host — no port forwarding at the second location.
 
 ## Steps
 
@@ -235,7 +280,10 @@ host. No port forwarding at the second location.
 3. **Buy and build the NAS.** NixOS, ZFS mirror on the two 12 TB drives at
    `/srv/restic`, joined to the tailnet, new host entry in `lib/registry.nix`.
    `services.restic.server` with `appendOnly = true`, `privateRepos` per host,
-   listening on the tailnet interface only. Monthly ZFS scrub.
+   listening on the tailnet interface only. Monthly ZFS scrub. **Sort fan
+   control before the box leaves the house** (see *Hardware*) — one that howls
+   gets unplugged, one that never spins cooks the drives, and neither failure is
+   visible from here.
 4. **Secrets** — `restic-password` (long and random),
    `restic-rest-user`/`-password` per host, and later the Infomaniak S3 keys,
    into `modules/homelab/global-secrets/secret.yaml` via `sops set`; compose
