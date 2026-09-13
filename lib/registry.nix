@@ -31,6 +31,10 @@
     tags = [
       "gaming"
       "gigaplayer-client"
+      # A second session next to Plasma, not a replacement -- `desktop` above
+      # still picks SDDM + Plasma 6, and "Hyprland" just appears alongside it
+      # in the session menu. See modules/hyprland.nix and plans/hyprland.md.
+      "hyprland"
     ];
     username = "phonkd";
 
@@ -53,6 +57,11 @@
         # off to 205-builder. Supplies the nixremote key via sops and pins 205's
         # host key.
         self.nixosModules.builder-client
+        # Hyprland as a second session (gated on the "hyprland" tag above).
+        # Named here rather than in modules/builder.nix's alwaysImport purely
+        # to keep this change off a file a concurrent refactor is rewriting;
+        # it self-gates and would be equally at home there.
+        self.nixosModules.hyprland
       ];
   };
 
@@ -61,7 +70,11 @@
     platform = "x86_64-linux";
     formFactor = "laptop";
     desktop = "kde";
-    tags = [ "gigaplayer-client" ];
+    tags = [
+      "gigaplayer-client"
+      # Second session alongside Plasma -- see the note on blac's tag.
+      "hyprland"
+    ];
     username = "phonkd";
 
     gpu = {
@@ -84,6 +97,8 @@
         # silently fell back to compiling the closure on the laptop after the
         # builder failed to answer.
         self.nixosModules.builder-client
+        # Hyprland as a second session -- see the note on blac's entry.
+        self.nixosModules.hyprland
       ];
   };
 
