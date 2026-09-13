@@ -44,6 +44,7 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
     # Makes nix-installed .app bundles launchable on the Mac. home-manager's
     # `targets.darwin.linkApps` symlinks each bundle into ~/Applications/Home
     # Manager Apps, but the symlink target lives on the /nix volume, which the

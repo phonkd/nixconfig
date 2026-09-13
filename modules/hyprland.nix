@@ -735,18 +735,18 @@
                 # Media and brightness keys. `bindel` repeats while held and
                 # works on the lock screen.
                 bindel = [
-                  ", XF86AudioRaiseVolume, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
-                  ", XF86AudioLowerVolume, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+                  "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
+                  "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
                   ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
                   ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
-                  ", XF86MonBrightnessUp, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
-                  ", XF86MonBrightnessDown, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%-"
+                  "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
+                  "SUPER SHIFT, i, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%-"
                 ];
 
                 bindl = [
-                  ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
-                  ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
-                  ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
+                  "SUPER, B, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
+                  "SUPER, N, exec, ${pkgs.playerctl}/bin/playerctl next"
+                  "SUPER SHIFT, N, exec, ${pkgs.playerctl}/bin/playerctl previous"
                 ];
 
                 # Drag to move/resize, as on the KDE side.
