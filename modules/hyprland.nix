@@ -106,6 +106,20 @@
           description = "Seconds between wallpaper (and colour scheme) changes.";
         };
 
+        scale = lib.mkOption {
+          type = lib.types.str;
+          # 1 = 100%. Deliberately not "auto": Hyprland's auto-scaling picks a
+          # fractional factor from the panel's DPI (1.25 or 1.5 on these
+          # laptops), and fractional scaling on Wayland costs sharpness in every
+          # XWayland app. A string rather than a float so "auto" and "1.25" are
+          # both expressible without a type change.
+          default = "1";
+          description = ''
+            Output scale factor for every monitor, as Hyprland's `monitor=`
+            fourth field. "1" is 100%; "auto" hands the choice back to Hyprland.
+          '';
+        };
+
         colorMode = lib.mkOption {
           type = lib.types.enum [
             "dark"
@@ -197,6 +211,7 @@
       wallpaperInterval = cfg.wallpaperInterval or 300;
       colorMode = cfg.colorMode or "dark";
       colorScheme = cfg.colorScheme or "scheme-tonal-spot";
+      scale = cfg.scale or "1";
 
       cfgHome = config.xdg.configHome;
 
@@ -547,7 +562,9 @@
                 # The file is seeded at activation, so it always exists.
                 source = [ generated.hypr ];
 
-                monitor = ",preferred,auto,auto";
+                # ",preferred,auto,<scale>" -- every output, its preferred mode,
+                # auto-placed, at noughty.hyprland.scale (1 = 100%).
+                monitor = ",preferred,auto,${scale}";
 
                 # Deliberately no XCURSOR_*/HYPRCURSOR_* here. `home.pointerCursor`
                 # is a *user-wide* setting, not a per-session one, and on these
@@ -595,7 +612,13 @@
                 };
 
                 dwindle = {
-                  pseudotile = true;
+                  # No `pseudotile` here: Hyprland 0.55 dropped it as a config
+                  # option, and setting it is a hard error -- "config option
+                  # <dwindle:pseudotile> does not exist". It is absent from the
+                  # option list the compositor ships in
+                  # share/hypr/stubs/hl.meta.lua, which is the authoritative
+                  # list for this build. Pseudotiling itself is still there as
+                  # the `pseudo` dispatcher, if you want it on a key.
                   preserve_split = true;
                 };
 
@@ -659,18 +682,47 @@
                   # --- compositor does not, so they have no counterpart in
                   # --- modules/kde.nix.
 
-                  # Launcher. Alt+Space is KRunner's key on the KDE side (the
-                  # KDE module calls out leaving it alone), so the same finger
-                  # gets the same kind of thing here.
-                  "${mod}, SPACE, exec, ${pkgs.rofi}/bin/rofi -show drun"
+                  # Launcher on Super+D -- the key the pre-GNOME Hyprland config
+                  # in this repo's history used ($mainMod, D, exec, $menu), so
+                  # it is the muscle memory that predates the KDE session.
+                  # Deliberately NOT Alt+Space: that is KRunner's key on the
+                  # Plasma side, and Alt is already the workspace modifier here.
+                  "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show drun"
                   # Float toggle -- AeroSpace's alt-space, which KDE could not
                   # have because KRunner owns that key. Super+Space here.
                   "SUPER, SPACE, togglefloating,"
                   "SUPER, E, exec, ${pkgs.nautilus}/bin/nautilus"
                   "SUPER, L, exec, ${pkgs.hyprlock}/bin/hyprlock"
                   "SUPER SHIFT, E, exit,"
-                  # Region screenshot to the clipboard, then the editor --
-                  # Spectacle's job on the Plasma side.
+                  # Screenshots -- Spectacle's job on the Plasma side. Three
+                  # targets on Super+Shift+1/2/3, screen -> window -> region,
+                  # narrowing as the number goes up. `copysave` puts the PNG on
+                  # the clipboard AND in $XDG_SCREENSHOTS_DIR (~/Pictures here),
+                  # and `--freeze` holds the screen still while you select, so
+                  # menus and hover states can be captured.
+                  #
+                  # If these turn out dead, it is the layout: `1`/`2`/`3` are
+                  # keysyms, and on this ch/de_nodeadkeys keyboard Shift+1 emits
+                  # `plus`. Hyprland normally still matches the base-level
+                  # keysym for a SHIFT bind, but the layout-independent spelling
+                  # is `code:10` / `code:11` / `code:12` if it does not.
+                  #
+                  # Super+Shift+1: the monitor the mouse is on.
+                  "SUPER SHIFT, 1, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave output"
+                  # Super+Shift+2: pick a window. grimblast dropped its `window`
+                  # target ("now included in 'area'"), so this is `area` with
+                  # slurp restricted to the window rectangles grimblast already
+                  # feeds it -- `slurp -r` is "restrict selection to predefined
+                  # boxes". SLURP_ARGS is grimblast's own documented hook for
+                  # this, not a wrapper around it. The practical difference from
+                  # plain `area` is that you cannot free-drag: every selection
+                  # snaps to exactly one window.
+                  "SUPER SHIFT, 2, exec, SLURP_ARGS=-r ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
+                  # Super+Shift+3: free region (single-clicking a window still
+                  # grabs that window, which is grimblast's own behaviour).
+                  "SUPER SHIFT, 3, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
+                  # PrtSc kept as a synonym for the region grab, for the times
+                  # the obvious key is the one you reach for.
                   ", Print, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
                   "SUPER, C, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a"
                   "SUPER, V, exec, ${pkgs.cliphist}/bin/cliphist list | ${pkgs.rofi}/bin/rofi -dmenu | ${pkgs.cliphist}/bin/cliphist decode | ${pkgs.wl-clipboard}/bin/wl-copy"
@@ -703,10 +755,35 @@
                   "SUPER, mouse:273, resizewindow"
                 ];
 
+                # Hyprland 0.55 rule grammar: `match:<field> <value>` selectors
+                # first, then `<property> <value>`. This replaced the older
+                # `windowrulev2 = <property>, <field>:<value>` form -- note the
+                # properties are snake_case now too (`suppress_event`, not
+                # `suppressevent`; `stay_focused`, not `stayfocused`), and the
+                # old spellings are a hard config error, not a deprecation
+                # warning: they failed with "invalid field type suppressevent"
+                # and "invalid field stayfocused: missing a value".
+                #
+                # Verified, not inferred. `Hyprland --verify-config -c <file>`
+                # parses a config and prints the errors without starting a
+                # compositor, which is the cheapest way to check this file after
+                # a Hyprland bump:
+                #
+                #   Hyprland --verify-config -c ~/.config/hypr/hyprland.conf
+                #
+                # These three rules (and everything else here, including the
+                # colours file `source`d above) return "config ok" on 0.55.4.
+                # The grammar also matches the lua form in the compositor's own
+                # shipped share/hypr/hyprland.lua, where the first of these is
+                # `match = { class = ".*" }` with `suppress_event = "maximize"`,
+                # and a later example sets `float = true` as a property.
                 windowrule = [
-                  "suppressevent maximize, class:.*"
-                  "float, title:^(Authentication Required)$"
-                  "stayfocused, title:^(Authentication Required)$"
+                  "match:class .*, suppress_event maximize"
+                  # polkit prompts (hyprpolkitagent): float them and keep focus,
+                  # or the password field loses the keyboard to whatever is
+                  # underneath.
+                  "match:title (Authentication Required), float on"
+                  "match:title (Authentication Required), stay_focused on"
                 ];
 
                 exec-once = [
@@ -968,7 +1045,11 @@
             programs.rofi = {
               enable = true;
               package = pkgs.rofi;
-              font = "Inter 12";
+              # Kept in step with the `font` in the matugen theme below, which
+              # is what actually renders. 13 rather than 12 because the panel
+              # runs at scale 1 (noughty.hyprland.scale) on ~162 DPI, so every
+              # px is literal.
+              font = "Inter 13";
               extraConfig = {
                 modi = "drun,run,window";
                 show-icons = true;
@@ -1099,22 +1180,126 @@
             xdg.dataFile."rofi/themes/matugen.rasi".text = ''
               @import "${generated.rofi}"
 
+              /* Every widget rofi draws is styled explicitly. The first cut of
+                 this theme set only window/inputbar/listview/element and looked
+                 bad for three specific reasons, all of which are defaults you
+                 have to opt out of rather than things you add:
+                   - `element` was styled but `element-text`/`element-icon` were
+                     not, so the text kept its own opaque background and sat
+                     top-aligned next to the icon instead of centred on it;
+                   - `element selected` is loose syntax. rofi's states are
+                     two-part (<row state>.<mode>), and without the normal/
+                     active/urgent variants the selection colour only applied
+                     to some rows;
+                   - no `mainbox`, `prompt` or `entry` rules, so the search line
+                     ran into the edge of the window at rofi's default padding.
+              */
+              * {
+                  font:             "Inter 13";
+                  background-color: transparent;
+                  text-color:       @foreground;
+              }
+
               window {
-                  width: 640px;
-                  border: 2px;
-                  border-color: @selected;
-                  border-radius: 12px;
+                  width:            42%;
+                  border:           2px;
+                  border-color:     @selected;
+                  border-radius:    16px;
                   background-color: @background;
+                  padding:          0;
               }
+
+              mainbox {
+                  padding:  16px;
+                  spacing:  14px;
+                  children: [ inputbar, listview ];
+              }
+
               inputbar {
-                  padding: 10px;
                   background-color: @background-alt;
-                  text-color: @foreground;
+                  border-radius:    12px;
+                  padding:          12px 14px;
+                  spacing:          10px;
+                  children:         [ prompt, entry ];
               }
-              listview { lines: 10; background-color: @background; }
-              element { padding: 8px; border-radius: 8px; background-color: transparent; text-color: @foreground; }
-              element selected { background-color: @selected; text-color: @on-selected; }
-              element-icon { size: 24px; }
+
+              /* Same reasoning as the element states: rofi's default theme
+                 gives prompt/entry a text-color from its own light palette, so
+                 both are set explicitly rather than left to inherit. */
+              prompt {
+                  background-color: transparent;
+                  text-color:       @selected;
+                  vertical-align:   0.5;
+              }
+
+              entry {
+                  background-color:  transparent;
+                  text-color:        @foreground;
+                  placeholder:       "Search";
+                  placeholder-color: @outline;
+                  vertical-align:    0.5;
+              }
+
+              listview {
+                  lines:        9;
+                  columns:      1;
+                  spacing:      4px;
+                  scrollbar:    true;
+                  fixed-height: false;
+              }
+
+              scrollbar {
+                  handle-color:  @selected;
+                  handle-width:  4px;
+                  border-radius: 4px;
+              }
+
+              element {
+                  padding:       10px 12px;
+                  spacing:       12px;
+                  border-radius: 10px;
+                  children:      [ element-icon, element-text ];
+              }
+
+              /* <row state>.<mode>. "normal" here is the mode, not the state.
+                 background-color is spelled out on EVERY state, which is the
+                 actual fix for rows rendering as white blocks: rofi's built-in
+                 theme carries `element normal.normal { background-color:
+                 var(normal-background) }`, and that palette is Solarized
+                 *light* (background is rgba(253,246,227)). A plain
+                 `element { background-color: transparent }` does not beat it —
+                 a state rule is more specific — and `element selected` is not
+                 even valid state syntax, so the old theme only ever recoloured
+                 the border. Setting each state explicitly leaves nothing to
+                 fall back to. */
+              element normal.normal    { background-color: transparent; text-color: @foreground; }
+              element alternate.normal { background-color: transparent; text-color: @foreground; }
+              element normal.active    { background-color: transparent; text-color: @active; }
+              element normal.urgent    { background-color: transparent; text-color: @urgent; }
+              element alternate.active { background-color: transparent; text-color: @active; }
+              element alternate.urgent { background-color: transparent; text-color: @urgent; }
+              element selected.normal  { background-color: @selected; text-color: @on-selected; }
+              element selected.active  { background-color: @active;   text-color: @background; }
+              element selected.urgent  { background-color: @urgent;   text-color: @background; }
+
+              element-icon {
+                  size:           28px;
+                  text-color:     inherit;
+                  vertical-align: 0.5;
+              }
+
+              element-text {
+                  text-color:     inherit;
+                  vertical-align: 0.5;
+              }
+
+              message {
+                  padding:          10px;
+                  border-radius:    10px;
+                  background-color: @background-alt;
+              }
+
+              textbox { text-color: @foreground; }
             '';
 
             # GTK: HM keeps ownership of gtk.css (it writes that file itself
