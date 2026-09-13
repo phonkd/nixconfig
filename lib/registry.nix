@@ -87,6 +87,40 @@
       ];
   };
 
+  # The ASUS Zenbook 14 UM3406GA. Same *role* as g14 -- KDE laptop, gigaplayer
+  # client, build-offload client, no deploy.hostname because laptops are deploy
+  # clients rather than deploy targets -- but not the same hardware: this one is
+  # a Radeon 840M iGPU with no dGPU, no ROG firmware and no fingerprint reader.
+  # See plans/z14-zenbook.md.
+  z14 = {
+    kind = "computer";
+    platform = "x86_64-linux";
+    formFactor = "laptop";
+    desktop = "kde";
+    tags = [ "gigaplayer-client" ];
+    username = "phonkd";
+
+    # AMD only. This is load-bearing rather than documentation: it is what keeps
+    # nvidia-desktop's config block off (it gates on gpu.hasNvidia) while the
+    # shared desktop baseline still arrives through that module's unconditional
+    # `imports`. No `compute` -- the 840M is an iGPU and nothing here schedules
+    # work onto it.
+    gpu = {
+      vendors = [ "amd" ];
+    };
+
+    extraModules =
+      { self, inputs }:
+      [
+        /etc/nixos/hardware-configuration.nix
+        self.nixosModules.z14
+        # Offload x86_64-linux builds to 205-builder over the tailnet, exactly
+        # as g14 does -- without it the laptop compiles every host's closure
+        # itself. Supplies the nixremote key via sops and pins 205's host key.
+        self.nixosModules.builder-client
+      ];
+  };
+
   "201-mono" = {
     kind = "server";
     platform = "x86_64-linux";

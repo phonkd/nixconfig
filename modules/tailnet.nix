@@ -1,7 +1,7 @@
 # Tailscale client for the headscale mesh (control plane:
 # modules/homelab/apps/headscale.nix on observability).
 #
-# Enrols every server AND NixOS desktop (g14/blac) into the tailnet and enables
+# Enrols every server AND NixOS desktop (g14/z14/blac) into the tailnet and enables
 # Tailscale SSH — over the tailnet, access is authorised by tailnet identity +
 # the headscale ACL, so there is no sshd port/key/known_hosts to manage (a
 # host's real sshd on :5432 stays only as off-tailnet break-glass). Headless:
@@ -10,8 +10,9 @@
 # per-desktop sing-box SOCKS proxy (HM `proxy` module, now Mac-only).
 #
 # Also carries the tailnet's exit-node wiring: 201-mono advertises itself as an
-# exit node and g14 is allowed to use one, both strictly opt-in at runtime. See
-# plans/g14-vpn.md (and the rule it narrows in plans/headscale-mesh.md).
+# exit node and the laptops (g14, z14) are allowed to use one, both strictly
+# opt-in at runtime. See plans/g14-vpn.md (and the rule it narrows in
+# plans/headscale-mesh.md).
 #
 # Wired into modules/builder.nix `alwaysImport`. It references
 # sops.secrets.headscale_authkey, a reusable pre-auth key (headscale user
@@ -22,6 +23,15 @@
 {
   flake.nixosModules.tailnet =
     { config, lib, ... }:
+    let
+      # Hosts that may *use* an exit node and drive tailscale without sudo.
+      # A list rather than a name test because there are two of them now: z14
+      # (the Zenbook, plans/z14-zenbook.md) wants exactly what g14 has.
+      laptops = [
+        "g14"
+        "z14"
+      ];
+    in
     lib.mkIf (config.noughty.host.is.server || config.noughty.host.is.nixosDesktop) {
       sops.secrets.headscale_authkey = { };
 
@@ -54,10 +64,13 @@
         # so it resolves to true rather than conflicting). "client" only relaxes
         # reverse-path filtering to "loose", which is what tailscale wants of a
         # host receiving exit-node replies.
+        # Keyed on the `laptops` list above rather than on is.nixosDesktop:
+        # blac stays at "none" with no operator flag, because it has never
+        # needed either and widening this is not part of adding z14.
         useRoutingFeatures =
           if config.noughty.host.name == "201-mono" then
             "server"
-          else if config.noughty.host.name == "g14" then
+          else if lib.elem config.noughty.host.name laptops then
             "client"
           else
             "none";
@@ -75,7 +88,7 @@
         extraSetFlags =
           if config.noughty.host.name == "201-mono" then
             [ "--advertise-exit-node" ]
-          else if config.noughty.host.name == "g14" then
+          else if lib.elem config.noughty.host.name laptops then
             [ "--operator=phonkd" ]
           else
             [ ];
