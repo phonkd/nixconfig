@@ -142,8 +142,8 @@ the module and are the only bindings not present in the KDE half.
       (`reload_style_on_change`, matugen's interactive prompt).
 - [x] `modules/hyprland.nix`: NixOS half (options + compositor + fonts) and HM
       half (hyprland, waybar, matugen, wallpaper timer).
-- [x] Wire into `lib/registry.nix` for `g14` and `blac`.
-- [ ] `deploy g14`, then pick "Hyprland" at SDDM.
+- [x] Wire into `lib/registry.nix` for `blac`, `z14` and `g14`.
+- [ ] Rebuild on the host itself, then pick "Hyprland" at SDDM (see rollout).
 
 ## Open decisions
 
@@ -166,10 +166,12 @@ the module and are the only bindings not present in the KDE half.
   follow-up -- the natural shape is a helper in `lib/` taking
   `{ pkgs, config, inputs }` and returning the key/action table both halves
   render.
-- **`z14` is not included.** It is a third KDE laptop, added to the registry by
-  that same concurrent session while this was in flight, so it was never in
-  scope here. Adding it is one line: the `"hyprland"` tag plus
-  `self.nixosModules.hyprland` in its `extraModules`, exactly as `g14` has.
+- **Hosts: `blac`, `z14`, `g14`.** `z14` was added at the user's request after
+  the fact — it landed in the registry from a concurrent session while this work
+  was in flight. `g14` keeps its tag even though that laptop is offline and may
+  be retired: the tag does nothing until something rebuilds that host, so
+  leaving it costs nothing and keeps the three KDE machines uniform. Drop it
+  from `lib/registry.nix` if the retirement is decided.
 - **GTK apps do not restyle live.** New windows pick up the new colours; already
   running GTK apps re-read their CSS only when nudged. A `gsettings` theme-toggle
   post-hook does that for GTK3 and is included; GTK4/libadwaita apps keep their
@@ -181,6 +183,18 @@ the module and are the only bindings not present in the KDE half.
   and every systemd unit is bound to `hyprland-session.target`, which only
   Hyprland starts. Worst case Hyprland fails to start and SDDM drops you back to
   the picker, where Plasma is still sitting.
-- Rollout is `deploy g14` / `deploy blac`, then log out and choose "Hyprland".
-- Back out by removing the `"hyprland"` tag from the registry entry (the module
-  self-gates on it) and redeploying.
+- Rollout is **not** `deploy <host>`. The desktops are deploy *clients*, not
+  deploy-rs nodes — none of them sets `deploy.hostname` in `lib/registry.nix`,
+  and `deploy --list` shows only the servers. So each machine rebuilds itself,
+  from its own checkout of `main`:
+
+  ```
+  sudo nixos-rebuild switch --flake ~/git/nixconfig#blac    # on blac
+  sudo nixos-rebuild switch --flake ~/git/nixconfig#z14     # on z14
+  ```
+
+  Then log out and pick "Hyprland" in SDDM's session menu. First login pulls
+  ~230 MB (fonts are most of it) and the wallpaper lands about three seconds in,
+  when the timer first fires.
+- Back out by removing the `"hyprland"` tag from that host's registry entry (the
+  module self-gates on it) and rebuilding.

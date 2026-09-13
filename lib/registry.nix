@@ -112,7 +112,11 @@
     platform = "x86_64-linux";
     formFactor = "laptop";
     desktop = "kde";
-    tags = [ "gigaplayer-client" ];
+    tags = [
+      "gigaplayer-client"
+      # Second session alongside Plasma -- see the note on blac's tag.
+      "hyprland"
+    ];
     username = "phonkd";
 
     # AMD only. This is load-bearing rather than documentation: it is what keeps
@@ -133,6 +137,8 @@
         # as g14 does -- without it the laptop compiles every host's closure
         # itself. Supplies the nixremote key via sops and pins 205's host key.
         self.nixosModules.builder-client
+        # Hyprland as a second session -- see the note on blac's entry.
+        self.nixosModules.hyprland
       ];
   };
 
