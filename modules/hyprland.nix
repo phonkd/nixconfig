@@ -47,10 +47,18 @@
 # ever owns a separate `colors.*` file, which an HM-owned file pulls in by
 # absolute path (relative imports would resolve against /nix/store).
 #
-# That is load-bearing for GTK4 in particular: HM writes gtk-4.0/gtk.css by
-# itself whenever a GTK4 theme is set -- and one is, Nordic-darker from
-# modules/desktop.nix -- so pointing matugen at that path would collide. Going
-# through `gtk.gtk{3,4}.extraCss` leaves the file HM's and the colours ours.
+# GTK is where that would otherwise bite: HM generates gtk-{3,4}.0/gtk.css
+# itself as soon as `gtk.gtk3.extraCss` / `gtk.gtk4.theme` are set, so those are
+# paths it may claim. (As things stand `gtk.gtk4.theme` is null on these hosts
+# -- `gtk.theme` in modules/desktop.nix is a different option -- so today HM
+# would not fight us for it. Routing the colours through
+# `gtk.gtk{3,4}.extraCss` anyway means the file stays HM's and only the colours
+# are ours, which stops being luck the moment someone sets a GTK4 theme.)
+#
+# The second GTK problem is scope, and it is not hypothetical: gtk.css is
+# *user-wide*, while everything else here is per-session. These hosts also run
+# Plasma, with a deliberate Windows 7 GTK theme from modules/kde.nix. See
+# `clearGtkColors` below for how the wallpaper colours are kept out of it.
 {
   self,
   inputs,
@@ -383,6 +391,30 @@
         $gs set $key "$current" 2>/dev/null || true
       '';
 
+      # GTK config is *user-wide*, not per-session, and these hosts also run
+      # Plasma -- where modules/kde.nix deliberately installs a Windows 7 GTK
+      # theme to match AeroThemePlasma. Left alone, the gtk.css imports below
+      # would repaint that session's GTK apps in wallpaper colours too, which
+      # is a visible regression nobody asked for.
+      #
+      # So the two GTK colour files are treated as session state: emptied when
+      # the Hyprland session stops, refilled by the first wallpaper rotation
+      # when it starts (within seconds -- the timer's OnActiveSec is 3). An
+      # empty file is still a valid @import target, so Plasma just gets the
+      # theme's own colours, exactly as before this module existed.
+      #
+      # The one hole is an unclean exit (a crash, or pulling the power), which
+      # leaves the files populated for the next Plasma login. Recover by
+      # emptying them by hand, or by starting and cleanly leaving Hyprland
+      # once. Not worth more machinery than that.
+      clearGtkColors = pkgs.writeShellScript "hyprland-clear-gtk-colors" ''
+        set -u
+        for f in ${lib.escapeShellArgs [ generated.gtk3 generated.gtk4 ]}; do
+          : > "$f" 2>/dev/null || true
+        done
+        ${gtkNudge}
+      '';
+
       matugenConfig = {
         config = { };
         templates = {
@@ -517,12 +549,15 @@
 
                 monitor = ",preferred,auto,auto";
 
-                # Cursor: the Bibata theme the old Hyprland config used.
+                # Deliberately no XCURSOR_*/HYPRCURSOR_* here. `home.pointerCursor`
+                # is a *user-wide* setting, not a per-session one, and on these
+                # hosts modules/kde.nix already owns it (AeroThemePlasma's
+                # "aero-drop"). Home Manager's cursor module exports
+                # XCURSOR_THEME/SIZE and HYPRCURSOR_THEME/SIZE as session
+                # variables from whatever that is, so Hyprland inherits the same
+                # cursor Plasma uses. Hardcoding a second theme here would name
+                # one that is not the one actually installed for the user.
                 env = [
-                  "XCURSOR_THEME,Bibata-Modern-Amber"
-                  "XCURSOR_SIZE,24"
-                  "HYPRCURSOR_THEME,Bibata-Modern-Amber"
-                  "HYPRCURSOR_SIZE,24"
                   "QT_QPA_PLATFORM,wayland;xcb"
                   "MOZ_ENABLE_WAYLAND,1"
                 ];
@@ -1037,18 +1072,13 @@
               matugen
               nwg-look
               wlogout
-              bibata-cursors
               hyprpolkitagent
             ];
 
-            # Cursor theme, matching the env vars set in the Hyprland config.
-            home.pointerCursor = lib.mkDefault {
-              package = pkgs.bibata-cursors;
-              name = "Bibata-Modern-Amber";
-              size = 24;
-              gtk.enable = true;
-              x11.enable = true;
-            };
+            # No `home.pointerCursor` here on purpose -- see the note next to
+            # the (cursor-free) `env` list above. It is user-wide state that
+            # modules/kde.nix already sets, and a second definition here would
+            # either fight it or be silently ignored.
           }
 
           # -------------------------------------------------------------------
@@ -1091,12 +1121,35 @@
             # for GTK4 whenever a theme is set), and these imports point it at
             # the colours matugen owns. `lines` merges, so this appends to
             # anything another module has put in extraCss.
+            #
+            # The import is unconditional because gtk.css is user-wide, but the
+            # *target* is session-scoped -- see clearGtkColors above. Under
+            # Plasma the imported file is empty and this is a no-op.
             gtk.gtk3.extraCss = ''
               @import url("file://${generated.gtk3}");
             '';
             gtk.gtk4.extraCss = ''
               @import url("file://${generated.gtk4}");
             '';
+
+            # Empties the GTK colour files when the Hyprland session ends, so
+            # Plasma keeps its own GTK theme. Nothing to do on start: the
+            # wallpaper timer refills them moments later. RemainAfterExit is
+            # what makes ExecStop run at session teardown rather than
+            # immediately after ExecStart returns.
+            systemd.user.services.hyprland-gtk-colors = {
+              Unit = {
+                Description = "Scope the wallpaper-derived GTK colours to the Hyprland session";
+                PartOf = [ "hyprland-session.target" ];
+              };
+              Service = {
+                Type = "oneshot";
+                RemainAfterExit = true;
+                ExecStart = "${pkgs.coreutils}/bin/true";
+                ExecStop = "${clearGtkColors}";
+              };
+              Install.WantedBy = [ "hyprland-session.target" ];
+            };
 
             # The wallpaper daemon. Bound to hyprland-session.target, so it
             # never comes up under Plasma.
@@ -1192,6 +1245,15 @@
                   for f in ${lib.escapeShellArgs (lib.attrValues generated)}; do
                     [ -e "$f" ] || ${pkgs.coreutils}/bin/touch "$f"
                   done
+
+                  # ...except the GTK pair, which must start out EMPTY. gtk.css
+                  # is user-wide, so a seeded-with-colours file would recolour
+                  # the Plasma session's GTK apps from the next login onwards,
+                  # before Hyprland had ever been used. They are filled in by
+                  # the first wallpaper rotation inside a Hyprland session and
+                  # emptied again when it ends (see clearGtkColors).
+                  ${pkgs.coreutils}/bin/truncate -s 0 \
+                    ${lib.escapeShellArgs [ generated.gtk3 generated.gtk4 ]} || true
                 fi
               fi
             '';
