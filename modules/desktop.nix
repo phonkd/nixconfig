@@ -71,9 +71,9 @@
         # content is generated from the settings below, so there is nothing
         # worth preserving: overwrite it and skip the backup entirely.
         gtk2.force = true;
-        # mkDefault throughout: on KDE hosts modules/aerothemeplasma.nix
-        # replaces the whole look with a light Windows 7 one, and a GTK stack
-        # still set to dark Nordic would be the one thing left contradicting it.
+        # mkDefault throughout: on KDE hosts modules/kde.nix replaces the
+        # whole look with a light Windows 7 one, and a GTK stack still set to
+        # dark Nordic would be the one thing left contradicting it.
         theme = lib.mkDefault {
           package = pkgs.nordic;
           name = "Nordic-darker";
@@ -109,42 +109,14 @@
     lib.mkIf config.noughty.host.is.nixosDesktop {
       # --- Desktop environment selection (driven by registry) ----------
       services.xserver.enable = true;
-      services.displayManager.sddm = lib.mkIf (de == "kde") {
-        enable = true;
-        wayland.enable = true;
-      };
-      services.desktopManager.plasma6.enable = lib.mkIf (de == "kde") true;
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
       services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
-
-      # --- KDE logs in to an empty desktop ------------------------------
-      # Plasma's default is loginMode=restorePreviousLogout: it saves the
-      # window list on logout and reopens the lot at the next login. Turned
-      # off here -- a login should start clean, not resurrect whatever was on
-      # screen when the machine was shut down.
-      #
-      # Values are ksmserver's own (`emptySession`, `restorePreviousLogout`,
-      # `restoreSavedSession`), verified against the strings in
-      # plasma-workspace's ksmserver and plasma-fallback-session-restore
-      # binaries rather than from memory -- the latter is the Wayland path
-      # that actually does the reopening in Plasma 6.
-      #
-      # /etc/xdg, not ~/.config, for the same reason as dolphinrc in
-      # modules/aerothemeplasma.nix: ksmserverrc is an ordinary KConfig file
-      # and cascades through XDG_CONFIG_DIRS, so this is a *default* that
-      # System Settings' "Desktop Session" page can still override into
-      # ~/.config/ksmserverrc. It also stays out of ksmserver's way: that
-      # file is rewritten at every logout with the saved-session groups, and
-      # a home.file symlink into the store would make it read-only.
-      environment.etc."xdg/ksmserverrc" = lib.mkIf (de == "kde") {
-        text = ''
-          [General]
-          loginMode=emptySession
-        '';
-      };
+      # The KDE branch -- SDDM, Plasma 6, the AeroThemePlasma shell and the
+      # KConfig defaults that come with it -- lives in modules/kde.nix, gated
+      # on this same `noughty.host.desktop`. Everything below is DE-agnostic.
 
       # --- Quiet boot ---------------------------------------------------
-      # Desktops boot behind Plymouth (aerothemeplasma.nix turns it on), so
+      # Desktops boot behind Plymouth (modules/kde.nix turns it on), so
       # the kernel/udev/stage-1 chatter underneath just flickers past the
       # splash -- nobody reads it, and on a failed boot you drop to a console
       # anyway. Deliberately NOT applied to servers: when one of those fails

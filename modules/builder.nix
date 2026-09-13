@@ -47,8 +47,10 @@ let
     gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
     containers # rootless podman for distrobox; gated on host.is.nixosDesktop
-    aerothemeplasma # gated on host.is.nixosDesktop AND desktop == "kde"
-    kde-plasma-shell # declares `noughty.kde.*`; the work is in the HM half
+    # Everything KDE (modules/kde.nix): the session and the AeroThemePlasma
+    # shell, gated on host.is.nixosDesktop AND desktop == "kde". Also declares
+    # `noughty.kde.*` unconditionally, so a host module can set it.
+    kde
 
     # Server baseline (gated on host.is.server).
     server-globalconfig

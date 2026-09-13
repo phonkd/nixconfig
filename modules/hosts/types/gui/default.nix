@@ -47,19 +47,13 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.gaming
-        # GTK half of the Windows 7 look (AeroThemePlasma covers Qt/Plasma).
-        # Self-gating: it checks osConfig.noughty.host.desktop and does
-        # nothing on a non-KDE desktop.
-        self.homeModules.aerothemeplasma
-        # AeroSpace's Option-key bindings, on Alt, for KDE. Self-gates on the
-        # desktop being KDE, same as aerothemeplasma above.
-        self.homeModules.kde-shortcuts
-        # Wallpaper slideshow + panel visibility, driven through plasmashell's
-        # scripting API at login. Same self-gate again; the per-host knobs are
-        # `noughty.kde.*`, declared by the NixOS half in alwaysImport.
-        self.homeModules.kde-plasma-shell
-        # `winver`, by AeroThemePlasma's author. Same self-gate again.
-        self.homeModules.linver
+        # The $HOME half of modules/kde.nix: the GTK side of the Windows 7 look
+        # (AeroThemePlasma covers Qt/Plasma), the AeroSpace-parity global
+        # shortcuts, Linver, and the wallpaper/panel layout. Self-gating -- it
+        # checks osConfig.noughty.host.desktop and does nothing on a non-KDE
+        # desktop. The per-host knobs are `noughty.kde.*`, declared by the
+        # NixOS half in alwaysImport.
+        self.homeModules.kde
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
         self.homeModules.zed-editor

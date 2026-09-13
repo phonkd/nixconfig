@@ -61,7 +61,7 @@
     # Repointing it at nixos-26.05 rebuilds that whole stack for no gain.
     mac-app-util.url = "github:hraban/mac-app-util";
     # AeroThemePlasma -- the Windows 7 shell for Plasma 6 -- packaged for
-    # NixOS. Sole consumer: modules/aerothemeplasma.nix.
+    # NixOS. Sole consumer: modules/kde.nix.
     #
     # PINNED, and the pin is load-bearing. This flake rebuilds libplasma and
     # plasma-workspace from *our* nixpkgs with the aeroshell patches applied,

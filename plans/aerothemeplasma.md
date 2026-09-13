@@ -60,7 +60,8 @@ rejected: it drags the whole host off the release branch for a rice.)
 
 ### What we switch on
 
-`modules/aerothemeplasma.nix`, self-gating on
+`modules/aerothemeplasma.nix` (folded into `modules/kde.nix` in 2026-09,
+which now holds every KDE-only setting), self-gating on
 `host.is.nixosDesktop && host.desktop == "kde"` like the module it replaced:
 
 - the shell itself, the SDDM theme, the PlymouthVista boot splash, the UAC
