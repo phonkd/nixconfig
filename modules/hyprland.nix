@@ -519,7 +519,18 @@
                     WlrLayershell.namespace: "quickshell-bar"
 
                     anchors { top: true; left: true; right: true }
-                    implicitHeight: 34
+
+                    // The *window* is deliberately taller than the bar drawn
+                    // inside it, and stays flush against the screen edge. The
+                    // reveal depends on that: the hot zone has to sit at y=0,
+                    // and giving the PanelWindow a top margin to make the bar
+                    // float would start the surface *below* the edge the
+                    // pointer is aiming at, so the gesture would stop working.
+                    // The floating look is therefore an inset drawn inside a
+                    // flush window, never a margin on the window itself.
+                    readonly property int barHeight: 34
+                    readonly property int barInset: 7
+                    implicitHeight: barHeight + barInset
 
                     // Reserve no screen space. This is NOT the default: three
                     // connected anchors make a PanelWindow ExclusionMode.Auto,
@@ -609,8 +620,32 @@
                     // painting is sufficient: a transparent layer surface emits
                     // no light of its own, which is the whole OLED argument.
                     Rectangle {
-                        anchors.fill: parent
-                        color: root.palette.background
+                        readonly property color base: root.palette.background
+                        readonly property color edge: root.palette.outline
+
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.leftMargin: bar.barInset * 2
+                        anchors.rightMargin: bar.barInset * 2
+                        anchors.topMargin: bar.barInset
+                        height: bar.barHeight
+                        radius: 14
+
+                        // Translucent, not the flat slab this started as. The
+                        // alpha here is exactly what Hyprland's `blur`
+                        // layerrule acts on -- the two belong together, because
+                        // 0.72 alpha over a busy wallpaper without a blur
+                        // behind it reads as washed out rather than as glass.
+                        // See the layerrule on this namespace further down.
+                        color: Qt.rgba(base.r, base.g, base.b, 0.72)
+
+                        // A hairline of the scheme's outline colour, kept faint.
+                        // Without it the blurred panel has no edge at all
+                        // against a light wallpaper and looks like a smudge.
+                        border.width: 1
+                        border.color: Qt.rgba(edge.r, edge.g, edge.b, 0.35)
+
                         opacity: bar.revealed ? 1 : 0
                         visible: opacity > 0
 
@@ -1109,6 +1144,31 @@
                   # underneath.
                   "match:title (Authentication Required), float on"
                   "match:title (Authentication Required), stay_focused on"
+                ];
+
+                # What turns the bar's 0.72 alpha into glass rather than a
+                # washed-out slab. The namespace is the one shell.qml sets on
+                # its layer surface (WlrLayershell.namespace).
+                #
+                # `ignorealpha` is the important half: it tells Hyprland not to
+                # blur pixels below that alpha, and the bar's surface is mostly
+                # transparent -- the inset margins around the floating panel,
+                # and the *entire* surface whenever the bar is hidden. Without
+                # it there would be a blurred rectangle sitting at the top of
+                # the screen at all times, which is precisely the always-on
+                # artefact the whole hidden-bar design exists to avoid.
+                # Same 0.55 grammar rewrite the windowrules above went through,
+                # and the same hard-error-not-a-warning behaviour: the old
+                # `blur, <namespace>` / `ignorealpha 0.3, <namespace>` spellings
+                # fail with "invalid field blur: missing a value" and "invalid
+                # field type ignorealpha". Selector first, snake_case property
+                # second, and the namespace match is a *regex* -- anchored here
+                # so it cannot also catch some future "quickshell-bar-popup".
+                # Field names taken from the compositor's own shipped
+                # share/hypr/stubs/hl.meta.lua (HL.LayerRuleSpec).
+                layerrule = [
+                  "match:namespace ^quickshell-bar$, blur on"
+                  "match:namespace ^quickshell-bar$, ignore_alpha 0.3"
                 ];
 
                 exec-once = [
