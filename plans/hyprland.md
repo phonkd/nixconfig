@@ -6,9 +6,9 @@
 
 A second, fully declarative desktop session on the KDE desktops (`g14`, `blac`):
 Hyprland + Waybar, with the **same keybindings** the KDE hosts already have
-(`modules/kde-shortcuts.nix`, which itself mirrors AeroSpace on the Mac), the
+(`modules/kde.nix`, which itself mirrors AeroSpace on the Mac), the
 **same rotating wallpaper** the KDE hosts already have
-(`modules/kde-plasma-shell.nix`'s slideshow), and — the new part — a colour
+(`modules/kde.nix`'s Plasma slideshow), and — the new part — a colour
 scheme that is **re-derived from each wallpaper as it changes** and pushed into
 the bar, the compositor and the GTK apps.
 
@@ -112,7 +112,7 @@ doesn't exist" config error or an unstyled bar.
 
 ### Keybindings
 
-Taken from `modules/kde-shortcuts.nix` verbatim — `Alt` is the Mac's `Option`:
+Taken from `modules/kde.nix` verbatim — `Alt` is the Mac's `Option`:
 
 | key | action |
 |---|---|
@@ -158,11 +158,18 @@ the module and are the only bindings not present in the KDE half.
   `"hyprland"` tag from `blac` in `lib/registry.nix` if you'd rather it stayed
   KDE-only.
 - **Bindings duplicated, not shared with the KDE module.** A single shared table
-  consumed by both halves would be nicer. It is deliberately not done here: a
-  concurrent session is mid-refactor on `modules/kde-shortcuts.nix` (it is being
-  folded into a new `modules/kde.nix`), and touching that file now would mean a
-  merge conflict against uncommitted work. Worth doing as a follow-up once that
-  lands.
+  consumed by both halves would be nicer. It was deliberately not done here:
+  this work was written while a concurrent session was mid-refactor on
+  `modules/kde-shortcuts.nix` (folding it into what is now `modules/kde.nix`),
+  and editing that file would have meant conflicting against uncommitted work.
+  That refactor has since landed, so unifying the two tables is now a clean
+  follow-up -- the natural shape is a helper in `lib/` taking
+  `{ pkgs, config, inputs }` and returning the key/action table both halves
+  render.
+- **`z14` is not included.** It is a third KDE laptop, added to the registry by
+  that same concurrent session while this was in flight, so it was never in
+  scope here. Adding it is one line: the `"hyprland"` tag plus
+  `self.nixosModules.hyprland` in its `extraModules`, exactly as `g14` has.
 - **GTK apps do not restyle live.** New windows pick up the new colours; already
   running GTK apps re-read their CSS only when nudged. A `gsettings` theme-toggle
   post-hook does that for GTK3 and is included; GTK4/libadwaita apps keep their

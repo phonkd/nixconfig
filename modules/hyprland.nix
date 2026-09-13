@@ -9,9 +9,9 @@
 # Three things are mirrored from the Plasma side on purpose, because the point
 # is that the two sessions feel the same:
 #
-#   * Keybindings, from modules/kde-shortcuts.nix -- which in turn mirrors
+#   * Keybindings, from modules/kde.nix -- which in turn mirrors
 #     AeroSpace on the Mac. Alt is Option. See the table further down.
-#   * A rotating wallpaper, like modules/kde-plasma-shell.nix's slideshow.
+#   * A rotating wallpaper, like modules/kde.nix's Plasma slideshow.
 #   * ...and the new part: the colour scheme is re-derived from each wallpaper
 #     as it changes, and pushed into the bar, the compositor, notifications,
 #     the launcher, the lock screen and GTK.
@@ -194,7 +194,7 @@
 
       # -- Keybindings -------------------------------------------------------
       #
-      # Straight from modules/kde-shortcuts.nix, which is itself AeroSpace's
+      # Straight from modules/kde.nix, which is itself AeroSpace's
       # Option-key layout with Option spelled Alt. `mod` is the single knob:
       # set it to SUPER and the whole set moves off Alt at once, exactly like
       # its KDE counterpart.
@@ -588,7 +588,7 @@
 
                 # -------------------------------------------------------------
                 # Keybindings -- the KDE set, verbatim where KDE has an
-                # equivalent action. See modules/kde-shortcuts.nix for the
+                # equivalent action. See modules/kde.nix for the
                 # reasoning behind each choice; only the differences are noted
                 # here.
                 # -------------------------------------------------------------
@@ -622,7 +622,7 @@
 
                   # --- Below here: things Plasma provides for free and a bare
                   # --- compositor does not, so they have no counterpart in
-                  # --- modules/kde-shortcuts.nix.
+                  # --- modules/kde.nix.
 
                   # Launcher. Alt+Space is KRunner's key on the KDE side (the
                   # KDE module calls out leaving it alone), so the same finger
