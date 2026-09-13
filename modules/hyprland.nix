@@ -25,7 +25,10 @@
 #   reload_style_on_change -- Option to enable reloading the css style if a
 #   modification is detected on the style sheet file or any imported css files.
 #
-# So Waybar watches the generated `colors.css` itself and restyles in place.
+# So Waybar watches the generated `colors.css` itself and restyles in place --
+# provided the `@import` naming it is a bare absolute path and not a `file://`
+# URL, which is a real trap and cost us the feature once. See the long note on
+# `programs.waybar.style` below.
 # Hyprland and mako have documented reload commands (`hyprctl reload`,
 # `makoctl reload`); rofi and hyprlock read their config at launch. Every
 # consumer is repainted through a first-class feature of that consumer.
@@ -580,9 +583,15 @@
                 ];
 
                 general = {
-                  gaps_in = 5;
-                  gaps_out = 12;
-                  border_size = 2;
+                  # Deliberately heavier than Hyprland's defaults. There are no
+                  # titlebars here, so the active border -- coloured from the
+                  # sourced matugen file -- is the only thing marking focus, and
+                  # at 2px that accent is too thin to pick out at a glance. The
+                  # gaps go up with it: a thicker frame on every window makes
+                  # the old 5/12 spacing look cramped.
+                  gaps_in = 8;
+                  gaps_out = 16;
+                  border_size = 3;
                   layout = "dwindle";
                   resize_on_border = true;
                   # col.active_border / col.inactive_border deliberately absent:
@@ -590,7 +599,10 @@
                 };
 
                 decoration = {
-                  rounding = 10;
+                  # Stays comfortably above general:border_size so the corner
+                  # arc still reads through the thicker border instead of being
+                  # squared off by it.
+                  rounding = 12;
                   blur = {
                     enabled = true;
                     size = 5;
@@ -729,6 +741,32 @@
                   # Force a wallpaper + colour scheme change now, instead of
                   # waiting out the timer.
                   "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start hyprland-wallpaper.service"
+
+                  # The bar. It is hidden by default -- OLED burn-in, see
+                  # `mode`/`start_hidden` in programs.waybar below -- so these
+                  # three are the only way back to it:
+                  #
+                  #   Super+Shift+B        peek. Up for a few seconds, then it
+                  #                        puts itself away again. The one you
+                  #                        actually use: glance at the clock or
+                  #                        the battery and it is gone.
+                  #   Super+Ctrl+B         pin. Up and staying up, any pending
+                  #                        auto-hide cancelled -- for when you
+                  #                        need to click a tray icon or scrub
+                  #                        the volume.
+                  #   Super+Ctrl+Shift+B   away again, now.
+                  #
+                  # `restart` rather than `start` on the peek unit so a second
+                  # press restarts the countdown instead of racing the first
+                  # press's hide. The pin has to stop that unit first, or its
+                  # sleep would fire a hide a few seconds later and un-pin the
+                  # bar; `;` and not `&&` because the stop is a no-op when
+                  # nothing is running and exits non-zero on some paths.
+                  # Hyprland's `exec` runs the rest of the line through
+                  # /bin/sh -c, so the separator is the shell's.
+                  "SUPER SHIFT, B, exec, ${pkgs.systemd}/bin/systemctl --user restart hyprland-waybar-peek.service"
+                  "SUPER CTRL, B, exec, ${pkgs.systemd}/bin/systemctl --user stop hyprland-waybar-peek.service; ${pkgs.systemd}/bin/systemctl --user kill --kill-whom=main --signal=SIGUSR1 waybar.service"
+                  "SUPER CTRL SHIFT, B, exec, ${pkgs.systemd}/bin/systemctl --user stop hyprland-waybar-peek.service; ${pkgs.systemd}/bin/systemctl --user kill --kill-whom=main --signal=SIGUSR2 waybar.service"
                 ]
                 ++ workspaceBinds;
 
@@ -810,6 +848,60 @@
               };
 
               settings.main = {
+                # -----------------------------------------------------------
+                # Autohide, because these are OLED panels
+                # -----------------------------------------------------------
+                # A bar is the worst possible thing to leave on an OLED: the
+                # same 34 rows of pixels, the same clock glyphs, all day. The
+                # wallpaper already rotates for exactly this reason
+                # (noughty.hyprland.wallpaperInterval), and the bar was the one
+                # thing on screen exempt from it.
+                #
+                # Waybar has no "autohide" option, but it does have the two
+                # options that add up to one, and they are first-class
+                # waybar(5) features rather than a compositor hack:
+                #
+                #   mode -- Selects one of the preconfigured display modes.
+                #     [...] supports the same values: dock, hide, invisible,
+                #     overlay.
+                #   start_hidden -- Option to start the bar hidden.
+                #
+                # Hidden, Waybar puts itself in its internal "invisible" mode:
+                # opacity 0, bottom layer, exclusive zone 0, pointer events
+                # passed straight through. Nothing is drawn at all, so there is
+                # nothing to burn a bar-shaped mark into the panel.
+                #
+                # Revealed, `mode = "hide"` is the OVERLAY layer with the
+                # exclusive zone still at 0 -- it floats over the windows for
+                # the few seconds it is up rather than reserving a strip. That
+                # is the other half of the ask: in neither state does Waybar
+                # ever claim screen space, so there is no permanent gap at the
+                # top and tiled windows use the full height.
+                #
+                # waybar(5) does warn that "hide and invisible modes may be not
+                # as useful without Sway IPC", and that is fair: on sway the
+                # reveal is swaybar's IPC watching the bar modifier, and there
+                # is no such IPC under Hyprland. The replacement is the signal
+                # pair below driven from three Hyprland binds -- see the
+                # Super+B block in the keybindings above and
+                # hyprland-waybar-peek.service below.
+                mode = "hide";
+                start_hidden = true;
+
+                # How those binds reach the bar. Deliberately show/hide rather
+                # than Waybar's defaults (toggle on SIGUSR1, reload on
+                # SIGUSR2): the peek unit has to be able to put the bar away
+                # without knowing whether something else already did, and a
+                # toggle cannot promise that. Nothing here wants SIGUSR2's
+                # default `reload` either -- restyling is
+                # reload_style_on_change's job, further down.
+                on-sigusr1 = "show";
+                on-sigusr2 = "hide";
+
+                # Only describes the `default` mode now, which nothing selects:
+                # Waybar folds the top-level bar options into modes.default,
+                # and `mode` above always wins. Kept so that deleting the two
+                # autohide lines gives back a plain docked bar.
                 layer = "top";
                 position = "top";
                 height = 34;
@@ -928,11 +1020,53 @@
               };
 
               # Named colours only -- every literal comes from the imported
-              # file. The import is absolute and file://-schemed because this
-              # stylesheet is a /nix/store path, so a bare relative import
-              # would look for colors.css next to it in the store.
+              # file. The path is absolute because this stylesheet is itself a
+              # /nix/store path, so a relative import would look for colors.css
+              # next to it in the store.
+              #
+              # It is deliberately NOT file://-schemed, and that one detail is
+              # why the bar used to sit there in yesterday's colours while the
+              # borders, notifications, launcher and GTK all followed the
+              # wallpaper. GTK is happy either way -- gtkcssparser.c runs
+              # g_uri_parse_scheme() over the url and takes the URI branch when
+              # it finds a scheme -- so the colours did land, once, at startup,
+              # from whatever the activation seeding had written. What could
+              # not cope was reload_style_on_change. Waybar works out which
+              # files to watch by running a regex over the stylesheet:
+              #
+              #   @import\s+(?:url\()?(?:"|')([^"')]+)(?:"|')\)?;
+              #
+              # and feeding the captured text straight to
+              # std::filesystem::exists (src/util/css_reload_helper.cpp). The
+              # capture was `file:///home/.../colors.css`, which is not a path
+              # that exists, so colors.css never got a file monitor and the
+              # only watched file left was style.css -- a store path that by
+              # definition never changes again. Every rotation after login
+              # repainted everything except the bar. Scheme-less, the capture
+              # is a real path, the monitor attaches, and matugen's write is
+              # picked up within a frame.
               style = ''
-                @import url("file://${generated.waybar}");
+                /* Last-resort palette. A colors.css that is missing or still
+                   empty -- a first login before the timer has fired, or the
+                   seeding having found no readable wallpaper -- would
+                   otherwise leave every @name below undefined, and GTK drops
+                   the whole declaration when it cannot resolve a named colour,
+                   i.e. a bar in GTK's stock widget colours. The import
+                   redefines all eleven; @define-color is a plain hash-table
+                   insert in GTK, so the later definition wins. */
+                @define-color background   #1c1b1f;
+                @define-color foreground   #e6e1e5;
+                @define-color surface      #211f26;
+                @define-color surface_high #2b2930;
+                @define-color primary      #d0bcff;
+                @define-color on_primary   #381e72;
+                @define-color secondary    #ccc2dc;
+                @define-color tertiary     #efb8c8;
+                @define-color outline      #938f99;
+                @define-color error        #f2b8b5;
+                @define-color on_error     #601410;
+
+                @import url("${generated.waybar}");
 
                 * {
                   font-family: "JetBrainsMono Nerd Font", "Font Awesome 6 Free", sans-serif;
@@ -1381,6 +1515,43 @@
                 AccuracySec = "5s";
               };
               Install.WantedBy = [ "hyprland-session.target" ];
+            };
+
+            # The reveal half of the bar's OLED autohide. Waybar starts hidden
+            # (programs.waybar above); this shows it, waits, and hides it
+            # again, so reading the clock costs a few seconds of lit pixels
+            # rather than a permanently lit strip along the top of the panel.
+            #
+            # A unit rather than a script behind the keybind, purely for what
+            # re-pressing the key should do: `systemctl --user restart` tears
+            # down the instance already running -- killing its sleep before the
+            # hide it was about to run -- and starts a fresh countdown. A bare
+            # script would need its own locking for that, or an older press
+            # would hide the bar out from under a newer one.
+            #
+            # Type=oneshot takes several ExecStart lines and runs them in
+            # order. `--kill-whom=main` because the default sends the signal to
+            # everything in the cgroup, and Waybar's on-click handlers (the
+            # pavucontrol one) spawn their children there -- SIGUSR1's default
+            # disposition is to terminate. The `-` prefixes make a press with
+            # no Waybar running fail quietly instead of leaving a failed unit
+            # behind.
+            systemd.user.services.hyprland-waybar-peek = {
+              Unit = {
+                Description = "Show Waybar briefly, then hide it again";
+                PartOf = [ "hyprland-session.target" ];
+              };
+              Service = {
+                Type = "oneshot";
+                ExecStart = [
+                  "-${pkgs.systemd}/bin/systemctl --user kill --kill-whom=main --signal=SIGUSR1 waybar.service"
+                  # Long enough to read a clock and a battery percentage and
+                  # still land a click on a tray icon; short enough that a
+                  # forgotten press is not a burn-in risk in its own right.
+                  "${pkgs.coreutils}/bin/sleep 6"
+                  "-${pkgs.systemd}/bin/systemctl --user kill --kill-whom=main --signal=SIGUSR2 waybar.service"
+                ];
+              };
             };
 
             # Seed every generated file, so the very first Hyprland login --
