@@ -133,14 +133,22 @@
             "dwindle"
             "hy3"
           ];
-          # Default stays dwindle, so this is opt-in per host and backing it
-          # out is one word. See the `group` block in the home half for what
-          # the dwindle side already gives you: Hyprland's *native* tabbed
-          # groups cover AeroSpace's accordion without a plugin, and that is
-          # deliberately not being taken away here. hy3 is the bigger step --
-          # a real i3 tree, where a tab group is one node type among several
-          # and splits are explicit rather than inferred from aspect ratio.
-          default = "dwindle";
+          # hy3 for the session as a whole rather than per host: all three
+          # hosts carrying the "hyprland" tag (blac, g14, z14) run it, so three
+          # identical host-module overrides would say the same thing three
+          # times. The option stays because it is the rollback -- a host that
+          # misbehaves sets `noughty.hyprland.layout = "dwindle"` and is back
+          # on stock Hyprland, which is byte-for-byte the config it had before
+          # hy3 existed.
+          #
+          # The dwindle branch is NOT vestigial. It carries Hyprland's *native*
+          # tabbed groups (see the `group` block in the home half), which cover
+          # AeroSpace's accordion with no plugin at all. hy3 is the bigger step
+          # -- a real i3 tree, where a tab group is one node type among several
+          # and splits are explicit rather than inferred from the focused
+          # window's aspect ratio. If that tree turns out not to earn its keep,
+          # flipping this default back is the whole retreat.
+          default = "hy3";
           description = ''
             Tiling layout for the Hyprland session.
 
@@ -1921,6 +1929,46 @@
                 fi
               fi
             '';
+
+            # Load hy3 into an ALREADY-RUNNING session.
+            #
+            # `exec-once` covers a fresh login and nothing else -- it does not
+            # re-run on `hyprctl reload`, by design. So rebuilding while logged
+            # into Hyprland lands the new config in a session where the plugin
+            # was never loaded: Home Manager's own onChange reload re-parses it,
+            # `general:layout = hy3` is accepted (an unregistered layout is not
+            # an error), and every `hy3:` bind is rejected with "Invalid
+            # dispatcher" and dropped. The visible result is a config-error
+            # banner plus dead alt-keys until the next logout/login, which is a
+            # miserable way to find out.
+            #
+            # This closes that gap: load the plugin, then reload so the binds
+            # register. Both are safe to repeat -- a second load is refused with
+            # "Cannot load a plugin twice!" and exit 0, leaving the one
+            # instance alone.
+            #
+            # Runs after `writeBoundary`, i.e. after linkGeneration has already
+            # fired Home Manager's onChange reload, so the ordering is
+            # load-then-reload and the binds land. The XDG_RUNTIME_DIR dance and
+            # the instance loop are lifted from HM's own reloadConfig: an
+            # activation has no session environment to inherit, and there may be
+            # more than one compositor running.
+            home.activation.hyprlandHy3Plugin = lib.mkIf hy3 (
+              lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                if [ -z "''${DRY_RUN:-}" ]; then
+                  XDG_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(${pkgs.coreutils}/bin/id -u)}"
+                  export XDG_RUNTIME_DIR
+                  if [ -d "/tmp/hypr" ] || [ -d "$XDG_RUNTIME_DIR/hypr" ]; then
+                    for i in $(${hyprctl} instances -j 2>/dev/null \
+                      | ${pkgs.jq}/bin/jq -r '.[].instance' 2>/dev/null); do
+                      verboseEcho "Loading hy3 into Hyprland instance $i"
+                      ${hyprctl} -i "$i" plugin load ${hy3Plugin} >/dev/null 2>&1 || true
+                      ${hyprctl} -i "$i" reload config-only >/dev/null 2>&1 || true
+                    done
+                  fi
+                fi
+              ''
+            );
           })
         ]
       );
