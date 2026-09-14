@@ -151,12 +151,25 @@
 
       config = lib.mkIf (enabled && config.noughty.host.is.nixosDesktop) {
         # The NixOS module is what makes Hyprland a *session*: it installs the
-        # wayland-sessions desktop entry SDDM lists, wires the portals, and sets
-        # the polkit/pam bits. Home Manager's module below only writes config --
-        # it is given `package = null` for exactly this reason.
+        # wayland-sessions desktop entry the login screen lists, wires the
+        # portals, and sets the polkit/pam bits. Home Manager's module below
+        # only writes config -- it is given `package = null` for exactly this
+        # reason.
         programs.hyprland = {
           enable = true;
-          withUWSM = true;
+          # Deliberately off. withUWSM adds a *second* session entry,
+          # "Hyprland (uwsm-managed)", whose whole job is to own the user's
+          # systemd session: uwsm starts graphical-session.target and
+          # wayland-wm@Hyprland.service itself. That collides head-on with the
+          # Home Manager half below, which sets `systemd.enable = true` and so
+          # appends its own exec-once that imports the environment and starts
+          # hyprland-session.target -- the target every user service in this
+          # module is PartOf/WantedBy. Two session managers racing for the same
+          # target is why picking that entry gave a session that did not come
+          # up. Only one of the two can own it, and HM's is the one the rest of
+          # this module is written against, so uwsm goes. With this false the
+          # login screen lists exactly one Hyprland, and it works.
+          withUWSM = false;
           xwayland.enable = true;
         };
 
@@ -213,6 +226,14 @@
     let
       hostTags = osConfig.noughty.host.tags or [ ];
       enabled = osConfig == null || builtins.elem "hyprland" hostTags;
+
+      # True on the hosts that also run the KDE session (blac, g14). There
+      # modules/kde.nix's home module owns `home.pointerCursor` and this one
+      # must keep its hands off it; on a Hyprland-only host (z14) kde.nix is
+      # inert and nothing sets a cursor at all unless this module does.
+      kdeOwnsCursor = (osConfig.noughty.host.desktop or null) == "kde";
+      cursorName = "Bibata-Modern-Classic";
+      cursorSize = 24;
 
       cfg = osConfig.noughty.hyprland or { };
       wallpaperDir = cfg.wallpaperDir or null;
@@ -730,17 +751,26 @@
                 # auto-placed, at noughty.hyprland.scale (1 = 100%).
                 monitor = ",preferred,auto,${scale}";
 
-                # Deliberately no XCURSOR_*/HYPRCURSOR_* here. `home.pointerCursor`
-                # is a *user-wide* setting, not a per-session one, and on these
-                # hosts modules/kde.nix already owns it (AeroThemePlasma's
-                # "aero-drop"). Home Manager's cursor module exports
-                # XCURSOR_THEME/SIZE and HYPRCURSOR_THEME/SIZE as session
-                # variables from whatever that is, so Hyprland inherits the same
-                # cursor Plasma uses. Hardcoding a second theme here would name
-                # one that is not the one actually installed for the user.
+                # The cursor half of `env` is conditional, and the condition is
+                # who installed the theme. `home.pointerCursor` is *user-wide*
+                # state, so on a KDE host modules/kde.nix owns it
+                # (AeroThemePlasma's "aero-drop") and exports XCURSOR_THEME/SIZE
+                # as session variables -- Hyprland inherits the same cursor
+                # Plasma uses, and naming a second theme here would name one not
+                # actually installed. On a Hyprland-only host this module is the
+                # one installing it (see `home.pointerCursor` below), so it can
+                # safely name it, and does: session variables reach Hyprland
+                # only via the login shell that greetd starts it from, and this
+                # makes the pointer independent of that path. No HYPRCURSOR_* --
+                # bibata ships XCursor only, and pointing hyprcursor at a theme
+                # it cannot find is a warning and a fallback, not an upgrade.
                 env = [
                   "QT_QPA_PLATFORM,wayland;xcb"
                   "MOZ_ENABLE_WAYLAND,1"
+                ]
+                ++ lib.optionals (!kdeOwnsCursor) [
+                  "XCURSOR_THEME,${cursorName}"
+                  "XCURSOR_SIZE,${toString cursorSize}"
                 ];
 
                 general = {
@@ -1281,10 +1311,26 @@
               hyprpolkitagent
             ];
 
-            # No `home.pointerCursor` here on purpose -- see the note next to
-            # the (cursor-free) `env` list above. It is user-wide state that
-            # modules/kde.nix already sets, and a second definition here would
-            # either fight it or be silently ignored.
+            # Cursor theme -- but only where nobody else defines one. On
+            # blac/g14 modules/kde.nix owns this (AeroThemePlasma's
+            # "aero-drop") and a second unconditional definition here would
+            # collide with it, which is why this used to be absent entirely.
+            # That was wrong for a Hyprland-only host: with kde.nix inert,
+            # *nothing* set a cursor, so no cursor theme was installed for the
+            # user and XCURSOR_THEME went unset. Clients then ask for a
+            # "default" theme that is not on disk and simply draw no pointer --
+            # which is how this was found, staring at a login screen with an
+            # invisible mouse.
+            home.pointerCursor = lib.mkIf (!kdeOwnsCursor) {
+              enable = true;
+              package = pkgs.bibata-cursors;
+              name = cursorName;
+              size = cursorSize;
+              gtk.enable = true;
+              # Writes ~/.icons/default/index.theme and the Xcursor.* Xresources
+              # -- where XWayland clients look, which GTK/Qt-on-Wayland do not.
+              x11.enable = true;
+            };
           }
 
           # -------------------------------------------------------------------

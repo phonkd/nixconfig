@@ -113,7 +113,8 @@
   # noughty.host.is.nixosDesktop, which the whole desktop baseline
   # (modules/desktop.nix) and modules/hyprland.nix key off, so it can't just
   # become null. "hyprland" names the DE-less case rather than reusing "kde"
-  # -- see the plain-SDDM branch in modules/desktop.nix.
+  # -- see the greetd/tuigreet branch in modules/desktop.nix, which is the
+  # login screen a host with no Plasma installed gets instead of SDDM.
   z14 = {
     kind = "computer";
     platform = "x86_64-linux";
