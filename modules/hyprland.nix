@@ -359,6 +359,26 @@
             col.inactive_border = rgba({{colors.outline_variant.default.hex_stripped}}66)
         }
 
+        # Tabbed / stacked groups. Split the same way `general` is: the
+        # behavioural half lives in hyprland.conf and only the palette is
+        # re-derived here, so a group's tab bar follows the wallpaper like
+        # every other surface.
+        #
+        # The group border repeats general's gradient on purpose -- a grouped
+        # window is still the focused window, and giving it a second accent
+        # would read as a different kind of focus rather than the same one.
+        group {
+            col.border_active = $primary $tertiary 45deg
+            col.border_inactive = rgba({{colors.outline_variant.default.hex_stripped}}66)
+
+            groupbar {
+                col.active = $primary
+                col.inactive = rgba({{colors.surface_container.default.hex_stripped}}cc)
+                text_color = $on_primary
+                text_color_inactive = $on_surface
+            }
+        }
+
         decoration {
             shadow {
                 color = rgba({{colors.shadow.default.hex_stripped}}99)
@@ -439,6 +459,20 @@
         gtk4 = "${cfgHome}/gtk-4.0/colors.css";
       };
 
+      # Deliberately NOT in `generated` above: that attrset is matugen's output
+      # and every entry in it is rewritten on each wallpaper rotation. This one
+      # is user state -- which way round the groupbar draws -- and nothing but
+      # the toggle keybind ever writes it.
+      #
+      # It has to be a `source`d file rather than a plain `hyprctl keyword`,
+      # and that is not a stylistic choice. The wallpaper timer runs `hyprctl
+      # reload` every wallpaperInterval seconds (300 by default, see the
+      # matugen post_hook), and a reload resets every keyword override back to
+      # what the config files say. A mode set with `keyword` alone would
+      # therefore revert itself within five minutes. Sourced, it survives --
+      # reload re-reads it like any other config.
+      groupbarMode = "${cfgHome}/hypr/groupbar-mode.conf";
+
       # GTK3 apps re-read their CSS when XSETTINGS changes, which is what this
       # toggle provokes. It is the one repaint here that is a nudge rather than
       # a documented reload -- GTK has no "reload your css" command. GTK4 /
@@ -476,6 +510,33 @@
           : > "$f" 2>/dev/null || true
         done
         ${gtkNudge}
+      '';
+
+      # Flip the groupbar between tabbed (titles side by side, i3's "tabbed")
+      # and stacked (titles listed one per row, i3's "stacking"). Hyprland has
+      # one knob for both -- `group:groupbar:stacked` -- so this is a toggle
+      # rather than two dispatchers.
+      #
+      # Current state is read back from the file rather than from `hyprctl
+      # getoption`, which keeps the script honest about what will survive the
+      # next reload and saves parsing JSON for one integer. A missing or empty
+      # file reads as 0, which is both Hyprland's default and what the seeding
+      # activation below writes.
+      #
+      # The file is written *and* the option is set live: writing alone would
+      # not show up until the next `hyprctl reload` (up to wallpaperInterval
+      # away), and setting alone would not survive it.
+      toggleGroupbarMode = pkgs.writeShellScript "hyprland-groupbar-mode" ''
+        set -eu
+        if ${pkgs.gnugrep}/bin/grep -qs 'stacked = 1' ${lib.escapeShellArg groupbarMode}; then
+          next=0
+        else
+          next=1
+        fi
+        ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname ${lib.escapeShellArg groupbarMode})"
+        ${pkgs.coreutils}/bin/printf 'group {\n    groupbar {\n        stacked = %s\n    }\n}\n' \
+          "$next" > ${lib.escapeShellArg groupbarMode}
+        ${pkgs.hyprland}/bin/hyprctl keyword group:groupbar:stacked "$next" >/dev/null
       '';
 
       matugenConfig = {
@@ -610,7 +671,15 @@
                 # change; `source` is absolute because this config itself is a
                 # store path, so a relative path would resolve into /nix/store.
                 # The file is seeded at activation, so it always exists.
-                source = [ generated.hypr ];
+                # Second entry is the groupbar tabbed/stacked mode -- user
+                # state the toggle keybind writes, sourced for the same reason
+                # the colours are: `hyprctl reload` re-reads sourced files and
+                # discards anything set with `hyprctl keyword`. Both are seeded
+                # at activation, so neither is ever a missing-source error.
+                source = [
+                  generated.hypr
+                  groupbarMode
+                ];
 
                 # ",preferred,auto,<scale>" -- every output, its preferred mode,
                 # auto-placed, at noughty.hyprland.scale (1 = 100%).
@@ -681,6 +750,61 @@
                   preserve_split = true;
                 };
 
+                # -------------------------------------------------------------
+                # Tabbed / stacked groups -- AeroSpace's accordion, in the one
+                # place the Mac layout had something a plain dwindle tree does
+                # not.
+                #
+                # On the Mac, alt-comma folds the focused container into an
+                # accordion: the windows stop sharing the screen and take turns
+                # in one tile. Hyprland's native groups are the same idea with
+                # a tab bar on top -- which is i3's "tabbed", and with
+                # `stacked` on, i3's "stacking". No plugin: hy3 would give the
+                # full i3 tree (explicit split containers, groups holding
+                # sub-splits), but it is an ABI-coupled plugin that has to be
+                # rebuilt in lockstep with every Hyprland bump, and none of
+                # what it adds beyond this is what the Mac layout does.
+                #
+                # Colours are deliberately absent here, exactly as in `general`
+                # above: the groupbar palette is re-derived from the wallpaper
+                # and arrives through the `source`d matugen file.
+                group = {
+                  # Hyprland's default is ON, and it is the wrong default for a
+                  # layout meant to mirror AeroSpace: with auto_group on, every
+                  # window opened while a group has focus is silently swallowed
+                  # into that group. Grouping should only ever happen because
+                  # the keybind or a drag asked for it.
+                  auto_group = false;
+
+                  groupbar = {
+                    enabled = true;
+                    # `stacked` is deliberately NOT set here. It is the one
+                    # group option owned by the sourced groupbarMode file, so
+                    # that the toggle keybind can rewrite it; setting it here
+                    # too would win (hyprland.conf is parsed after its own
+                    # `source` lines) and pin the mode to whatever this says.
+                    #
+                    # The rest is sizing. Hyprland's defaults (14px bar, 8px
+                    # font) are tuned for a much tighter config than this one
+                    # -- 3px borders, 8/16 gaps, 12px rounding -- and a bar
+                    # that thin reads as a stripe rather than a tab.
+                    height = 20;
+                    font_family = "JetBrainsMono Nerd Font";
+                    font_size = 11;
+                  };
+                };
+
+                binds = {
+                  # What makes alt-h/j/k/l behave like AeroSpace inside an
+                  # accordion, and the reason this needs no extra "next tab"
+                  # key: with this on, movefocus cycles through the group's own
+                  # windows first and only leaves the group once it runs off
+                  # the end. Off (the default), focus skips straight past the
+                  # group's other tabs to the next tile, and the tabs are
+                  # reachable only with the mouse.
+                  movefocus_cycles_groupfirst = true;
+                };
+
                 input = {
                   # Swiss German, no dead keys -- carried over from the old
                   # Hyprland config in git history. Plasma gets this from its
@@ -718,12 +842,30 @@
 
                   # alt-shift-h/j/k/l = move the window. The KDE half had to
                   # spell this as quick-tile, because KWin has no tiling-WM
-                  # "move node". Hyprland does, so this is `movewindow` --
-                  # which is what the AeroSpace original actually does.
-                  "${mod} SHIFT, H, movewindow, l"
-                  "${mod} SHIFT, J, movewindow, d"
-                  "${mod} SHIFT, K, movewindow, u"
-                  "${mod} SHIFT, L, movewindow, r"
+                  # "move node". Hyprland does, so this is a move -- which is
+                  # what the AeroSpace original actually does.
+                  #
+                  # `movewindoworgroup` rather than plain `movewindow`, so the
+                  # same four keys also get windows in and out of the tab
+                  # groups below: it moves *into* the neighbour if that
+                  # neighbour is a group, *out of* the current group if the
+                  # window is in one, and otherwise is exactly `movewindow`.
+                  # So nothing about the ungrouped case changes.
+                  "${mod} SHIFT, H, movewindoworgroup, l"
+                  "${mod} SHIFT, J, movewindoworgroup, d"
+                  "${mod} SHIFT, K, movewindoworgroup, u"
+                  "${mod} SHIFT, L, movewindoworgroup, r"
+
+                  # alt-comma = group / ungroup, mirroring AeroSpace's
+                  # `layout accordion` on the same key. Tab bar appears, the
+                  # windows take turns in one tile, alt-h/l walks the tabs
+                  # (see binds:movefocus_cycles_groupfirst above).
+                  "${mod}, COMMA, togglegroup,"
+                  # alt-shift-comma = flip that bar between tabbed and stacked.
+                  # An exec rather than a dispatcher because Hyprland has no
+                  # dispatcher for it -- see toggleGroupbarMode for why the
+                  # mode has to be written to a file as well as set live.
+                  "${mod} SHIFT, COMMA, exec, ${toggleGroupbarMode}"
 
                   # alt-f = fullscreen
                   "${mod}, F, fullscreen, 0"
@@ -1324,6 +1466,21 @@
             # readable yet, which is enough for every consumer to parse.
             home.activation.hyprlandColors = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
               if [ -z "''${DRY_RUN:-}" ]; then
+                # The groupbar mode file is `source`d too, so it has the same
+                # must-exist-or-it-is-a-config-error property as the colour
+                # files -- but it is user state, not matugen output, so it is
+                # seeded on its own terms: written once with Hyprland's own
+                # default (tabbed), and never touched again. The toggle keybind
+                # owns it from then on.
+                if [ ! -e ${lib.escapeShellArg groupbarMode} ]; then
+                  verboseEcho "Seeding the Hyprland groupbar mode (tabbed)"
+                  $DRY_RUN_CMD ${pkgs.coreutils}/bin/mkdir -p \
+                    "$(${pkgs.coreutils}/bin/dirname ${lib.escapeShellArg groupbarMode})"
+                  $DRY_RUN_CMD ${pkgs.coreutils}/bin/printf \
+                    'group {\n    groupbar {\n        stacked = 0\n    }\n}\n' \
+                    > ${lib.escapeShellArg groupbarMode}
+                fi
+
                 seeded=0
                 for f in ${lib.escapeShellArgs (lib.attrValues generated)}; do
                   if [ ! -e "$f" ]; then
