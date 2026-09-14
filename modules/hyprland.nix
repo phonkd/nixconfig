@@ -648,19 +648,17 @@
         # overshoot/bounce -- verified against the raw parametric curve, not
         # just eyeballed).
         #
-        # --transition-step matters more than it looks: it defaults to 90
-        # (out of 255) for every type except 'simple', which can finish the
-        # whole transition in a handful of frames regardless of
-        # --transition-duration -- that's almost certainly why the animation
-        # was invisible before. 2 is swww/awww's own default for 'simple'
-        # and is what actually keeps it gradual.
+        # --transition-step was pinned to 2 at one point to force a gradual
+        # animation (default is 90 for every type except 'simple'), but that
+        # small a step glows at the moving edge -- too many blended frames
+        # there overshoot with the bezier retiming applied. Left at its
+        # default; --transition-duration is what should govern pacing.
         ${pkgs.awww}/bin/awww img "$image" \
           --resize crop \
           --transition-type "$transition" \
           --transition-angle "$angle" \
           --transition-pos "$pos" \
           --transition-bezier .25,.75,.75,.25 \
-          --transition-step 2 \
           --transition-duration 1 \
           --transition-fps 60 || true
 
