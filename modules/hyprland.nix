@@ -1,10 +1,13 @@
-# Hyprland: a second, fully declarative session on the KDE desktops.
+# Hyprland: a second, fully declarative session on the KDE desktops (blac,
+# g14). On z14 there is no KDE at all (`desktop = "hyprland"` in
+# lib/registry.nix) and this is the *only* session -- modules/desktop.nix's
+# plain-SDDM branch is what gives it a login screen instead.
 #
-# This is *additive*. KDE is untouched -- SDDM simply grows a "Hyprland" entry
-# next to "Plasma", and every systemd user unit below is bound to
-# `hyprland-session.target`, which only Hyprland ever starts. Log in to Plasma
-# and nothing here runs. Back it out by dropping the "hyprland" host tag in
-# lib/registry.nix.
+# On blac/g14 this is *additive*. KDE is untouched -- SDDM simply grows a
+# "Hyprland" entry next to "Plasma", and every systemd user unit below is
+# bound to `hyprland-session.target`, which only Hyprland ever starts. Log in
+# to Plasma and nothing here runs. Back it out by dropping the "hyprland" host
+# tag in lib/registry.nix.
 #
 # Three things are mirrored from the Plasma side on purpose, because the point
 # is that the two sessions feel the same:

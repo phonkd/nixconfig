@@ -102,19 +102,25 @@
       ];
   };
 
-  # The ASUS Zenbook 14 UM3406GA. Same *role* as g14 -- KDE laptop, gigaplayer
-  # client, build-offload client, no deploy.hostname because laptops are deploy
+  # The ASUS Zenbook 14 UM3406GA. Same *role* as g14 was -- gigaplayer client,
+  # build-offload client, no deploy.hostname because laptops are deploy
   # clients rather than deploy targets -- but not the same hardware: this one is
   # a Radeon 840M iGPU with no dGPU, no ROG firmware and no fingerprint reader.
   # See plans/z14-zenbook.md.
+  #
+  # Unlike blac/g14 there is no KDE/Plasma here at all -- Hyprland (below) is
+  # the only session. `desktop` still has to be non-null: it also drives
+  # noughty.host.is.nixosDesktop, which the whole desktop baseline
+  # (modules/desktop.nix) and modules/hyprland.nix key off, so it can't just
+  # become null. "hyprland" names the DE-less case rather than reusing "kde"
+  # -- see the plain-SDDM branch in modules/desktop.nix.
   z14 = {
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "laptop";
-    desktop = "kde";
+    desktop = "hyprland";
     tags = [
       "gigaplayer-client"
-      # Second session alongside Plasma -- see the note on blac's tag.
       "hyprland"
     ];
     username = "phonkd";
@@ -137,7 +143,8 @@
         # as g14 does -- without it the laptop compiles every host's closure
         # itself. Supplies the nixremote key via sops and pins 205's host key.
         self.nixosModules.builder-client
-        # Hyprland as a second session -- see the note on blac's entry.
+        # Hyprland -- the only session on this host, unlike blac/g14 where
+        # it sits next to Plasma.
         self.nixosModules.hyprland
       ];
   };
