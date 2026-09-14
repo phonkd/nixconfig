@@ -14,10 +14,14 @@
 # for the UM3406 upstream, and every generic thing its AMD-laptop profiles would
 # set is already true in this config -- verified by eval rather than assumed:
 # fstrim and enableRedistributableFirmware are on, hardware.graphics.enable32Bit
-# comes with programs.steam, upower and power-profiles-daemon come with Plasma
-# (which is also why tlp stays off), and the generated hardware-configuration.nix
-# already carries hardware.cpu.amd.updateMicrocode. Importing the profiles would
-# add a whole unpinned repo fetch to restate settings we already have.
+# comes with programs.steam, and the generated hardware-configuration.nix already
+# carries hardware.cpu.amd.updateMicrocode. Importing the profiles would add a
+# whole unpinned repo fetch to restate settings we already have.
+#
+# upower and power-profiles-daemon are the one thing that stopgap g14/Plasma
+# era got for free (Plasma's module enables both) and this host now has to ask
+# for explicitly, having no desktop environment of its own -- see below. tlp
+# stays off: it fights power-profiles-daemon over the same CPU governor.
 { ... }:
 {
   flake.nixosModules.z14 =
@@ -43,12 +47,11 @@
       # more power-efficient path on recent Ryzen parts.
       boot.kernelParams = [ "amd_pstate=active" ];
 
-      # This panel is OLED, so the one permanently-lit element on it -- the
-      # taskbar -- gets hidden until the pointer asks for it. Exactly blac's
-      # reasoning; see modules/kde.nix, which also drives the wallpaper
-      # slideshow (the other half of the same burn-in story, and already on by
-      # default for every KDE host, so it needs no line here).
-      noughty.kde.panelAutoHide = true;
+      # No modules/kde.nix on this host to bring these in for free (see the
+      # header comment) -- explicit, the way g14 also does for its own
+      # reasons.
+      services.upower.enable = true;
+      services.power-profiles-daemon.enable = true;
 
       # AirPlay audio *out*, carried over from g14 -- it is about the Sonos
       # speakers on this LAN, not about the GA401, so it belongs on whichever

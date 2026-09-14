@@ -115,8 +115,23 @@
       # KConfig defaults that come with it -- lives in modules/kde.nix, gated
       # on this same `noughty.host.desktop`. Everything below is DE-agnostic.
 
+      # Hyprland-only desktops (z14, `desktop = "hyprland"`): plain SDDM,
+      # no Plasma session and none of AeroThemePlasma. modules/hyprland.nix's
+      # `programs.hyprland.enable` is what supplies the actual
+      # wayland-sessions entry SDDM lists here; this branch only exists so
+      # such a host still gets a login screen at all, the way the KDE branch
+      # does for `desktop == "kde"`.
+      services.displayManager.sddm = lib.mkIf (de == "hyprland") {
+        enable = true;
+        wayland.enable = true;
+      };
+      # Same Plymouth invariant the comment below assumes -- kde.nix sets it
+      # for KDE hosts, so a KDE-less desktop needs its own mkDefault.
+      boot.plymouth.enable = lib.mkIf (de == "hyprland") (lib.mkDefault true);
+
       # --- Quiet boot ---------------------------------------------------
-      # Desktops boot behind Plymouth (modules/kde.nix turns it on), so
+      # Desktops boot behind Plymouth (modules/kde.nix turns it on for KDE
+      # hosts, the branch above for Hyprland-only ones), so
       # the kernel/udev/stage-1 chatter underneath just flickers past the
       # splash -- nobody reads it, and on a failed boot you drop to a console
       # anyway. Deliberately NOT applied to servers: when one of those fails
