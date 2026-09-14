@@ -105,6 +105,31 @@
       # that string onto an actual display-manager + desktop-manager, so
       # hosts never hand-wire GDM/SDDM again -- flip the registry field.
       de = config.noughty.host.desktop;
+
+      # The session list the greeter below offers: NixOS' merged
+      # wayland-sessions directory, minus "Hyprland (uwsm-managed)".
+      #
+      # That entry is *not* controlled by programs.hyprland.withUWSM (which
+      # only decides whether programs.uwsm gets enabled) -- the Hyprland
+      # package ships the .desktop file itself, so it shows up in the picker
+      # either way. Picking it hands the user's systemd session to uwsm, which
+      # starts graphical-session.target and wayland-wm@Hyprland.service and
+      # never touches hyprland-session.target -- the target every user service
+      # in modules/hyprland.nix is bound to. So it logs you into a compositor
+      # with no bar, no wallpaper daemon and no idle handling, which is exactly
+      # the "that option doesn't work" it earned. One Hyprland in the list,
+      # the one this repo is actually wired for.
+      #
+      # Copy-then-remove rather than copy-one-file: any other session a host
+      # installs still shows up, and a rename upstream degrades to "the uwsm
+      # entry is back", not "the list is empty".
+      sessionsWithoutUwsm = pkgs.runCommand "wayland-sessions-no-uwsm" { } ''
+        mkdir -p $out/share/wayland-sessions
+        cp ${config.services.displayManager.sessionData.desktops}/share/wayland-sessions/*.desktop \
+          $out/share/wayland-sessions/
+        chmod -R u+w $out/share/wayland-sessions
+        rm -f $out/share/wayland-sessions/hyprland-uwsm.desktop
+      '';
     in
     lib.mkIf config.noughty.host.is.nixosDesktop {
       # --- Desktop environment selection (driven by registry) ----------
@@ -115,15 +140,40 @@
       # KConfig defaults that come with it -- lives in modules/kde.nix, gated
       # on this same `noughty.host.desktop`. Everything below is DE-agnostic.
 
-      # Hyprland-only desktops (z14, `desktop = "hyprland"`): plain SDDM,
-      # no Plasma session and none of AeroThemePlasma. modules/hyprland.nix's
-      # `programs.hyprland.enable` is what supplies the actual
-      # wayland-sessions entry SDDM lists here; this branch only exists so
-      # such a host still gets a login screen at all, the way the KDE branch
-      # does for `desktop == "kde"`.
-      services.displayManager.sddm = lib.mkIf (de == "hyprland") {
+      # Hyprland-only desktops (z14, `desktop = "hyprland"`): greetd running
+      # tuigreet, deliberately *not* SDDM. SDDM is the KDE branch's alone now
+      # (modules/kde.nix). Its Wayland greeter is a Qt/Plasma-shaped thing that
+      # leans on pieces a KDE-less host never installs -- a cursor theme above
+      # all -- and without them it comes up drawing no pointer at all. The
+      # greeter is still there and still takes keyboard input, but with nothing
+      # to point with the session dropdown is unreachable, so you are stuck
+      # with whatever entry happened to be preselected. tuigreet has no such
+      # failure mode: it is a text UI on VT1, so it needs no compositor, no Qt
+      # theme and no cursor, and it reads the very same wayland-sessions
+      # entries `programs.hyprland.enable` installs -- session picker on F3.
+      services.greetd = lib.mkIf (de == "hyprland") {
         enable = true;
-        wayland.enable = true;
+        # tuigreet draws on the VT directly, so systemd's boot chatter would
+        # otherwise scribble over it. This flag is upstream's fix: it sends the
+        # unit's stderr to the journal and gives it /dev/tty1 properly (TTYPath
+        # + TTYReset + TTYVTDisallocate).
+        useTextGreeter = true;
+        settings.default_session.command = lib.concatStringsSep " " [
+          (lib.getExe pkgs.greetd.tuigreet)
+          "--time"
+          # Prefill the last user *and* reselect the session they last picked,
+          # so the everyday case is: type password, Enter.
+          "--remember"
+          "--remember-user-session"
+          "--asterisks"
+          # tuigreet's built-in default is the FHS /usr/share path, which does
+          # not exist here. See `sessionsWithoutUwsm` above for what this is
+          # and why it isn't sessionData.desktops directly. With the uwsm entry
+          # gone this leaves exactly one session, so a first-ever login -- the
+          # case --remember-user-session has nothing remembered for -- lands on
+          # the right one without any default needing to be named.
+          "--sessions ${sessionsWithoutUwsm}/share/wayland-sessions"
+        ];
       };
       # Same Plymouth invariant the comment below assumes -- kde.nix sets it
       # for KDE hosts, so a KDE-less desktop needs its own mkDefault.
