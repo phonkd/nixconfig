@@ -503,55 +503,70 @@
       # -- Keybindings -------------------------------------------------------
       #
       # Straight from modules/kde.nix, which is itself AeroSpace's
-      # Option-key layout with Option spelled Alt. `mod` is the single knob:
-      # set it to SUPER and the whole set moves off Alt at once, exactly like
-      # its KDE counterpart.
+      # Option-key layout with Option spelled Alt. `mod` is the knob for the
+      # window-management half: set it to SUPER and focus, movement, grouping,
+      # fullscreen and the launchers all move off Alt at once, exactly like its
+      # KDE counterpart.
+      #
+      # It is no longer *every* bind, and the workspace keys are the exception
+      # -- they sit on SUPER unconditionally now, for the reasons written out
+      # at workspaceKeys below. Flipping `mod` to SUPER would collide them with
+      # the window-management set rather than move them.
       #
       # The Alt-vs-menu-mnemonics caveat from the KDE module applies here too:
       # on Linux Alt+<letter> is also how Qt/GTK apps reach their menu bars,
       # and a compositor bind wins over the focused app.
       mod = "ALT";
 
-      # Three physical keyboard rows, top to bottom -- the number row, then
-      # QWE, then ASD -- onto workspaces 1..9. Still AeroSpace's order
-      # (built-in display, then external 2, then external 3); the rows simply
-      # moved down one, so QWE/ASD/UIO became 123/QWE/ASD. The home row now
-      # has a row above *and* below it rather than two rows off to its right,
-      # which is the point: the 3x3 grid matches the keyboard's own shape.
+      # The whole number row, 1..9, onto workspaces 1..9 -- and on SUPER, not
+      # on `mod`. This is the one part of the keymap that does not follow the
+      # knob above, so it is worth saying why out loud.
       #
-      # modules/kde.nix mirrors this. modules/aerospace.nix deliberately does
-      # not: AeroSpace cannot bind this set, and that limitation is precisely
-      # why the all-letters QWE/ASD/UIO scheme existed here in the first
-      # place -- the Mac's constraint used to pick the layout for all three
-      # sessions. It no longer does. The two Linux sessions share a keyboard
-      # and share these keys; the Mac keeps the letters.
+      # The scheme this replaces put workspaces on three keyboard *rows*
+      # (123/QWE/ASD) as a 3x3 grid under Alt. It read well and it cost the
+      # number row's Alt bindings, which is what made it untenable: the
+      # screenshot keys wanted Alt+Shift+1/2/3, and under the grid that chord
+      # was already send-to-workspace. Moving the workspaces one modifier over
+      # frees Alt's digits outright rather than carving an exception out of
+      # them, and a straight 1..9 needs no mnemonic -- the workspace number is
+      # the key you press.
       #
-      # The number row is spelled `code:` rather than `1`/`2`/`3`, and that is
-      # not cosmetic. Every one of these keys also carries a SHIFT bind
-      # (send-to-workspace), and this is a ch/de_nodeadkeys keyboard where
-      # Shift+1 emits `plus` -- the exact trap the screenshot binds above
-      # carry a note about, and a dead send-to-workspace key would fail
-      # silently. `code:` matches the physical key, so it is immune both to
-      # that and to any later layout change. The values are the X11 keycodes
-      # for AE01..AE03 (evdev code + 8), read off xkb's own keycodes/evdev
-      # table rather than remembered. It is also the honest spelling for a
-      # scheme whose logic is positional rather than alphabetic.
+      # Nothing collides on SUPER. Its letters are the ones spoken for (Q close,
+      # W wallpaper, E files, D launcher, and the rest below), and this scheme
+      # no longer uses letters at all; SUPER+1..9 and SUPER+Shift+1..9 were
+      # both free, the latter only because the screenshot binds vacated it in
+      # the same change.
+      #
+      # modules/kde.nix and modules/aerospace.nix both still run the older
+      # layouts -- KDE the 123/QWE/ASD grid, the Mac the all-letters QWE/ASD/UIO
+      # set that AeroSpace's binder forces. The three sessions agreeing was
+      # always a nicety rather than a constraint, and this one is a Hyprland
+      # keyboard decision.
+      #
+      # Spelled `code:` rather than `1`..`9`, and that is not cosmetic. Every
+      # one of these keys also carries a SHIFT bind (send-to-workspace), and
+      # this is a ch/de_nodeadkeys keyboard where Shift+1 emits `plus` -- the
+      # exact trap the screenshot binds carry a note about, and a dead
+      # send-to-workspace key would fail silently. `code:` matches the physical
+      # key, so it is immune both to that and to any later layout change. The
+      # values are the X11 keycodes for AE01..AE09 (evdev code + 8), read off
+      # xkb's own keycodes/evdev table rather than remembered.
       workspaceKeys = [
         "code:10"
         "code:11"
         "code:12"
-        "Q"
-        "W"
-        "E"
-        "A"
-        "S"
-        "D"
+        "code:13"
+        "code:14"
+        "code:15"
+        "code:16"
+        "code:17"
+        "code:18"
       ];
 
       workspaceBinds = lib.flatten (
         lib.imap1 (i: key: [
-          "${mod}, ${key}, workspace, ${toString i}"
-          "${mod} SHIFT, ${key}, ${dispatch "movetoworkspace"}, ${toString i}"
+          "SUPER, ${key}, workspace, ${toString i}"
+          "SUPER SHIFT, ${key}, ${dispatch "movetoworkspace"}, ${toString i}"
         ]) workspaceKeys
       );
 
@@ -1320,8 +1335,11 @@
                   # alt-f = fullscreen
                   "${mod}, F, fullscreen, 0"
 
-                  # Meta+Q = close window. Deliberately not on `mod`, exactly
-                  # as in the KDE half: Alt+Q is a workspace key below.
+                  # Meta+Q = close window, as in the KDE half. Alt+Q was a
+                  # workspace key when this landed, which is why it is not on
+                  # `mod`; the workspaces have since moved to SUPER's number
+                  # row and freed the letter, but the reason to leave this
+                  # alone is now muscle memory rather than a collision.
                   "SUPER, Q, ${dispatch "killactive"},"
 
                   # Launchers: alt-b/v -- two of the three apps KDE and
@@ -1380,16 +1398,25 @@
                   # exists -- annotation is the considered shot, Print is the
                   # reflex one.
                   #
-                  # If these turn out dead, it is the layout: `1`/`2`/`3` are
-                  # keysyms, and on this ch/de_nodeadkeys keyboard Shift+1 emits
-                  # `plus`. Hyprland normally still matches the base-level
-                  # keysym for a SHIFT bind, but the layout-independent spelling
-                  # is `code:10` / `code:11` / `code:12` if it does not -- which
-                  # is the spelling the workspace binds above settled on.
+                  # On Alt+Shift, and on `code:` rather than the keysyms
+                  # `1`/`2`/`3`. The keysym spelling is a live trap on this
+                  # ch/de_nodeadkeys keyboard, where Shift+1 emits `plus`:
+                  # Hyprland normally still matches the base-level keysym for a
+                  # SHIFT bind, but when it does not the bind is simply dead and
+                  # says nothing about it. `code:10`/`11`/`12` are the physical
+                  # AE01..AE03 keys and cannot be wrong, which is the same call
+                  # the workspace binds above made.
                   #
-                  # Super+Shift+1: the monitor the mouse is on.
-                  "SUPER SHIFT, 1, exec, ${annotate "output"}"
-                  # Super+Shift+2: pick a window. grimblast dropped its `window`
+                  # These were on Super+Shift until the workspace keys took the
+                  # number row; they moved here, and the workspaces moved to
+                  # Super, in one change -- the two halves swapped modifiers
+                  # rather than either one carving an exception out of the
+                  # other. Alt+Shift+3 for a region also puts the considered
+                  # screenshot a finger-roll from macOS's Cmd+Shift+3.
+                  #
+                  # Alt+Shift+1: the monitor the mouse is on.
+                  "${mod} SHIFT, code:10, exec, ${annotate "output"}"
+                  # Alt+Shift+2: pick a window. grimblast dropped its `window`
                   # target ("now included in 'area'"), so this is `area` with
                   # slurp restricted to the window rectangles grimblast already
                   # feeds it -- `slurp -r` is "restrict selection to predefined
@@ -1397,10 +1424,10 @@
                   # this, not a wrapper around it. The practical difference from
                   # plain `area` is that you cannot free-drag: every selection
                   # snaps to exactly one window.
-                  "SUPER SHIFT, 2, exec, SLURP_ARGS=-r ${annotate "area"}"
-                  # Super+Shift+3: free region (single-clicking a window still
+                  "${mod} SHIFT, code:11, exec, SLURP_ARGS=-r ${annotate "area"}"
+                  # Alt+Shift+3: free region (single-clicking a window still
                   # grabs that window, which is grimblast's own behaviour).
-                  "SUPER SHIFT, 3, exec, ${annotate "area"}"
+                  "${mod} SHIFT, code:12, exec, ${annotate "area"}"
                   # PrtSc keeps the old instant path: straight to the clipboard
                   # and to disk, no editor, nothing to confirm. Shift+PrtSc is
                   # the same region grab routed through satty, so the annotated
@@ -1417,16 +1444,22 @@
                   # waiting out the timer.
                   "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start hyprland-wallpaper.service"
 
-                  # Audio output switcher, on alt-0. Nothing else can hold that
-                  # key: `workspaceKeys` above takes the first three digits (as
-                  # code:10/11/12) plus Q W E A S D and stops at nine, so 0 is
-                  # the one key on the number row the workspace set does not
-                  # reach -- this session has no workspace 10. That stays true
-                  # however the letter half of the list is rearranged.
+                  # Audio output switcher, on alt-0. Alt's digits are free now
+                  # that the workspaces sit on SUPER, so this no longer has to
+                  # dodge them -- but 0 stays the right key regardless: the
+                  # workspace set runs 1..9 and there is no workspace 10, so
+                  # the number row's last key is the one that never gets
+                  # claimed on either modifier.
+                  #
+                  # `code:19` is AE10, the physical 0. No SHIFT here, so the
+                  # keysym `0` would in fact have worked -- the Shift+1-emits-
+                  # `plus` trap needs a SHIFT bind to bite -- but spelling one
+                  # key of the number row differently from the other nine is
+                  # the kind of detail that goes wrong later.
                   #
                   # `bind`, not `bindel`: this opens a menu, and repeating it
                   # while the key is held would stack a second rofi on the first.
-                  "${mod}, 0, exec, ${sinkSwitcher}"
+                  "${mod}, code:19, exec, ${sinkSwitcher}"
                 ]
                 ++ workspaceBinds;
 
