@@ -111,6 +111,24 @@
             user = "phonkd";
             proxyCommand = "none";
           };
+          # ext-mail was missing from this list, which made `ssh ext-mail` fail
+          # as "Connection closed by UNKNOWN port 65535" — the bedag `Host *`
+          # socat SOCKS catch-all swallowing it, exactly as it does for obs's
+          # public IP without the break-glass block below. Misleading symptom
+          # for what is only a missing alias.
+          #
+          # Over the tailnet it needs neither :5432 nor id_ed25519_priv: it is
+          # an enrolled node with Tailscale SSH live, so it authorises by
+          # identity like every other host (verified: `ssh 100.64.0.19`). The
+          # port and key in lib/registry.nix / the nixconfig-ops runbook are
+          # for the OFF-tailnet deploy path only, which is deliberate and
+          # unaffected by this alias — `deploy.hostname` there is the public
+          # IP, so deploys do not come through here.
+          programs.ssh.matchBlocks."ext-mail" = {
+            hostname = "100.64.0.19";
+            user = "phonkd";
+            proxyCommand = "none";
+          };
 
           # --- obs break-glass (tailnet is DOWN) ----------------------------
           # When the mesh is broken the `observability` alias above is useless,

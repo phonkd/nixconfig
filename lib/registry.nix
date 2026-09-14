@@ -120,14 +120,21 @@
     platform = "x86_64-linux";
     formFactor = "laptop";
     desktop = "hyprland";
+    # NB no "work" tag: work happens on the Mac. It carried one briefly (see
+    # plans/work-setup-on-nixos.md, which built the Linux half of modules/work/
+    # for this host) and the tag is all it took to opt in -- re-add it here if
+    # that ever changes; nothing else was removed.
+    #
+    # Dropping it is what took the bedag `Host *` socat SOCKS catch-all off
+    # this laptop. That catch-all is why `ssh ext-mail` here failed as
+    # "Connection closed by UNKNOWN port 65535" rather than as a plain unknown
+    # host -- ext-mail is in no matchBlock, so it fell through to the proxy.
+    # With work gone, no catch-all remains for anything to fall through to, so
+    # homeModules.work-ssh-bypass (which existed only to punch holes in it)
+    # goes with it and is not missed.
     tags = [
       "gigaplayer-client"
       "hyprland"
-      # The work setup (modules/work/). z14 is the only Linux host that
-      # carries it -- see plans/work-setup-on-nixos.md. Deliberately not on
-      # blac or g14: the work ssh config ends in a `Host *` SOCKS catch-all,
-      # which is not something to land on a machine by surprise.
-      "work"
     ];
     username = "phonkd";
 
