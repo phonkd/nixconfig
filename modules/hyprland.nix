@@ -13,20 +13,27 @@
 #     AeroSpace on the Mac. Alt is Option. See the table further down.
 #   * A rotating wallpaper, like modules/kde.nix's Plasma slideshow.
 #   * ...and the new part: the colour scheme is re-derived from each wallpaper
-#     as it changes, and pushed into the bar, the compositor, notifications,
-#     the launcher, the lock screen and GTK.
+#     as it changes, and pushed into the shell, the compositor, the launcher,
+#     the lock screen and GTK.
+#
+# The shell is Caelestia (programs.caelestia below), adopted in place of a
+# hand-written Quickshell bar -- see plans/caelestia-shell.md. It is a whole
+# desktop rather than a bar, so it also owns notifications now; mako is off,
+# and the note at services.mako explains why that is a choice rather than an
+# oversight.
 #
 # Why every consumer repaints itself without a reload hack
 # --------------------------------------------------------
-# The usual way to repaint a bar from a wallpaper is to signal it, or kill and
-# respawn it, after rewriting its colours. None of that happens here. The bar is
-# Quickshell, so the colours arrive as JSON through a FileView that watches the
-# file and rebinds -- QML property bindings do the repainting, and there is
-# nothing to restart. See `quickshellConfig` below.
+# The usual way to repaint a shell from a wallpaper is to signal it, or kill
+# and respawn it, after rewriting its colours. None of that happens here.
+# Caelestia reads its scheme through a FileView that watches the file and
+# rebinds, so QML property bindings do the repainting and there is nothing to
+# restart -- which is exactly why matugen can keep owning colour generation
+# instead of handing it to `caelestia scheme set`. See `caelestiaTemplate`.
 #
-# Hyprland and mako have documented reload commands (`hyprctl reload`,
-# `makoctl reload`); rofi and hyprlock read their config at launch. Every
-# consumer is repainted through a first-class feature of that consumer.
+# Hyprland has a documented reload command (`hyprctl reload`); rofi and
+# hyprlock read their config at launch. Every consumer is repainted through a
+# first-class feature of that consumer.
 #
 # Colour generation is matugen (Material You extraction + templating). Two of
 # its behaviours are not obvious and were found by running it, not by reading:
@@ -268,19 +275,70 @@
       # reload, no signal, nothing to restart. Keys match the fallback palette
       # in shell.qml one for one; see the merge there, which is what stops a
       # half-written or still-empty file from blanking the bar.
-      quickshellTemplate = pkgs.writeText "matugen-quickshell.json" ''
+      # Caelestia's colour scheme, in Caelestia's own state file. This is what
+      # keeps the wallpaper pipeline ours instead of handing colour duty to
+      # `caelestia scheme set`: services/Colours.qml reads this path through a
+      # FileView with watchChanges + onFileChanged, so a rotation repaints the
+      # shell live, exactly like every other consumer here.
+      #
+      # Two details are load-bearing and both come from reading that loader:
+      #
+      #   * values are `hex_stripped`. The loader does `#${colour}` itself, so
+      #     a leading '#' here yields '##rrggbb' and silently no colour.
+      #   * keys are Material 3 roles in camelCase, which is NOT what matugen
+      #     calls them -- matugen is snake_case (`on_primary`,
+      #     `surface_container_high`). Hence the mapping below rather than a
+      #     straight dump. Keys the loader does not know are ignored, and roles
+      #     omitted here keep Caelestia's built-in defaults, so a partial map
+      #     degrades quietly rather than breaking the shell.
+      #
+      # Custom named schemes are not an officially supported upstream feature,
+      # so this file is undocumented surface -- if a release renames it, the
+      # fallback is letting caelestia-cli own colours.
+      caelestiaTemplate = pkgs.writeText "matugen-caelestia.json" ''
         {
-          "background":   "{{colors.surface.default.hex}}",
-          "foreground":   "{{colors.on_surface.default.hex}}",
-          "surface":      "{{colors.surface_container.default.hex}}",
-          "surface_high": "{{colors.surface_container_high.default.hex}}",
-          "primary":      "{{colors.primary.default.hex}}",
-          "on_primary":   "{{colors.on_primary.default.hex}}",
-          "secondary":    "{{colors.secondary.default.hex}}",
-          "tertiary":     "{{colors.tertiary.default.hex}}",
-          "outline":      "{{colors.outline.default.hex}}",
-          "error":        "{{colors.error.default.hex}}",
-          "on_error":     "{{colors.on_error.default.hex}}"
+          "name": "matugen",
+          "flavour": "default",
+          "mode": "${colorMode}",
+          "colours": {
+            "background":              "{{colors.background.default.hex_stripped}}",
+            "onBackground":            "{{colors.on_background.default.hex_stripped}}",
+            "surface":                 "{{colors.surface.default.hex_stripped}}",
+            "onSurface":               "{{colors.on_surface.default.hex_stripped}}",
+            "surfaceVariant":          "{{colors.surface_variant.default.hex_stripped}}",
+            "onSurfaceVariant":        "{{colors.on_surface_variant.default.hex_stripped}}",
+            "surfaceContainerLowest":  "{{colors.surface_container_lowest.default.hex_stripped}}",
+            "surfaceContainerLow":     "{{colors.surface_container_low.default.hex_stripped}}",
+            "surfaceContainer":        "{{colors.surface_container.default.hex_stripped}}",
+            "surfaceContainerHigh":    "{{colors.surface_container_high.default.hex_stripped}}",
+            "surfaceContainerHighest": "{{colors.surface_container_highest.default.hex_stripped}}",
+            "surfaceBright":           "{{colors.surface_bright.default.hex_stripped}}",
+            "surfaceDim":              "{{colors.surface_dim.default.hex_stripped}}",
+            "surfaceTint":             "{{colors.surface_tint.default.hex_stripped}}",
+            "inverseSurface":          "{{colors.inverse_surface.default.hex_stripped}}",
+            "inverseOnSurface":        "{{colors.inverse_on_surface.default.hex_stripped}}",
+            "primary":                 "{{colors.primary.default.hex_stripped}}",
+            "onPrimary":               "{{colors.on_primary.default.hex_stripped}}",
+            "primaryContainer":        "{{colors.primary_container.default.hex_stripped}}",
+            "onPrimaryContainer":      "{{colors.on_primary_container.default.hex_stripped}}",
+            "inversePrimary":          "{{colors.inverse_primary.default.hex_stripped}}",
+            "secondary":               "{{colors.secondary.default.hex_stripped}}",
+            "onSecondary":             "{{colors.on_secondary.default.hex_stripped}}",
+            "secondaryContainer":      "{{colors.secondary_container.default.hex_stripped}}",
+            "onSecondaryContainer":    "{{colors.on_secondary_container.default.hex_stripped}}",
+            "tertiary":                "{{colors.tertiary.default.hex_stripped}}",
+            "onTertiary":              "{{colors.on_tertiary.default.hex_stripped}}",
+            "tertiaryContainer":       "{{colors.tertiary_container.default.hex_stripped}}",
+            "onTertiaryContainer":     "{{colors.on_tertiary_container.default.hex_stripped}}",
+            "error":                   "{{colors.error.default.hex_stripped}}",
+            "onError":                 "{{colors.on_error.default.hex_stripped}}",
+            "errorContainer":          "{{colors.error_container.default.hex_stripped}}",
+            "onErrorContainer":        "{{colors.on_error_container.default.hex_stripped}}",
+            "outline":                 "{{colors.outline.default.hex_stripped}}",
+            "outlineVariant":          "{{colors.outline_variant.default.hex_stripped}}",
+            "shadow":                  "{{colors.shadow.default.hex_stripped}}",
+            "scrim":                   "{{colors.scrim.default.hex_stripped}}"
+          }
         }
       '';
 
@@ -316,22 +374,6 @@
         $lockAccent = rgb({{colors.primary.default.hex_stripped}})
         $lockInner = rgb({{colors.surface_container_high.default.hex_stripped}})
         $lockError = rgb({{colors.error.default.hex_stripped}})
-      '';
-
-      # Global keys ONLY -- deliberately no `[criteria]` section. mako parses an
-      # include in the enclosing context and Home Manager emits the settings
-      # alphabetically, which puts `include=` in the middle of the file
-      # (between `font` and `margin`). A section header in the included file
-      # would therefore still be open when mako read the *parent's* remaining
-      # keys, silently scoping margin/padding/width to that criteria instead of
-      # to every notification. Urgency colours are set in mako's own config
-      # below, where the section nesting is under Home Manager's control.
-      makoTemplate = pkgs.writeText "matugen-mako" ''
-        # Generated by matugen; included from mako's config. post_hook runs
-        # `makoctl reload`.
-        background-color={{colors.surface_container.default.hex}}ee
-        text-color={{colors.on_surface.default.hex}}
-        border-color={{colors.primary.default.hex}}
       '';
 
       rofiTemplate = pkgs.writeText "matugen-rofi.rasi" ''
@@ -384,363 +426,18 @@
       # files survive a reboot and a first login has something to read even
       # before the first rotation (see the seeding activation script below).
       generated = {
-        # A sibling of the `bar` config directory, not a file inside it: Home
-        # Manager owns `quickshell/bar` as a symlink into the store, so nothing
-        # mutable can live under there.
-        quickshell = "${cfgHome}/quickshell/colors.json";
+        # Under stateHome, not configHome, because that is where Caelestia
+        # looks: utils/Paths.qml resolves `state` to
+        # $XDG_STATE_HOME/caelestia. It is also the right category -- this file
+        # is generated output that changes on every wallpaper rotation, not
+        # configuration.
+        caelestia = "${config.xdg.stateHome}/caelestia/scheme.json";
         hypr = "${cfgHome}/hypr/colors.conf";
         hyprlock = "${cfgHome}/hypr/hyprlock-colors.conf";
-        mako = "${cfgHome}/mako/colors";
         rofi = "${cfgHome}/rofi/colors.rasi";
         gtk3 = "${cfgHome}/gtk-3.0/colors.css";
         gtk4 = "${cfgHome}/gtk-4.0/colors.css";
       };
-
-      # The bar itself. A directory rather than a bare file because
-      # programs.quickshell.configs maps a name to a config *directory*, and
-      # quickshell looks for shell.qml inside it.
-      #
-      # Everything below was checked against the .qmltypes of the quickshell in
-      # our pinned nixpkgs (0.3.0) rather than the project's docs, which
-      # describe a later API: `ShellWindow` does not exist here, workspaces have
-      # no `occupied` property, `FileView.text` is a function and not a
-      # property, and `UPowerDevice.percentage` is a fraction. Each of those is
-      # commented at the point it bites.
-      quickshellConfig = pkgs.writeTextDir "shell.qml" ''
-        // Generated by modules/hyprland.nix -- edit it there, not here.
-
-        // Both delegates below (the Variants one, the Repeater one) reach out
-        // to ids in this file's scope. Without this pragma that is an
-        // "unqualified access" that happens to resolve through the context
-        // chain -- it works until it silently does not. Bound makes the
-        // capture explicit, and is why every delegate here declares its model
-        // data with `required property`, which the pragma insists on.
-        pragma ComponentBehavior: Bound
-
-        import QtQuick
-        import Quickshell
-        import Quickshell.Wayland
-        import Quickshell.Hyprland
-        import Quickshell.Io
-        import Quickshell.Services.UPower
-
-        ShellRoot {
-            id: root
-
-            // The pill labels, in workspace order, straight from the same Nix
-            // list that builds the Alt+<letter> bindings. Interpolated rather
-            // than restated so the two cannot drift: the entire point of
-            // lettered pills is that what is on screen is the key you press.
-            readonly property var workspaceKeys: ${builtins.toJSON workspaceKeys}
-
-            // Same keys the matugen template writes. This is not belt and
-            // braces -- the colour-seeding activation guarantees colors.json
-            // exists but is explicitly allowed to leave it *empty* when no
-            // wallpaper is readable yet, and an empty file is not valid JSON.
-            // Every colour therefore has to survive the parse failing.
-            readonly property var fallback: ({
-                "background":   "#1c1b1f",
-                "foreground":   "#e6e1e5",
-                "surface":      "#211f26",
-                "surface_high": "#2b2930",
-                "primary":      "#d0bcff",
-                "on_primary":   "#381e72",
-                "secondary":    "#ccc2dc",
-                "tertiary":     "#efb8c8",
-                "outline":      "#938f99",
-                "error":        "#f2b8b5",
-                "on_error":     "#601410"
-            })
-
-            property var palette: root.fallback
-
-            // Two things about FileView in 0.3.0 that are easy to get wrong and
-            // both fail silently: `watchChanges` only *watches* -- the reload is
-            // not automatic and has to be asked for in onFileChanged -- and
-            // `text` is a function rather than a property, because FileView is a
-            // QML wrapper over FileViewInternal. Bind to `text` and you get a
-            // function object, not the file.
-            FileView {
-                id: coloursFile
-                path: "${generated.quickshell}"
-                watchChanges: true
-                onFileChanged: reload()
-                onLoaded: root.readColours()
-            }
-
-            function readColours() {
-                var raw = coloursFile.text();
-                if (!raw) return;
-
-                var parsed;
-                try {
-                    parsed = JSON.parse(raw);
-                } catch (e) {
-                    return;             // half-written file; keep the last good one
-                }
-
-                // Merged over the fallback rather than swapped in: a template
-                // that grows a key before this file does would otherwise leave
-                // a binding resolving to undefined, which QML paints as
-                // transparent -- invisible text on an invisible bar.
-                var merged = {};
-                for (var key in root.fallback)
-                    merged[key] = (parsed[key] !== undefined) ? parsed[key] : root.fallback[key];
-                root.palette = merged;
-            }
-
-            readonly property var batteryIcons: [ "󰁺", "󰁽", "󰁿", "󰂁", "󰁹" ]
-
-            function batteryGlyph(level, charging) {
-                if (charging) return "󰂄";
-                var i = Math.floor(level * root.batteryIcons.length);
-                if (i < 0) i = 0;
-                if (i >= root.batteryIcons.length) i = root.batteryIcons.length - 1;
-                return root.batteryIcons[i];
-            }
-
-            readonly property var workspaces: Hyprland.workspaces.values
-
-            function workspaceById(id) {
-                for (var i = 0; i < root.workspaces.length; i++)
-                    if (root.workspaces[i].id === id) return root.workspaces[i];
-                return null;            // never been visited; no object exists yet
-            }
-
-            Variants {
-                model: Quickshell.screens
-
-                PanelWindow {
-                    id: bar
-                    required property var modelData
-                    screen: modelData
-
-                    WlrLayershell.layer: WlrLayer.Overlay
-                    WlrLayershell.namespace: "quickshell-bar"
-
-                    anchors { top: true; left: true; right: true }
-
-                    // The *window* is deliberately taller than the bar drawn
-                    // inside it, and stays flush against the screen edge. The
-                    // reveal depends on that: the hot zone has to sit at y=0,
-                    // and giving the PanelWindow a top margin to make the bar
-                    // float would start the surface *below* the edge the
-                    // pointer is aiming at, so the gesture would stop working.
-                    // The floating look is therefore an inset drawn inside a
-                    // flush window, never a margin on the window itself.
-                    readonly property int barHeight: 34
-                    readonly property int barInset: 7
-                    implicitHeight: barHeight + barInset
-
-                    // Reserve no screen space. This is NOT the default: three
-                    // connected anchors make a PanelWindow ExclusionMode.Auto,
-                    // which quietly reserves implicitHeight -- a 34px strip
-                    // missing from every tiled window, for a bar that is
-                    // invisible almost all of the time.
-                    exclusionMode: ExclusionMode.Ignore
-
-                    // The default is *white*. It also has to be declared here
-                    // rather than flipped on reveal: a surface that is opaque
-                    // before it first becomes visible cannot be made
-                    // transparent later without surfaceFormat.opaque = false.
-                    color: "transparent"
-
-                    property bool revealed: false
-
-                    // Pointer input is confined to `hotZone` -- 2px while
-                    // hidden, the whole bar once revealed. Two things follow,
-                    // and the second one is load-bearing:
-                    //
-                    //   * the top two rows of pixels belong to the bar rather
-                    //     than the window beneath it. That is what an
-                    //     edge-triggered reveal costs, and why this is 2px and
-                    //     not 20.
-                    //   * it must never reach 0. Quickshell sets
-                    //     Qt::WindowTransparentForInput whenever the mask
-                    //     resolves to an empty region, and a window transparent
-                    //     for input cannot be hovered -- a zero-height hidden
-                    //     strip makes the bar permanently unreachable.
-                    mask: Region { item: hotZone }
-
-                    Item {
-                        id: hotZone
-                        anchors.top: parent.top
-                        width: parent.width
-                        height: bar.revealed ? bar.height : 2
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-
-                            // Growing the mask under the cursor does not
-                            // re-trigger these: entering the 2px strip gives
-                            // exactly one `entered`, and sliding down into the
-                            // newly grown region gives no `exited`. So there is
-                            // no flicker here that needs debouncing.
-                            onEntered: {
-                                hideTimer.stop();
-                                dwellTimer.restart();
-                            }
-                            onExited: {
-                                dwellTimer.stop();
-                                hideTimer.restart();
-                            }
-                        }
-                    }
-
-                    // Grazing the top edge on the way to something else should
-                    // not flash the bar; asking for it on purpose should not
-                    // feel like waiting.
-                    Timer {
-                        id: dwellTimer
-                        interval: 120
-                        onTriggered: bar.revealed = true
-                    }
-
-                    // Enough grace to leave and come back -- sliding off the
-                    // bar and returning does not make it vanish mid-gesture.
-                    Timer {
-                        id: hideTimer
-                        interval: 500
-                        onTriggered: bar.revealed = false
-                    }
-
-                    SystemClock {
-                        id: clock
-                        // Minutes, not Seconds: the bar renders HH:mm, so a
-                        // per-second wakeup would be 59 repaints of a string
-                        // that did not change -- on a bar nobody is looking at.
-                        precision: SystemClock.Minutes
-                    }
-
-                    // `visible` is deliberately not what hides this. Hiding the
-                    // window destroys the layer surface and takes the input
-                    // region with it, so the hot zone above would never fire
-                    // again and the bar could not be summoned back. Not
-                    // painting is sufficient: a transparent layer surface emits
-                    // no light of its own, which is the whole OLED argument.
-                    Rectangle {
-                        readonly property color base: root.palette.background
-                        readonly property color edge: root.palette.outline
-
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.leftMargin: bar.barInset * 2
-                        anchors.rightMargin: bar.barInset * 2
-                        anchors.topMargin: bar.barInset
-                        height: bar.barHeight
-                        radius: 14
-
-                        // Translucent, not the flat slab this started as. The
-                        // alpha here is exactly what Hyprland's `blur`
-                        // layerrule acts on -- the two belong together, because
-                        // 0.72 alpha over a busy wallpaper without a blur
-                        // behind it reads as washed out rather than as glass.
-                        // See the layerrule on this namespace further down.
-                        color: Qt.rgba(base.r, base.g, base.b, 0.72)
-
-                        // A hairline of the scheme's outline colour, kept faint.
-                        // Without it the blurred panel has no edge at all
-                        // against a light wallpaper and looks like a smudge.
-                        border.width: 1
-                        border.color: Qt.rgba(edge.r, edge.g, edge.b, 0.35)
-
-                        opacity: bar.revealed ? 1 : 0
-                        visible: opacity > 0
-
-                        Behavior on opacity {
-                            NumberAnimation { duration: 140; easing.type: Easing.OutQuad }
-                        }
-
-                        Row {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 4
-
-                            Repeater {
-                                model: root.workspaceKeys.length
-
-                                Rectangle {
-                                    id: pill
-                                    required property int index
-
-                                    readonly property int wsId: index + 1
-                                    readonly property var ws: root.workspaceById(wsId)
-                                    readonly property bool focused: ws !== null && ws.focused
-                                    // 0.3.0 has no `occupied`/`populated` on a
-                                    // workspace, so ask it how many toplevels
-                                    // it is holding instead.
-                                    readonly property bool occupied: ws !== null && ws.toplevels.values.length > 0
-
-                                    width: 26
-                                    height: 22
-                                    radius: 7
-                                    color: focused ? root.palette.primary
-                                         : occupied ? root.palette.surface_high
-                                         : "transparent"
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        text: root.workspaceKeys[pill.index]
-                                        font.family: "JetBrainsMono Nerd Font"
-                                        font.pixelSize: 12
-                                        font.bold: pill.focused
-                                        color: pill.focused ? root.palette.on_primary
-                                             : pill.occupied ? root.palette.foreground
-                                             : root.palette.outline
-                                    }
-
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        onClicked: Hyprland.dispatch("workspace " + pill.wsId)
-                                    }
-                                }
-                            }
-                        }
-
-                        Row {
-                            anchors.right: parent.right
-                            anchors.rightMargin: 12
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 16
-
-                            Text {
-                                // UPower.displayDevice is null on a machine with
-                                // no battery, and these hosts are laptops only by
-                                // convention -- guard rather than assume.
-                                readonly property var battery: UPower.displayDevice
-                                // percentage is energy/energyCapacity, i.e. 0..1
-                                // and NOT 0..100. Read as a percentage directly
-                                // it gives a bar permanently reading 0%.
-                                readonly property real level: battery !== null ? battery.percentage : 0
-                                readonly property bool charging: battery !== null
-                                    && (battery.state === UPowerDeviceState.Charging
-                                        || battery.state === UPowerDeviceState.FullyCharged)
-
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: battery !== null && battery.isLaptopBattery
-                                text: root.batteryGlyph(level, charging) + " " + Math.round(level * 100) + "%"
-                                font.family: "JetBrainsMono Nerd Font"
-                                font.pixelSize: 12
-                                color: (level <= 0.15 && !charging) ? root.palette.error
-                                                                    : root.palette.foreground
-                            }
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: Qt.formatDateTime(clock.date, "HH:mm")
-                                font.family: "JetBrainsMono Nerd Font"
-                                font.pixelSize: 13
-                                color: root.palette.foreground
-                            }
-                        }
-                    }
-                }
-            }
-        }
-      '';
 
       # GTK3 apps re-read their CSS when XSETTINGS changes, which is what this
       # toggle provokes. It is the one repaint here that is a nudge rather than
@@ -784,10 +481,10 @@
       matugenConfig = {
         config = { };
         templates = {
-          quickshell = {
-            input_path = "${quickshellTemplate}";
-            output_path = generated.quickshell;
-            # No post_hook: the bar's FileView watches this file itself.
+          caelestia = {
+            input_path = "${caelestiaTemplate}";
+            output_path = generated.caelestia;
+            # No post_hook: the shell's own FileView watches this file.
           };
           hyprland = {
             input_path = "${hyprTemplate}";
@@ -797,11 +494,6 @@
           hyprlock = {
             input_path = "${hyprlockTemplate}";
             output_path = generated.hyprlock;
-          };
-          mako = {
-            input_path = "${makoTemplate}";
-            output_path = generated.mako;
-            post_hook = "makoctl reload || true";
           };
           rofi = {
             input_path = "${rofiTemplate}";
@@ -823,15 +515,16 @@
       #
       # Set the wallpaper, then re-derive the scheme from that same image.
       # Every binary is an absolute store path: a systemd user unit inherits no
-      # PATH worth relying on. hyprctl/makoctl are the exception -- they are
-      # invoked from matugen's post_hooks, which run under a shell, so they are
-      # put on PATH explicitly below.
+      # PATH worth relying on. hyprctl is the exception -- it is invoked from
+      # matugen's post_hook, which runs under a shell, so it is put on PATH
+      # explicitly below. (mako used to be here for `makoctl reload`; Caelestia
+      # owns notifications now and watches its own scheme file, so neither the
+      # binary nor the hook is needed.)
       rotate = pkgs.writeShellScript "hyprland-wallpaper-rotate" ''
         set -u
         export PATH=${
           lib.makeBinPath [
             pkgs.hyprland
-            pkgs.mako
             pkgs.glib
             pkgs.coreutils
           ]
@@ -884,6 +577,12 @@
       themingEnabled = wallpaperDir != null;
     in
     {
+      # Unconditional, like every other import here: the module only declares
+      # options, and all of its config hangs off `programs.caelestia.enable`
+      # below, which is itself inside `lib.mkIf enabled`. A host without the
+      # hyprland tag therefore gets the options and none of the shell.
+      imports = [ inputs.caelestia.homeManagerModules.default ];
+
       config = lib.mkIf enabled (
         lib.mkMerge [
           {
@@ -1146,29 +845,32 @@
                   "match:title (Authentication Required), stay_focused on"
                 ];
 
-                # What turns the bar's 0.72 alpha into glass rather than a
-                # washed-out slab. The namespace is the one shell.qml sets on
-                # its layer surface (WlrLayershell.namespace).
+                # What turns Caelestia's transparency into glass rather than a
+                # washed-out slab -- appearance.transparency below sets the
+                # alpha, and this is what puts something behind it. The shell
+                # names its surfaces `caelestia-bar`, `caelestia-launcher`,
+                # `caelestia-sidebar`, `caelestia-border` and so on, hence the
+                # prefix match rather than one rule per component.
                 #
-                # `ignorealpha` is the important half: it tells Hyprland not to
-                # blur pixels below that alpha, and the bar's surface is mostly
-                # transparent -- the inset margins around the floating panel,
-                # and the *entire* surface whenever the bar is hidden. Without
-                # it there would be a blurred rectangle sitting at the top of
-                # the screen at all times, which is precisely the always-on
-                # artefact the whole hidden-bar design exists to avoid.
-                # Same 0.55 grammar rewrite the windowrules above went through,
-                # and the same hard-error-not-a-warning behaviour: the old
-                # `blur, <namespace>` / `ignorealpha 0.3, <namespace>` spellings
-                # fail with "invalid field blur: missing a value" and "invalid
-                # field type ignorealpha". Selector first, snake_case property
-                # second, and the namespace match is a *regex* -- anchored here
-                # so it cannot also catch some future "quickshell-bar-popup".
-                # Field names taken from the compositor's own shipped
-                # share/hypr/stubs/hl.meta.lua (HL.LayerRuleSpec).
+                # `ignore_alpha` is the half that matters for burn-in: it tells
+                # Hyprland not to blur pixels below that alpha, and the bar's
+                # surface is fully transparent whenever it is hidden. Without
+                # it a blurred strip would sit at the top of the screen all
+                # day, which is the exact always-on artefact hiding the bar
+                # exists to avoid.
+                #
+                # Grammar is Hyprland 0.55's, same rewrite the windowrules
+                # above went through and the same hard-error-not-a-warning
+                # behaviour: the older `blur, <namespace>` and
+                # `ignorealpha 0.3, <namespace>` spellings fail with "invalid
+                # field blur: missing a value" and "invalid field type
+                # ignorealpha". Selector first, snake_case property second,
+                # namespace matched as a regex. Field names come from the
+                # compositor's own shipped share/hypr/stubs/hl.meta.lua
+                # (HL.LayerRuleSpec).
                 layerrule = [
-                  "match:namespace ^quickshell-bar$, blur on"
-                  "match:namespace ^quickshell-bar$, ignore_alpha 0.3"
+                  "match:namespace ^caelestia-.*, blur on"
+                  "match:namespace ^caelestia-.*, ignore_alpha 0.3"
                 ];
 
                 exec-once = [
@@ -1182,54 +884,91 @@
             };
 
             # ---------------------------------------------------------------
-            # Bar
+            # Bar / shell
             # ---------------------------------------------------------------
-            # Reveal-on-approach rather than a keybind: the bar is not drawn at
-            # all until the pointer reaches the top edge of the screen, and it
-            # puts itself away again shortly after the pointer leaves. Both
-            # halves matter -- these are OLED panels, where a permanently lit
-            # strip of clock glyphs is the one thing on screen that never moves,
-            # and a bar you have to remember a chord to summon is a bar you stop
-            # using. plans/quickshell-bar.md has the API archaeology behind the
-            # three properties that make this work without a compositor hack.
-            programs.quickshell = {
+            # Caelestia, in place of the hand-written Quickshell bar this used
+            # to carry (commit 1201b63, if it ever needs to come back).
+            #
+            # It is a whole desktop rather than a bar, so most of what follows
+            # is handing its extra halves back to the things this module
+            # already runs. plans/caelestia-shell.md records what it insists on
+            # owning, what it gives up, and the one thing it will not give up
+            # (notifications -- see services.mako below).
+            programs.caelestia = {
               enable = true;
-
-              # A *named* config rather than a bare ~/.config/quickshell/shell.qml.
-              # Quickshell prefers that bare file and ignores the named
-              # subdirectories entirely when it exists, so leaving it unclaimed
-              # means a throwaway hand-written shell can be dropped there to try
-              # something out without this module shadowing it.
-              activeConfig = "bar";
-              configs.bar = quickshellConfig;
 
               systemd = {
                 enable = true;
-                # Only ever start under Hyprland. The default here is
-                # graphical-session.target, which the Plasma session reaches too
-                # -- that would put this bar on top of the Plasma panel.
+                # Only ever start under Hyprland. The module's default is
+                # config.wayland.systemd.target, i.e. graphical-session.target,
+                # which the Plasma session reaches too -- that would drop this
+                # shell on top of the Plasma panel.
                 target = "hyprland-session.target";
+              };
+
+              settings = {
+                bar = {
+                  # The reason adopting this is worth anything at all: upstream
+                  # already implements the hide-until-approached behaviour the
+                  # hand-written bar existed to provide. `persistent` defaults
+                  # to TRUE, so this is the line that keeps an OLED panel dark.
+                  persistent = false;
+                  showOnHover = true;
+                };
+
+                appearance.transparency = {
+                  # Off by default upstream, which is precisely the complaint
+                  # that started this ("not really good looking, not
+                  # transparent"). Blur comes from the layerrules on the
+                  # caelestia-* namespaces in the compositor section above.
+                  enabled = true;
+                  base = 0.6;
+                  layers = 0.2;
+                };
+
+                # Caelestia draws its own wallpaper otherwise --
+                # background.wallpaperEnabled defaults true -- which would sit
+                # on top of the one swww is rotating. False drops its
+                # background layer to WlrLayer.Bottom with a transparent
+                # colour, so the wallpaper this module already manages shows
+                # through untouched.
+                background.wallpaperEnabled = false;
+
+                general.idle = {
+                  # hypridle owns idle here and hyprlock owns locking. Left
+                  # alone Caelestia brings a SECOND idle stack -- its defaults
+                  # are lock at 180s, dpms off at 300s, suspend-then-hibernate
+                  # at 600s -- and the two would race to blank the screen. An
+                  # empty timeout list is how you tell it to stay out of that.
+                  timeouts = [ ];
+                  lockBeforeSleep = false;
+                };
               };
             };
 
             # ---------------------------------------------------------------
             # Notifications, launcher, lock screen, idle
             # ---------------------------------------------------------------
-            services.mako = {
-              enable = true;
-              settings = {
-                # mako's own include directive; matugen owns the target and
-                # `makoctl reload` re-reads the lot.
-                include = generated.mako;
-                border-radius = 10;
-                border-size = 2;
-                default-timeout = 6000;
-                font = "Inter 11";
-                margin = "12";
-                padding = "12";
-                width = 380;
-              };
-            };
+            # mako is OFF, and this is the one thing adopting Caelestia
+            # genuinely costs.
+            #
+            # Caelestia force-loads its notification service on shell init --
+            # modules/ServiceLoader.qml names `Notifs;` unconditionally, unlike
+            # `VPN` right below it, which is gated on a config key -- and
+            # services/Notifs.qml stands up a NotificationServer. So it claims
+            # org.freedesktop.Notifications, and there is no setting that stops
+            # it. Two daemons cannot both hold that bus name.
+            #
+            # Leaving both enabled would not error, which is exactly why it is
+            # the wrong answer: whichever unit registers first silently wins
+            # and the other's notifications vanish. A start-order race that
+            # works until it doesn't is worse than a deliberate choice, so this
+            # is the deliberate choice -- Caelestia draws notifications now.
+            #
+            # The matugen `mako` template and its `makoctl reload` post-hook
+            # went with it. `git revert` of this commit brings back mako, the
+            # template and the hand-written bar together.
+            services.mako.enable = false;
 
             programs.rofi = {
               enable = true;

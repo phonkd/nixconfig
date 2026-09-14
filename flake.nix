@@ -61,6 +61,26 @@
     # its pinned nixpkgs gives a cached sbcl + ASDF closure (~20s to build).
     # Repointing it at nixos-26.05 rebuilds that whole stack for no gain.
     mac-app-util.url = "github:hraban/mac-app-util";
+    # Caelestia -- the Quickshell desktop shell used by the Hyprland session
+    # (modules/hyprland.nix). Sole consumer: that module.
+    #
+    # Deliberately NOT following our nixpkgs, same reasoning as mac-app-util
+    # above but with bigger numbers behind it. Caelestia needs quickshell from
+    # git rather than the 0.3.0 in nixos-26.05, and against its OWN pin that
+    # costs a measured 7 derivations to build (quickshell 0.3.1 -- a tagged
+    # release, not a wild master -- plus cpptrace, m3shapes and three small
+    # caelestia C++ bits) with the other 654 paths, Qt6 included, substituting
+    # straight from cache.nixos.org.
+    #
+    # Repointing it at nixos-26.05 changes every one of those hashes, throws
+    # the 654 cached paths away, and rebuilds the lot against a Qt6 upstream
+    # never tested it against. The price of not following is a second nixpkgs
+    # in the lock and a second Qt6 in the closure; that is the honest cost of
+    # borrowing someone else's shell.
+    #
+    # The build does not land on the laptop: g14 is a builder-client, so the
+    # quickshell compile offloads to 205-builder like everything else.
+    caelestia.url = "github:caelestia-dots/shell";
     # AeroThemePlasma -- the Windows 7 shell for Plasma 6 -- packaged for
     # NixOS. Sole consumer: modules/kde.nix.
     #
