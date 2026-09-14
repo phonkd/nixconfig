@@ -578,17 +578,18 @@
         # a deprecation alias, so the real name is used throughout. The daemon
         # is a separate unit; if it is not up yet this call fails and the next
         # tick retries, so it is not fatal.
-        # Bezier is the CSS "easeOutBack" curve: it overshoots slightly before
-        # settling, which reads as a little twist/snap rather than a linear
-        # wipe. Duration is short on purpose -- this is a burn-in mitigation
-        # tick, not a slideshow, so it shouldn't linger.
+        # Bezier retimes the transition fast -> slow -> fast: it gets ahead
+        # of linear pace early, drifts behind through the middle, then
+        # catches up at the very end, while staying monotonic throughout (no
+        # overshoot/bounce -- verified against the raw parametric curve, not
+        # just eyeballed).
         ${pkgs.awww}/bin/awww img "$image" \
           --resize crop \
           --transition-type "$transition" \
           --transition-angle "$angle" \
           --transition-pos "$pos" \
-          --transition-bezier .34,1.56,.64,1 \
-          --transition-duration 0.6 \
+          --transition-bezier .25,.75,.75,.25 \
+          --transition-duration 1 \
           --transition-fps 60 || true
 
         # --source-color-index 0 is what makes this non-interactive: matugen 4
