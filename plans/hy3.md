@@ -210,10 +210,12 @@ Deploy in this order, and it matters:
    wedges the session, log into KDE and fix it.
 2. **`blac`** — same KDE fallback.
 3. **`z14` last.** There is *no* KDE on z14 (`desktop = "hyprland"` in
-   `lib/registry.nix`); Hyprland is the only session. A layout that fails to
-   load here leaves a bare SDDM with nothing to log into. Recovery is a TTY
-   (`Ctrl+Alt+F2`) plus `git revert` and `deploy z14`, or booting the previous
-   generation from the boot menu.
+   `lib/registry.nix`); Hyprland is the only session, and the login screen is
+   greetd/tuigreet rather than SDDM (`modules/desktop.nix`). A layout that
+   fails to load here leaves one session entry that does not come up. It is
+   not a lockout — tuigreet is a text UI on VT1, so `Ctrl+Alt+F2` gets a TTY —
+   but the fix is then `git revert` + `deploy z14` from that TTY, or booting
+   the previous generation from the boot menu.
 
 Each host flips `noughty.hyprland.layout = "hy3"` in its registry entry / host
 module. `deploy <host>` per `nixconfig-ops`.
