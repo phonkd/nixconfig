@@ -650,14 +650,17 @@
         fi
 
         # A different transition effect each rotation, picked here rather
-        # than left to awww's own `--transition-type random`, so the angle
-        # (wipe/wave) and circle position (grow/outer) get randomised too --
-        # `random` alone leaves those at their defaults every time.
-        transitions=(fade left right top bottom wipe wave grow center outer any)
+        # than left to awww's own `--transition-type random`, so the wipe/wave
+        # angle gets randomised too -- `random` alone leaves it at its default
+        # every time, and would also drag the circle transitions back in.
+        #
+        # The circle wipes (grow, outer, and their aliases center/any) are
+        # deliberately absent: they read as a spotlight sweeping the screen
+        # rather than as a wallpaper change. Dropping them also makes
+        # --transition-pos dead, as it only steers the circle's centre.
+        transitions=(fade left right top bottom wipe wave)
         transition="''${transitions[RANDOM % ''${#transitions[@]}]}"
         angle=$((RANDOM % 360))
-        positions=(center top left right bottom top-left top-right bottom-left bottom-right)
-        pos="''${positions[RANDOM % ''${#positions[@]}]}"
 
         # swww was renamed to awww upstream, and nixpkgs keeps `swww` only as
         # a deprecation alias, so the real name is used throughout. The daemon
@@ -674,7 +677,6 @@
           --resize crop \
           --transition-type "$transition" \
           --transition-angle "$angle" \
-          --transition-pos "$pos" \
           --transition-duration 1 \
           --transition-fps 60 || true
 
