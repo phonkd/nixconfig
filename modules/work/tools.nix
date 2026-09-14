@@ -22,6 +22,14 @@
           remmina
           devbox
           terraform
+          # These four were only ever on the Mac (brew, or /usr/bin) and were
+          # missing on Linux, where the work aliases in bedag-setup's shell.nix
+          # reference them by name. (socat, which the ssh `Host *` catch-all
+          # dials the SOCKS listener with, comes from modules/proxy.nix.)
+          glab
+          kubie
+          ejson
+          teleport
           (pkgs.buildGoModule rec {
               pname = "subst";
               version = "1.0.1";
