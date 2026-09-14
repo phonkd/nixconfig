@@ -84,5 +84,37 @@
       services.pipewire.extraConfig.pipewire."10-airplay" = {
         "context.modules" = [ { name = "libpipewire-module-raop-discover"; } ];
       };
+
+      # Bluetooth audio: the best codec this laptop can actually reach.
+      #
+      # aptX Lossless is not it, and no amount of config makes it so. It is not
+      # a codec in its own right but the top mode of aptX Adaptive R2, and the
+      # only encoder that exists is Qualcomm's proprietary blob for Snapdragon
+      # Sound hosts (Android/Windows). Nothing open implements it: libfreeaptx
+      # -- the library PipeWire links for the aptX family -- stops at aptX and
+      # aptX HD, and the pipewire in this closure builds exactly
+      # {sbc, aac, aptx, aptx_hd, aptx_ll, ldac, lc3, opus, faststream, g722};
+      # `ls $(dirname $(readlink -f $(which pipewire)))/../lib/spa-0.2/bluez5`
+      # is the check. A headset advertising aptX Lossless negotiates down to
+      # aptX HD, LDAC or AAC when it connects here.
+      #
+      # So the knob worth having is the ceiling of what *is* built, and that is
+      # LDAC's bitrate. PipeWire defaults to "auto", which hands the choice to
+      # Sony's ABR library: it opens below the top rate and backs off further
+      # when the link is busy. "hq" pins 990 kbit/s, the highest-bandwidth path
+      # this machine has to a headset. The trade is the usual one -- if it
+      # stutters in a crowded 2.4 GHz room, "auto" goes back and that is the
+      # whole fix.
+      #
+      # enable-sbc-xq is the same idea one tier down, for sinks that speak
+      # neither LDAC nor aptX: SBC at ~452 kbit/s rather than ~328. Stated
+      # rather than assumed, because the built-in spa default for it has moved
+      # between releases.
+      services.pipewire.wireplumber.extraConfig."10-bluez-quality" = {
+        "monitor.bluez.properties" = {
+          "bluez5.a2dp.ldac.quality" = "hq";
+          "bluez5.enable-sbc-xq" = true;
+        };
+      };
     };
 }
