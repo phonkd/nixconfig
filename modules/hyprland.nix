@@ -1160,7 +1160,7 @@
               }
 
               window {
-                  width:            42%;
+                  width:            32%;
                   border:           2px;
                   border-color:     @selected;
                   border-radius:    16px;
@@ -1200,7 +1200,7 @@
               }
 
               listview {
-                  lines:        9;
+                  lines:        7;
                   columns:      1;
                   spacing:      4px;
                   scrollbar:    true;
