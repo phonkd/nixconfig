@@ -597,7 +597,7 @@
           --transition-pos "$pos" \
           --transition-bezier .25,.75,.75,.25 \
           --transition-step 2 \
-          --transition-duration 1.7 \
+          --transition-duration 1 \
           --transition-fps 60 || true
 
         # --source-color-index 0 is what makes this non-interactive: matugen 4
