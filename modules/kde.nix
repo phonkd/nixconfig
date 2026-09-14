@@ -439,20 +439,37 @@ in
       # The modifier the whole set hangs off. "Alt" = AeroSpace's Option.
       mod = "Alt";
 
-      # AeroSpace's workspace letters, in AeroSpace's own order (built-in
+      # AeroSpace's workspace keys, in AeroSpace's own order (built-in
       # display, then external 2, then external 3), onto KDE virtual desktops
       # 1..9. The Mac spreads these across three monitors; a single-screen
       # KDE host just gets nine desktops in a 3x3 grid.
+      #
+      # Three physical keyboard rows, top to bottom: the number row, then QWE,
+      # then ASD. This used to be QWE/ASD/UIO -- the rows moved down one so
+      # the 3x3 grid of desktops matches the 3x3 block of keys, instead of the
+      # third row sitting off to the right of the other two.
+      #
+      # Mirrored in modules/hyprland.nix, and *deliberately not* in
+      # modules/aerospace.nix. AeroSpace cannot bind this set, which is where
+      # the all-letters QWE/ASD/UIO scheme came from in the first place: the
+      # Mac's constraint used to set the layout for all three. It no longer
+      # does. The two Linux sessions share a keyboard and now share these
+      # keys; the Mac keeps the letters. So this list and Hyprland's move
+      # together, and AeroSpace's stays where it is on purpose.
+      #
+      # Qt key sequences here, so plain "1"/"2"/"3" -- the `code:` spelling
+      # the Hyprland half needs for the SHIFT variants on this
+      # ch/de_nodeadkeys keyboard has no equivalent in kglobalshortcutsrc.
       workspaceKeys = [
+        "1"
+        "2"
+        "3"
         "Q"
         "W"
         "E"
         "A"
         "S"
         "D"
-        "U"
-        "I"
-        "O"
       ];
       desktopCount = builtins.length workspaceKeys;
       desktopRows = 3;

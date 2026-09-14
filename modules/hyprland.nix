@@ -450,8 +450,9 @@
       #
       # hy3 adds the rest of the i3 tree, which the native groups have no
       # equivalent for. Key space is tight: ALT already owns H J K L F B V M,
-      # COMMA, and the nine workspace letters (Q W E A S D U I O), which leaves
-      # C G N P R T X Y Z. Letters rather than AeroSpace's literal punctuation
+      # COMMA, the six workspace letters (Q W E A S D) and the 1/2/3 number
+      # row, which leaves C G N P R T U I O X Y Z. Letters rather than
+      # AeroSpace's literal punctuation
       # (alt-slash "flip axis") -- on this ch/de_nodeadkeys keyboard `/` is
       # Shift+7, and the module already carries a note at the screenshot binds
       # about keysym-vs-`code:` spelling biting exactly that way. COMMA is
@@ -511,18 +512,40 @@
       # and a compositor bind wins over the focused app.
       mod = "ALT";
 
-      # AeroSpace's workspace letters in AeroSpace's own order (built-in
-      # display, then external 2, then external 3) onto workspaces 1..9.
+      # Three physical keyboard rows, top to bottom -- the number row, then
+      # QWE, then ASD -- onto workspaces 1..9. Still AeroSpace's order
+      # (built-in display, then external 2, then external 3); the rows simply
+      # moved down one, so QWE/ASD/UIO became 123/QWE/ASD. The home row now
+      # has a row above *and* below it rather than two rows off to its right,
+      # which is the point: the 3x3 grid matches the keyboard's own shape.
+      #
+      # modules/kde.nix mirrors this. modules/aerospace.nix deliberately does
+      # not: AeroSpace cannot bind this set, and that limitation is precisely
+      # why the all-letters QWE/ASD/UIO scheme existed here in the first
+      # place -- the Mac's constraint used to pick the layout for all three
+      # sessions. It no longer does. The two Linux sessions share a keyboard
+      # and share these keys; the Mac keeps the letters.
+      #
+      # The number row is spelled `code:` rather than `1`/`2`/`3`, and that is
+      # not cosmetic. Every one of these keys also carries a SHIFT bind
+      # (send-to-workspace), and this is a ch/de_nodeadkeys keyboard where
+      # Shift+1 emits `plus` -- the exact trap the screenshot binds above
+      # carry a note about, and a dead send-to-workspace key would fail
+      # silently. `code:` matches the physical key, so it is immune both to
+      # that and to any later layout change. The values are the X11 keycodes
+      # for AE01..AE03 (evdev code + 8), read off xkb's own keycodes/evdev
+      # table rather than remembered. It is also the honest spelling for a
+      # scheme whose logic is positional rather than alphabetic.
       workspaceKeys = [
+        "code:10"
+        "code:11"
+        "code:12"
         "Q"
         "W"
         "E"
         "A"
         "S"
         "D"
-        "U"
-        "I"
-        "O"
       ];
 
       workspaceBinds = lib.flatten (
@@ -538,6 +561,77 @@
       zen = "${inputs.zen-browser.packages.${pkgs.system}.default}/bin/zen";
       kitty = "${config.programs.kitty.package}/bin/kitty";
       spotify = "${pkgs.spotify}/bin/spotify";
+
+      # -- Screenshots: capture, then annotate -------------------------------
+      #
+      # grimblast keeps doing the capturing -- the targets, the freeze, the
+      # window snapping -- and satty is bolted on behind it as the annotation
+      # step: arrows, boxes, blur, text, highlight and auto-numbered markers
+      # drawn over the capture before it goes anywhere. Tool keys inside
+      # satty, since they are nowhere in its --help: z arrow, r rectangle,
+      # e ellipse, i line, b brush, t text, g highlight, m numbered marker,
+      # u blur, c crop, p pointer. Enter commits, Escape discards.
+      #
+      # The seam is grimblast's own `edit` action rather than a pipe. `edit`
+      # writes the capture to a temp file and runs $GRIMBLAST_EDITOR with that
+      # path as its final argument, which is exactly the hook this wants. The
+      # obvious alternative -- `grimblast save area - | satty --filename -` --
+      # is a trap: grimblast's save() ends in `echo "$file"`, so against a `-`
+      # target it drops a stray "-\n" onto stdout directly behind the PNG's
+      # IEND chunk. Decoders generally skip trailing bytes; nothing promises
+      # they must, and a temp file costs nothing.
+      #
+      # satty then does *both* halves of what `copysave` used to do. The
+      # action list is order-sensitive in a way its --help does not admit:
+      # satty raises its early-exit flag after running the first action and
+      # checks it immediately, so `--early-exit` next to a multi-action list
+      # copies to the clipboard, logs "Early exit, ignoring further actions."
+      # and never writes the file. Hence no `--early-exit`, and a trailing
+      # `exit` inside the list, which runs all three in order.
+      #
+      # --copy-command rather than satty's native GTK clipboard: a Wayland
+      # clipboard offer dies with the process that made it and satty exits
+      # straight after copying. wl-copy forks a small daemon that keeps
+      # serving the selection, which is also what grimblast does today.
+      #
+      # Directory and filename format are grimblast's own, so an annotated
+      # shot lands beside a plain one under the same naming.
+      sattyEdit = pkgs.writeShellScript "satty-edit" ''
+        set -u
+        dir="''${XDG_SCREENSHOTS_DIR:-''${XDG_PICTURES_DIR:-$HOME}}"
+        ${pkgs.coreutils}/bin/mkdir -p "$dir"
+        ${pkgs.satty}/bin/satty \
+          --filename "$1" \
+          --output-filename "$dir/%Y%m%d_%H%M%S.png" \
+          --actions-on-enter save-to-clipboard,save-to-file,exit \
+          --copy-command ${pkgs.wl-clipboard}/bin/wl-copy
+        ${pkgs.coreutils}/bin/rm -f "$1"
+      '';
+
+      # grimblast parks `edit`'s temp file in /tmp, which is world readable.
+      # $XDG_RUNTIME_DIR is 0700 and goes away with the session, which is a
+      # better home for a screenshot nobody has decided to keep yet -- and the
+      # wrapper above deletes it either way.
+      annotate =
+        target:
+        "env GRIMBLAST_EDITOR=${sattyEdit} DEFAULT_TMP_EDITOR_DIR=\"$XDG_RUNTIME_DIR\""
+        + " ${pkgs.grimblast}/bin/grimblast --freeze edit ${target}";
+
+      # -- Display settings GUI ----------------------------------------------
+      #
+      # nwg-displays is the arrange-your-monitors dialog Plasma has and a bare
+      # compositor does not: position, resolution, refresh rate, scale,
+      # rotation, mirroring, applied live via hyprctl and then written out.
+      #
+      # It persists by *writing Hyprland config*, which is the whole problem:
+      # hyprland.conf here is a read-only symlink into the store. Same shape
+      # as matugen and the colours, and the same answer -- the tool owns its
+      # own file and this config pulls it in by absolute path. It picks the
+      # paths up from $XDG_CONFIG_HOME/hypr and creates both files itself if
+      # they are missing, so the defaults are already the right ones and only
+      # the workspace count needs saying.
+      monitorsConf = "${cfgHome}/hypr/monitors.conf";
+      workspacesConf = "${cfgHome}/hypr/workspaces.conf";
 
       # -- matugen templates -------------------------------------------------
       #
@@ -1022,6 +1116,35 @@
               # agnostic, so this is one line to change later.
               configType = "hyprlang";
 
+              # nwg-displays' output, and the one place in this file where
+              # *where* a `source` lands is the entire point.
+              #
+              # `settings.source` below would not do. Home Manager hands
+              # `source` to toHyprconf's importantPrefixes, which hoists those
+              # lines to the very top of the generated file -- correct for the
+              # colours, fatal here: the generic `monitor=,preferred,auto,...`
+              # rule further down would then be read *after* nwg-displays'
+              # per-output lines. `extraConfig` is concatenated last (verified
+              # in HM's own hyprland.nix, where the file's text is systemd
+              # activation + plugins + settings + submaps + extraConfig), so
+              # anything the GUI writes wins over the fallback, which is what
+              # keeps that fallback a sane default rather than an override.
+              #
+              # workspaces.conf is sourced too, not just monitors.conf: the
+              # same dialog assigns workspaces to outputs, and leaving that
+              # half unsourced would make a working-looking part of the GUI
+              # quietly do nothing. Nothing else in this module emits
+              # `workspace=` rules, so it has the field to itself.
+              #
+              # Both are seeded empty at activation -- see
+              # home.activation.hyprlandDisplays -- because Hyprland treats a
+              # `source` of a missing file as a config error, and nwg-displays
+              # only creates them the first time it is actually run.
+              extraConfig = ''
+                source = ${monitorsConf}
+                source = ${workspacesConf}
+              '';
+
               settings = {
                 # Colours live in a file matugen rewrites on every wallpaper
                 # change; `source` is absolute because this config itself is a
@@ -1222,19 +1345,30 @@
                   "SUPER SHIFT, E, exit,"
                   # Screenshots -- Spectacle's job on the Plasma side. Three
                   # targets on Super+Shift+1/2/3, screen -> window -> region,
-                  # narrowing as the number goes up. `copysave` puts the PNG on
-                  # the clipboard AND in $XDG_SCREENSHOTS_DIR (~/Pictures here),
-                  # and `--freeze` holds the screen still while you select, so
-                  # menus and hover states can be captured.
+                  # narrowing as the number goes up, each one landing in satty
+                  # to be annotated before it is committed (see `annotate` and
+                  # `sattyEdit` above for the arrow/box/blur half and for why
+                  # the pipeline is shaped the way it is). `--freeze` holds the
+                  # screen still while you select, so menus and hover states
+                  # can be captured.
+                  #
+                  # The annotate step is a deliberate behaviour change and the
+                  # one thing here that can lose a capture: satty commits on
+                  # Enter and *discards* on Escape, where `copysave` was
+                  # unconditional and instant. Plain Print below is kept on the
+                  # old no-GUI path precisely so that instant route still
+                  # exists -- annotation is the considered shot, Print is the
+                  # reflex one.
                   #
                   # If these turn out dead, it is the layout: `1`/`2`/`3` are
                   # keysyms, and on this ch/de_nodeadkeys keyboard Shift+1 emits
                   # `plus`. Hyprland normally still matches the base-level
                   # keysym for a SHIFT bind, but the layout-independent spelling
-                  # is `code:10` / `code:11` / `code:12` if it does not.
+                  # is `code:10` / `code:11` / `code:12` if it does not -- which
+                  # is the spelling the workspace binds above settled on.
                   #
                   # Super+Shift+1: the monitor the mouse is on.
-                  "SUPER SHIFT, 1, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave output"
+                  "SUPER SHIFT, 1, exec, ${annotate "output"}"
                   # Super+Shift+2: pick a window. grimblast dropped its `window`
                   # target ("now included in 'area'"), so this is `area` with
                   # slurp restricted to the window rectangles grimblast already
@@ -1243,13 +1377,20 @@
                   # this, not a wrapper around it. The practical difference from
                   # plain `area` is that you cannot free-drag: every selection
                   # snaps to exactly one window.
-                  "SUPER SHIFT, 2, exec, SLURP_ARGS=-r ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
+                  "SUPER SHIFT, 2, exec, SLURP_ARGS=-r ${annotate "area"}"
                   # Super+Shift+3: free region (single-clicking a window still
                   # grabs that window, which is grimblast's own behaviour).
-                  "SUPER SHIFT, 3, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
-                  # PrtSc kept as a synonym for the region grab, for the times
-                  # the obvious key is the one you reach for.
+                  "SUPER SHIFT, 3, exec, ${annotate "area"}"
+                  # PrtSc keeps the old instant path: straight to the clipboard
+                  # and to disk, no editor, nothing to confirm. Shift+PrtSc is
+                  # the same region grab routed through satty, so the annotated
+                  # flow is also reachable from the obvious key.
                   ", Print, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
+                  "SHIFT, Print, exec, ${annotate "area"}"
+                  # Display arrangement GUI -- Win+P, the key Windows puts the
+                  # projector/display switcher on. `-n 9` because this config
+                  # has nine workspaces, not nwg-displays' default ten.
+                  "SUPER, P, exec, ${pkgs.nwg-displays}/bin/nwg-displays -n 9"
                   "SUPER, C, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a"
                   "SUPER, V, exec, ${pkgs.cliphist}/bin/cliphist list | ${pkgs.rofi}/bin/rofi -dmenu | ${pkgs.cliphist}/bin/cliphist decode | ${pkgs.wl-clipboard}/bin/wl-copy"
                   # Force a wallpaper + colour scheme change now, instead of
@@ -1597,7 +1738,19 @@
               rofi
               grimblast
               slurp
+              # satty is the annotation editor the screenshot binds hand their
+              # capture to; swappy stays as the incumbent it replaces there,
+              # since it is still a perfectly good `grimblast edit` target and
+              # costs nothing to keep. satty wins the bind because swappy has
+              # no highlighter and no numbered-marker tool, and exposes
+              # copy-then-save only through its global config file rather than
+              # per-invocation flags.
+              satty
               swappy
+              # The display arrangement GUI on Super+P. In $PATH as well as in
+              # the bind so `nwg-displays --help` and its one-shot companions
+              # (nwg-displays-apply) are reachable from a terminal.
+              nwg-displays
               hyprpicker
               cliphist
               wl-clipboard
@@ -1853,6 +2006,31 @@
               };
               Install.WantedBy = [ "hyprland-session.target" ];
             };
+
+            # nwg-displays' two files, seeded empty for exactly the reason the
+            # colour files below are seeded: `extraConfig` `source`s them, and
+            # Hyprland calls a missing `source` a config error. nwg-displays
+            # does create them itself, but only when it is first run, which on
+            # a fresh host is strictly after the first login that has to parse
+            # this config.
+            #
+            # Empty is the right seed rather than a copy of the fallback
+            # `monitor=` rule: an empty file says "the GUI has not been used
+            # here", which leaves `monitor=,preferred,auto,<scale>` in the
+            # generated config as the thing actually in charge. As with the
+            # colours, an existing file is never touched -- the GUI's output
+            # is user state and an activation must not clobber it.
+            home.activation.hyprlandDisplays = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+              if [ -z "''${DRY_RUN:-}" ]; then
+                for f in ${lib.escapeShellArgs [ monitorsConf workspacesConf ]}; do
+                  if [ ! -e "$f" ]; then
+                    verboseEcho "Seeding $f for nwg-displays"
+                    $DRY_RUN_CMD ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$f")"
+                    $DRY_RUN_CMD ${pkgs.coreutils}/bin/touch "$f"
+                  fi
+                done
+              fi
+            '';
 
             # Seed every generated file, so the very first Hyprland login --
             # before the timer has ever fired -- finds them present. Without
