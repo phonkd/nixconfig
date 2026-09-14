@@ -1,35 +1,67 @@
 # hy3 — i3/sway tiling layout for the Hyprland session
 
-**Repo(s):** nixconfig   **Status:** phases 1–4 implemented, not yet rolled out
+**Repo(s):** nixconfig   **Status:** done — hy3 is the default on all three Hyprland hosts
 
 ## Where this stands
 
-Implemented in `modules/hyprland.nix` as `noughty.hyprland.layout`
-(`"dwindle"` | `"hy3"`, default `"dwindle"`). No host has opted in yet, so
-nothing has changed in practice — Step 5 (rollout) is what remains.
+**Live on all three hosts.** `noughty.hyprland.layout` defaults to `"hy3"`, and
+blac / g14 / z14 are the complete set of hosts carrying the `"hyprland"` tag.
+The option remains as the rollback — set a host to `"dwindle"` and it is back on
+stock Hyprland with the native tabbed groups, byte-for-byte the config it had
+before hy3 existed.
 
-Two corrections to what this plan originally said, both found by measuring:
+Corrections to what this plan originally said, all found by measuring:
 
 - **Step 1's three predicted outcomes were all wrong**, and so was the thing it
   predicted would break. `general:layout = hy3` and the whole
   `plugin { hy3 { … } }` block parse fine before the plugin loads. It is the
   **binds** that hard-fail (`Invalid dispatcher, requested "hy3:movefocus"
   does not exist`), and an unresolved bind is *dropped*, not deferred. The fix
-  is the plan's own fallback 1 — but it must be chained into the same command
-  as the load (`hyprctl plugin load … && hyprctl reload config-only`), because
-  two separate `exec-once` entries are ordered by spawn only. `configType`
-  stays `hyprlang`; the lua escape hatch was not needed.
+  is the plan's own fallback 1 — but chained into the same command as the load
+  (`hyprctl plugin load … && hyprctl reload config-only`), because two separate
+  `exec-once` entries are ordered by spawn only. `configType` stays `hyprlang`;
+  the lua escape hatch was not needed.
+- **`exec-once` does not cover a rebuild.** This one was found by living it, not
+  by reading, and it is the failure most likely to recur. See "The rebuild gap"
+  below.
 - **hy3 is no longer the only tabbing story.** Commit `0182324` landed
   Hyprland's *native* tabbed/stacked groups on alt-comma, from a branch that
   ran in parallel with this plan and was merged the same day — neither
-  supersedes the other. That module's comment argues against hy3 ("an
-  ABI-coupled plugin … none of what it adds beyond this is what the Mac layout
-  does"), which is a fair reading of the accordion requirement alone. So hy3 is
-  opt-in rather than a replacement, the native groups are kept intact for the
-  dwindle path, and alt-comma means "accordion" under both.
+  supersedes the other. So the dwindle branch is kept intact rather than being
+  dead weight, and alt-comma means "accordion" under both layouts.
+- The colour decision in Step 4 was reversed; see that step.
 
-The colour decision in Step 4 was also reversed, for a reason the plan did not
-know about: see "Tab config and theming" below.
+## The rebuild gap
+
+`exec-once` runs at session start and **does not re-run on `hyprctl reload`** —
+that is by design, not a bug. So rebuilding while already logged into Hyprland
+produces a session that has the new config but not the plugin:
+
+- Home Manager's `onChange` reload re-parses the config;
+- `general:layout = hy3` is accepted, because an unregistered layout is not an
+  error (Step 1);
+- every `hy3:` bind is rejected and **dropped**.
+
+Observed symptom: a persistent config-error banner listing
+`Invalid dispatcher, requested "hy3:movefocus" does not exist`, `hyprctl plugin
+list` reporting **"no plugins loaded"**, zero hy3 binds, and a compositor that
+is otherwise perfectly healthy. It looks like the plugin is broken. It is not —
+it was simply never loaded into that session.
+
+Fixed by `home.activation.hyprlandHy3Plugin`, which loads the plugin into any
+running instance and then reloads so the binds register. It runs after
+`writeBoundary`, i.e. after HM's own onChange reload, so the ordering is
+load-then-reload. Both calls are safe to repeat — a second load is refused with
+`Cannot load a plugin twice!` and exit 0.
+
+**To fix such a session by hand** (no logout needed):
+
+```
+hyprctl plugin load /nix/store/…-hy3-0.55.0/lib/libhy3.so
+hyprctl reload config-only
+hyprctl plugin list      # expect: Plugin hy3 by outfoxxed
+hyprctl binds | grep -c hy3:   # expect: 28
+```
 
 ## Goal
 
@@ -94,8 +126,7 @@ Verified against this repo's actual pins, not the upstream README:
 
 ## Approach
 
-Land it behind an option, smallest slice first. Phases 1-3 are done; phase 4
-(rollout) is the remaining work.
+Land it behind an option, smallest slice first. All four phases are done.
 
 **Phase 1 — make hy3 loadable and provable.** ✅ Plugin, the
 `noughty.hyprland.layout` enum, and the layout/keybind/plugin-config changes
@@ -108,8 +139,9 @@ proven with `Hyprland --verify-config` before any deploy.
 **Phase 3 — theming.** ✅ Tab colours in the matugen pipeline, so tabs follow
 the wallpaper like every other surface. Gated on the layout.
 
-**Phase 4 — rollout.** ⬜ Not started; no host has opted in. Then decide
-whether the option stays (see Open decisions).
+**Phase 4 — rollout.** ✅ Shipped to all three hosts at once, as the default
+rather than per-host opt-in. The option stays (see Open decisions) -- it is the
+rollback, and the dwindle branch it selects is not dead code.
 
 ## Steps
 
@@ -280,42 +312,40 @@ are the same surface in the same scheme: `primary`/`on_primary` active,
 `outline_variant` inactive, `error`/`on_error` urgent. The block is gated on
 the layout, so a dwindle host's colours file gains no hy3 text at all.
 
-### 5. Rollout — the remaining work
+### 5. Rollout — DONE
 
-Nothing has opted in yet. All three hosts still evaluate to `dwindle`, and the
-code is committed and on `main`, so this step is purely "flip one host and see".
+Shipped to all three hosts at once by flipping the module default, rather than
+the staged g14 → blac → z14 order this plan proposed. That order existed to
+keep a KDE fallback available while hy3 was unproven; by the time it shipped,
+the config had been verified against the compositor's own checker on all three
+hosts and the plugin's ABI match confirmed by store-path reference, so the
+staging bought little.
 
-Deploy order, and it matters — the reasoning here was re-checked against the
-current tree and still holds:
+z14 remains the host with no fallback session (`desktop = "hyprland"` since
+`76625c3`, greetd/tuigreet rather than SDDM). If it ever fails to come up:
+`Ctrl+Alt+F2` for a TTY, then set `noughty.hyprland.layout = "dwindle"` and
+rebuild, or pick the previous generation from the boot menu.
 
-1. **`g14`** — laptop, `desktop = "kde"`, so Plasma is still in the SDDM
-   session list. If hy3 wedges the session, log into KDE and fix it.
-2. **`blac`** — same KDE fallback.
-3. **`z14` last.** There is *no* KDE on z14 any more (`desktop = "hyprland"` in
-   `lib/registry.nix`, since `76625c3`); Hyprland is the only session, and the
-   login screen is greetd/tuigreet rather than SDDM (`modules/desktop.nix`, the
-   `de == "hyprland"` branch). A layout that fails here leaves the one session
-   entry not coming up. Not a lockout — tuigreet is a text UI on VT1, so
-   `Ctrl+Alt+F2` gets a TTY — but the fix is then `git revert` + `deploy z14`
-   from that TTY, or the previous generation from the boot menu.
-
-Each host flips `noughty.hyprland.layout = "hy3"` in its registry entry / host
-module. `deploy <host>` per `nixconfig-ops`.
-
-**What to check after the first flip**, in this order, because each one
-explains the next:
+**What to check after a rebuild**, in this order, because each explains the
+next:
 
 ```
-hyprctl plugin list          # hy3 present? if not, nothing below matters
+hyprctl plugin list            # "Plugin hy3 by outfoxxed" -- if "no plugins
+                               # loaded", see The rebuild gap above
 hyprctl getoption general:layout
-hyprctl binds | grep hy3     # the chained reload registered them?
+hyprctl binds | grep -c hy3:   # expect 28
 journalctl --user -u hyprland-session -b
 ```
 
-The failure mode to expect, if the chained reload ever regresses, is
-*specifically* "hy3 tiles correctly but none of the alt-keys do anything" —
-that is dropped binds, not a broken plugin. A config-error banner at login that
-clears by itself is the same story.
+The failure mode to recognise is **"hy3 tiles nothing and the alt-keys are
+dead, with an error banner"** — that is dropped binds from a session that never
+loaded the plugin, not a broken plugin. It is the rebuild gap, and the
+activation step now handles it; the manual repair is two commands.
+
+Note that `g14`, `blac` and `z14` are **not** deploy-rs nodes — the registry
+says laptops are "deploy clients rather than deploy targets", and none of the
+three sets `deploy.hostname`. There is no `deploy <host>` for this change;
+these hosts are rebuilt locally.
 
 ### 6. Housekeeping (separate commit)
 
@@ -330,14 +360,17 @@ next person who reads hy3's install docs against this repo.
   The native-groups commit argues hy3 adds nothing the Mac layout wants, and
   that is true *for the accordion*. What hy3 adds is the rest of the i3 tree:
   explicit split containers (`hy3:makegroup`), focus-parent/child, and window
-  placement that does not depend on the focused window's aspect ratio. If after
-  a week on g14 you only ever use alt-comma, the honest answer is to drop hy3
-  and keep the native groups.
-- **Keep the `layout` option after rollout, or inline hy3?** Recommendation:
-  keep it regardless. It is the whole rollback story for z14, which has no
-  second session, and the module already carries options at this granularity
-  (`scale`, `colorMode`, `colorScheme`). It is also what keeps both answers to
-  the question above cheap.
+  placement that does not depend on the focused window's aspect ratio. It is
+  now running on all three hosts, so the evidence is being gathered. If after a
+  week you only ever reach for alt-comma, the honest answer is to set the
+  default back to "dwindle" and keep the native groups -- that branch is still
+  there, intact, for exactly this.
+- **Keep the `layout` option now that hy3 is the default?** Yes -- it is the
+  whole rollback story for z14, which has no second session, and the module
+  already carries options at this granularity (`scale`, `colorMode`,
+  `colorScheme`). It is also what keeps both answers to the question above
+  cheap. Note the dwindle branch it selects is not dead code: it still carries
+  the native tabbed groups.
 - **Autotile on or off?** Shipped **on** (`trigger_width = 800` /
   `trigger_height = 500`). hy3 defaults it off, but off means every split is
   manual, a big step down from dwindle for casual use. Flip to
@@ -346,9 +379,12 @@ next person who reads hy3's install docs against this repo.
 
 ## Risks / rollout
 
-- **Dropped binds, not a dead plugin, is the failure mode to expect.** If the
-  chained `hyprctl reload config-only` ever regresses, hy3 tiles correctly and
-  none of the alt-keys respond. See Step 1.
+- **Dropped binds, not a dead plugin, is the failure mode to expect.** Hy3
+  tiles nothing, the alt-keys are dead, and a config-error banner lists
+  `Invalid dispatcher`. Two causes: the chained `hyprctl reload config-only`
+  regressing (Step 1), or -- far more likely -- a rebuild into a session that
+  predates it, which is The rebuild gap above. Check `hyprctl plugin list`
+  first; "no plugins loaded" distinguishes them immediately.
 - **Plugin fails to load silently** — the classic ABI-mismatch symptom. Should
   not happen: `pkgs.hyprlandPlugins.hy3` 0.55.0 references the very same
   `pkgs.hyprland` 0.55.4 store path the session runs (checked with
@@ -366,6 +402,7 @@ next person who reads hy3's install docs against this repo.
 - **Caelestia** should be unaffected: it is layer-shell, hy3 tabs are window
   decoration, and the `layerrule` blur rules target `caelestia-*` namespaces.
   Untested in combination — eyeball it on g14 first.
-- **Back out:** `noughty.hyprland.layout = "dwindle"` and `deploy <host>`. On a
-  dwindle host the generated config is byte-identical to what it was before hy3
-  existed, so backing out is genuinely a no-op rather than an approximation.
+- **Back out:** set `noughty.hyprland.layout = "dwindle"` (the module default,
+  or per host) and rebuild -- these are not deploy-rs nodes. The dwindle config
+  is byte-identical to what it was before hy3 existed, so backing out is
+  genuinely a no-op rather than an approximation.
