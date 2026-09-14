@@ -1199,7 +1199,13 @@
                   # it is the muscle memory that predates the KDE session.
                   # Deliberately NOT Alt+Space: that is KRunner's key on the
                   # Plasma side, and Alt is already the workspace modifier here.
-                  "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show drun"
+                  #
+                  # `combi` rather than `drun`: it searches open windows *and*
+                  # .desktop entries in one list, so the launcher doubles as a
+                  # window switcher and picking an app that is already running
+                  # raises it instead of starting a second copy. The sub-modes
+                  # and their order live in programs.rofi.extraConfig below.
+                  "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show combi"
                   # Float toggle -- AeroSpace's alt-space, which KDE could not
                   # have because KRunner owns that key. Super+Space here.
                   "SUPER, SPACE, togglefloating,"
@@ -1469,9 +1475,32 @@
               # px is literal.
               font = "Inter 13";
               extraConfig = {
-                modi = "drun,run,window";
+                # `modes` is rofi 2.0's spelling; `modi` is the pre-2.0 alias
+                # and still parses, but `rofi -dump-config` writes `modes`, so
+                # use the name the binary itself prints.
+                modes = "combi,drun,run,window";
+                # What Super+D actually shows (see the bind below). Order is
+                # load-bearing: combi concatenates each sub-mode's matches in
+                # *this* order rather than interleaving them, so an already
+                # running window always sorts above the .desktop entry that
+                # would start a second copy. Type "spotify", hit Enter, and you
+                # land on the running Spotify -- rofi activates the window
+                # through wlr-foreign-toplevel and Hyprland follows it to
+                # whatever workspace it lives on. With nothing running, the
+                # same keystrokes fall through to `drun` and launch it.
+                #
+                # `window` mode works here only because nixpkgs merged
+                # rofi-wayland into `rofi` (2025-09-06) and 2.0 speaks
+                # foreign-toplevel natively; the old X11 build saw XWayland
+                # windows only, which on this desktop is none of them.
+                combi-modes = "window,drun,run";
                 show-icons = true;
                 drun-display-format = "{name}";
+                # Class then title, e.g. `spotify   Spotify Premium`. rofi's
+                # default also has a `{w}` desktop-number field, which is
+                # always empty on Wayland -- foreign-toplevel carries no
+                # workspace -- and leaves a ragged gap at the start of the row.
+                window-format = "{c}   {t}";
               };
               # A theme *name*, not a path: HM turns this into `@theme
               # "matugen"` in config.rasi, which rofi resolves through its
