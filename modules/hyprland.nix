@@ -128,6 +128,33 @@
           '';
         };
 
+        layout = lib.mkOption {
+          type = lib.types.enum [
+            "dwindle"
+            "hy3"
+          ];
+          # Default stays dwindle, so this is opt-in per host and backing it
+          # out is one word. See the `group` block in the home half for what
+          # the dwindle side already gives you: Hyprland's *native* tabbed
+          # groups cover AeroSpace's accordion without a plugin, and that is
+          # deliberately not being taken away here. hy3 is the bigger step --
+          # a real i3 tree, where a tab group is one node type among several
+          # and splits are explicit rather than inferred from aspect ratio.
+          default = "dwindle";
+          description = ''
+            Tiling layout for the Hyprland session.
+
+            "dwindle" is Hyprland's built-in automatic halving, plus its native
+            tabbed/stacked groups on alt-comma.
+
+            "hy3" loads the hy3 compositor plugin for i3/sway-style explicit
+            split containers and tabbed groups. It moves the focus, move,
+            close, send-to-workspace and group keybinds onto hy3's own
+            dispatchers, and replaces the native group configuration -- hy3
+            manages its own tabs and Hyprland's groupbar is unused under it.
+          '';
+        };
+
         colorMode = lib.mkOption {
           type = lib.types.enum [
             "dark"
@@ -242,6 +269,226 @@
       colorScheme = cfg.colorScheme or "scheme-tonal-spot";
       scale = cfg.scale or "1";
 
+      layout = cfg.layout or "dwindle";
+      hy3 = layout == "hy3";
+
+      # The plugin .so. This is the same path Home Manager's own `plugins`
+      # option would derive ($out/lib/lib<pname>.so), and hy3 ships exactly
+      # that -- but that option is deliberately not used; see `exec-once`.
+      #
+      # It comes from nixpkgs, NOT from hy3's flake. That matters: hy3's README
+      # tells you to add a `hy3` flake input with
+      # `inputs.hyprland.follows = "hyprland"`, which here would build it
+      # against this flake's `hyprland` input (Hyprland *master*) while the
+      # session actually runs pkgs.hyprland. Hyprland refuses to load a plugin
+      # built against a different commit, so that route yields a plugin that
+      # silently never loads. pkgs.hyprlandPlugins.hy3 is built against
+      # pkgs.hyprland by construction -- verified: the two share a store path
+      # reference, and it substitutes from cache.nixos.org rather than building.
+      hy3Plugin = "${pkgs.hyprlandPlugins.hy3}/lib/libhy3.so";
+
+      # Absolute, like every other binary named from this config: `exec-once` is
+      # run by the compositor, not by a login shell, so nothing guarantees the
+      # user profile is on its PATH. (The matugen post_hook further down can say
+      # a bare `hyprctl` only because it puts one on PATH itself.)
+      hyprctl = "${pkgs.hyprland}/bin/hyprctl";
+
+      # hy3 replaces the dispatchers that have to understand its tree. The
+      # stock ones still exist under hy3 but operate on Hyprland's own notion
+      # of layout, so leaving any of these unswapped makes the layout misbehave
+      # in ways that look like bugs rather than misconfiguration.
+      dispatch = name: if hy3 then "hy3:${name}" else name;
+
+      # alt-shift-h/j/k/l is the one that does NOT follow the pattern above.
+      # The dwindle side deliberately uses `movewindoworgroup` rather than
+      # plain `movewindow`, so the same four keys also move windows in and out
+      # of the native tab groups (see the bind's own comment). hy3 has no
+      # `orgroup` variant -- `hy3:movewindow` is already tree-aware and does
+      # the equivalent -- so the two spellings are named explicitly instead of
+      # being derived, to keep `dispatch` from silently dropping the `orgroup`.
+      moveWindowDispatch = if hy3 then "hy3:movewindow" else "movewindoworgroup";
+
+      # Layout-specific settings, merged into `settings` below.
+      #
+      # Deliberately a plain `if`, not `lib.mkIf`: the Home Manager `settings`
+      # option is a value type, not a submodule, so a nested mkIf is never
+      # resolved -- it would reach toHyprconf as an attrset with
+      # `_type = "if"` and be rendered into the config file verbatim.
+      layoutSettings =
+        if hy3 then
+          {
+            # Every key here is taken from the plugin binary's own option
+            # strings (`strings libhy3.so | grep plugin:hy3`), not from the
+            # README -- which is how the `radius`/`rounding` trap below was
+            # caught.
+            plugin.hy3 = {
+              # Stacks on top of general:gaps_in (8), so deliberately smaller
+              # than hy3's default of 10: otherwise every grouped node gains a
+              # second, wider margin and reads as noticeably airier than the
+              # same windows under dwindle.
+              group_inset = 6;
+
+              tabs = {
+                height = 20;
+                padding = 6;
+                # `radius`, not `rounding` -- hy3 does not follow Hyprland's
+                # own `decoration:rounding` spelling.
+                radius = 6;
+                border_width = 2;
+                render_text = true;
+                # Matches the native groupbar's font on the dwindle side, so
+                # the two layouts' tab bars are the same object visually.
+                text_font = "JetBrainsMono Nerd Font";
+                text_height = 11;
+
+                # `colors` is deliberately absent here, exactly as in `general`
+                # and `group`: the tab palette is re-derived from the wallpaper
+                # and arrives through the `source`d matugen file.
+                #
+                # This is a safety property, not just consistency. The obvious
+                # alternative -- emit `$hy3TabActive` variables from matugen and
+                # reference them from here -- breaks on a host where the seeding
+                # activation finds no readable wallpaper: it writes an *empty*
+                # colours file, and an undefined hyprlang variable is a hard
+                # error ("failed to parse $hy3TabActive as a color"), verified
+                # with --verify-config. With the keys living in the generated
+                # file instead, an empty file simply means hy3 keeps its own
+                # defaults and the session still comes up.
+              };
+
+              autotile = {
+                # hy3 defaults this off, i.e. every split is manual. That is
+                # strict i3 behaviour and a real step down from dwindle for
+                # casual use, so it is on -- with triggers meaning "only
+                # auto-split a node already big enough to be worth splitting".
+                enable = true;
+                trigger_width = 800;
+                trigger_height = 500;
+              };
+            };
+          }
+        else
+          {
+            dwindle = {
+              # No `pseudotile` here: Hyprland 0.55 dropped it as a config
+              # option, and setting it is a hard error -- "config option
+              # <dwindle:pseudotile> does not exist". It is absent from the
+              # option list the compositor ships in
+              # share/hypr/stubs/hl.meta.lua, which is the authoritative
+              # list for this build. Pseudotiling itself is still there as
+              # the `pseudo` dispatcher, if you want it on a key.
+              preserve_split = true;
+            };
+
+            # -------------------------------------------------------------
+            # Tabbed / stacked groups -- AeroSpace's accordion, in the one
+            # place the Mac layout had something a plain dwindle tree does
+            # not.
+            #
+            # On the Mac, alt-comma folds the focused container into an
+            # accordion: the windows stop sharing the screen and take turns
+            # in one tile. Hyprland's native groups are the same idea with
+            # a tab bar on top -- which is i3's "tabbed", and with
+            # `stacked` on, i3's "stacking". No plugin: hy3 would give the
+            # full i3 tree (explicit split containers, groups holding
+            # sub-splits), but it is an ABI-coupled plugin that has to be
+            # rebuilt in lockstep with every Hyprland bump, and none of
+            # what it adds beyond this is what the Mac layout does.
+            #
+            # Colours are deliberately absent here, exactly as in `general`
+            # above: the groupbar palette is re-derived from the wallpaper
+            # and arrives through the `source`d matugen file.
+            group = {
+              # Hyprland's default is ON, and it is the wrong default for a
+              # layout meant to mirror AeroSpace: with auto_group on, every
+              # window opened while a group has focus is silently swallowed
+              # into that group. Grouping should only ever happen because
+              # the keybind or a drag asked for it.
+              auto_group = false;
+
+              groupbar = {
+                enabled = true;
+                # `stacked` is deliberately NOT set here. It is the one
+                # group option owned by the sourced groupbarMode file, so
+                # that the toggle keybind can rewrite it; setting it here
+                # too would win (hyprland.conf is parsed after its own
+                # `source` lines) and pin the mode to whatever this says.
+                #
+                # The rest is sizing. Hyprland's defaults (14px bar, 8px
+                # font) are tuned for a much tighter config than this one
+                # -- 3px borders, 8/16 gaps, 12px rounding -- and a bar
+                # that thin reads as a stripe rather than a tab.
+                height = 20;
+                font_family = "JetBrainsMono Nerd Font";
+                font_size = 11;
+              };
+            };
+
+            binds = {
+              # What makes alt-h/j/k/l behave like AeroSpace inside an
+              # accordion, and the reason this needs no extra "next tab"
+              # key: with this on, movefocus cycles through the group's own
+              # windows first and only leaves the group once it runs off
+              # the end. Off (the default), focus skips straight past the
+              # group's other tabs to the next tile, and the tabs are
+              # reachable only with the mouse.
+              movefocus_cycles_groupfirst = true;
+            };
+          };
+
+      # Group / split bindings. alt-comma is AeroSpace's `layout accordion` and
+      # keeps that meaning under both layouts -- only the machinery behind it
+      # changes, so the muscle memory does not.
+      #
+      # hy3 adds the rest of the i3 tree, which the native groups have no
+      # equivalent for. Key space is tight: ALT already owns H J K L F B V M,
+      # COMMA, and the nine workspace letters (Q W E A S D U I O), which leaves
+      # C G N P R T X Y Z. Letters rather than AeroSpace's literal punctuation
+      # (alt-slash "flip axis") -- on this ch/de_nodeadkeys keyboard `/` is
+      # Shift+7, and the module already carries a note at the screenshot binds
+      # about keysym-vs-`code:` spelling biting exactly that way. COMMA is
+      # safe because it is an unshifted key on this layout; `/` is not.
+      groupBinds =
+        if hy3 then
+          [
+            # Fold the focused node into a tab group, and back out again.
+            "${mod}, COMMA, hy3:changegroup, toggletab"
+            # alt-shift-comma was "tabbed vs stacked" under the native
+            # groupbar. hy3 has no stacked mode, so the key is reused for the
+            # other half of AeroSpace's layout pair: flip the split axis
+            # (AeroSpace's alt-slash).
+            "${mod} SHIFT, COMMA, hy3:changegroup, opposite"
+            # i3's `split h` / `split v` -- the explicit split containers that
+            # are the whole reason for running hy3 over dwindle.
+            "${mod}, N, hy3:makegroup, h"
+            "${mod} SHIFT, N, hy3:makegroup, v"
+            # i3's `focus parent` / `focus child`: walk up and down the tree
+            # so a whole container can be moved or tabbed, not just a window.
+            "${mod}, P, hy3:changefocus, raise"
+            "${mod} SHIFT, P, hy3:changefocus, lower"
+            # Cycle tabs within a group. Under dwindle this needs no key --
+            # binds:movefocus_cycles_groupfirst puts it on alt-h/l -- but hy3
+            # has no equivalent option, so the tabs get their own key.
+            "SUPER, Tab, hy3:focustab, r"
+            "SUPER SHIFT, Tab, hy3:focustab, l"
+            # Temporarily grow a node over its siblings, and back.
+            "${mod}, X, hy3:expand, expand"
+            "${mod} SHIFT, X, hy3:expand, base"
+          ]
+        else
+          [
+            # alt-comma = group / ungroup, mirroring AeroSpace's
+            # `layout accordion` on the same key. Tab bar appears, the
+            # windows take turns in one tile, alt-h/l walks the tabs
+            # (see binds:movefocus_cycles_groupfirst above).
+            "${mod}, COMMA, togglegroup,"
+            # alt-shift-comma = flip that bar between tabbed and stacked.
+            # An exec rather than a dispatcher because Hyprland has no
+            # dispatcher for it -- see toggleGroupbarMode for why the
+            # mode has to be written to a file as well as set live.
+            "${mod} SHIFT, COMMA, exec, ${toggleGroupbarMode}"
+          ];
+
       cfgHome = config.xdg.configHome;
 
       # -- Keybindings -------------------------------------------------------
@@ -273,7 +520,7 @@
       workspaceBinds = lib.flatten (
         lib.imap1 (i: key: [
           "${mod}, ${key}, workspace, ${toString i}"
-          "${mod} SHIFT, ${key}, movetoworkspace, ${toString i}"
+          "${mod} SHIFT, ${key}, ${dispatch "movetoworkspace"}, ${toString i}"
         ]) workspaceKeys
       );
 
@@ -402,6 +649,46 @@
                 text_color_inactive = $on_surface
             }
         }
+
+        ${lib.optionalString hy3 (''
+          # hy3's tab bar. Same split as `group` directly above --
+          # behaviour in hyprland.conf, palette here -- and the roles are
+          # deliberately the same ones, so a hy3 tab and a native groupbar tab
+          # are the same surface in the same scheme.
+          #
+          # Only emitted when the layout is actually hy3, for the same reason
+          # the `dwindle` and `group` blocks in hyprland.conf are gated: a
+          # dwindle host never loads hy3, so these would be dead keys in a
+          # generated file. Hyprland tolerates them either way -- `plugin:` is
+          # a free-form bucket, verified with --verify-config -- so this is
+          # tidiness rather than a correctness fix.
+          plugin {
+              hy3 {
+                  # A nested `colors` section, not Hyprland's `col.` prefix --
+                  # hy3's keys are plugin:hy3:tabs:colors:*, taken from the
+                  # plugin binary's own option strings rather than its README.
+                  tabs {
+                      colors {
+                          active = $primary
+                          active_border = $tertiary
+                          active_text = $on_primary
+                          # The tab holding keyboard focus inside a group that is
+                          # not itself focused: dimmer than active, brighter than
+                          # inactive.
+                          focused = rgb({{colors.secondary.default.hex_stripped}})
+                          focused_border = $tertiary
+                          focused_text = $on_primary
+                          inactive = rgba({{colors.surface_container.default.hex_stripped}}cc)
+                          inactive_border = rgba({{colors.outline_variant.default.hex_stripped}}66)
+                          inactive_text = $on_surface
+                          urgent = rgb({{colors.error.default.hex_stripped}})
+                          urgent_border = rgb({{colors.error.default.hex_stripped}})
+                          urgent_text = rgb({{colors.on_error.default.hex_stripped}})
+                      }
+                  }
+              }
+          }
+        '')}
 
         decoration {
             shadow {
@@ -739,8 +1026,11 @@
                 # at activation, so neither is ever a missing-source error.
                 source = [
                   generated.hypr
-                  groupbarMode
-                ];
+                ]
+                # Native-groupbar state only. hy3 draws its own tabs and has no
+                # stacked mode, so under hy3 this file has nothing to say and
+                # the keybind that writes it is not bound either.
+                ++ lib.optional (!hy3) groupbarMode;
 
                 # ",preferred,auto,<scale>" -- every output, its preferred mode,
                 # auto-placed, at noughty.hyprland.scale (1 = 100%).
@@ -778,7 +1068,11 @@
                   gaps_in = 8;
                   gaps_out = 16;
                   border_size = 3;
-                  layout = "dwindle";
+                  # noughty.hyprland.layout. Naming a layout the compositor has not
+                  # registered yet is NOT a config error (verified with
+                  # --verify-config), which is what makes hy3's deferred plugin
+                  # load at `exec-once` survivable.
+                  layout = layout;
                   resize_on_border = true;
                   # col.active_border / col.inactive_border deliberately absent:
                   # they come from the sourced colours file.
@@ -809,71 +1103,11 @@
                   ];
                 };
 
-                dwindle = {
-                  # No `pseudotile` here: Hyprland 0.55 dropped it as a config
-                  # option, and setting it is a hard error -- "config option
-                  # <dwindle:pseudotile> does not exist". It is absent from the
-                  # option list the compositor ships in
-                  # share/hypr/stubs/hl.meta.lua, which is the authoritative
-                  # list for this build. Pseudotiling itself is still there as
-                  # the `pseudo` dispatcher, if you want it on a key.
-                  preserve_split = true;
-                };
-
-                # -------------------------------------------------------------
-                # Tabbed / stacked groups -- AeroSpace's accordion, in the one
-                # place the Mac layout had something a plain dwindle tree does
-                # not.
-                #
-                # On the Mac, alt-comma folds the focused container into an
-                # accordion: the windows stop sharing the screen and take turns
-                # in one tile. Hyprland's native groups are the same idea with
-                # a tab bar on top -- which is i3's "tabbed", and with
-                # `stacked` on, i3's "stacking". No plugin: hy3 would give the
-                # full i3 tree (explicit split containers, groups holding
-                # sub-splits), but it is an ABI-coupled plugin that has to be
-                # rebuilt in lockstep with every Hyprland bump, and none of
-                # what it adds beyond this is what the Mac layout does.
-                #
-                # Colours are deliberately absent here, exactly as in `general`
-                # above: the groupbar palette is re-derived from the wallpaper
-                # and arrives through the `source`d matugen file.
-                group = {
-                  # Hyprland's default is ON, and it is the wrong default for a
-                  # layout meant to mirror AeroSpace: with auto_group on, every
-                  # window opened while a group has focus is silently swallowed
-                  # into that group. Grouping should only ever happen because
-                  # the keybind or a drag asked for it.
-                  auto_group = false;
-
-                  groupbar = {
-                    enabled = true;
-                    # `stacked` is deliberately NOT set here. It is the one
-                    # group option owned by the sourced groupbarMode file, so
-                    # that the toggle keybind can rewrite it; setting it here
-                    # too would win (hyprland.conf is parsed after its own
-                    # `source` lines) and pin the mode to whatever this says.
-                    #
-                    # The rest is sizing. Hyprland's defaults (14px bar, 8px
-                    # font) are tuned for a much tighter config than this one
-                    # -- 3px borders, 8/16 gaps, 12px rounding -- and a bar
-                    # that thin reads as a stripe rather than a tab.
-                    height = 20;
-                    font_family = "JetBrainsMono Nerd Font";
-                    font_size = 11;
-                  };
-                };
-
-                binds = {
-                  # What makes alt-h/j/k/l behave like AeroSpace inside an
-                  # accordion, and the reason this needs no extra "next tab"
-                  # key: with this on, movefocus cycles through the group's own
-                  # windows first and only leaves the group once it runs off
-                  # the end. Off (the default), focus skips straight past the
-                  # group's other tabs to the next tile, and the tabs are
-                  # reachable only with the mouse.
-                  movefocus_cycles_groupfirst = true;
-                };
+                # `dwindle` / `group` / `binds` (for the native layout) and
+                # `plugin.hy3` (for hy3) are merged in from `layoutSettings` at
+                # the end of this block. Exactly one of the two sets is ever
+                # written -- this module does not carry dead config for the
+                # layout that is not in use.
 
                 input = {
                   # Swiss German, no dead keys -- carried over from the old
@@ -915,10 +1149,10 @@
                 # -------------------------------------------------------------
                 bind = [
                   # alt-h/j/k/l = focus left/down/up/right
-                  "${mod}, H, movefocus, l"
-                  "${mod}, J, movefocus, d"
-                  "${mod}, K, movefocus, u"
-                  "${mod}, L, movefocus, r"
+                  "${mod}, H, ${dispatch "movefocus"}, l"
+                  "${mod}, J, ${dispatch "movefocus"}, d"
+                  "${mod}, K, ${dispatch "movefocus"}, u"
+                  "${mod}, L, ${dispatch "movefocus"}, r"
 
                   # alt-shift-h/j/k/l = move the window. The KDE half had to
                   # spell this as quick-tile, because KWin has no tiling-WM
@@ -931,28 +1165,25 @@
                   # neighbour is a group, *out of* the current group if the
                   # window is in one, and otherwise is exactly `movewindow`.
                   # So nothing about the ungrouped case changes.
-                  "${mod} SHIFT, H, movewindoworgroup, l"
-                  "${mod} SHIFT, J, movewindoworgroup, d"
-                  "${mod} SHIFT, K, movewindoworgroup, u"
-                  "${mod} SHIFT, L, movewindoworgroup, r"
-
-                  # alt-comma = group / ungroup, mirroring AeroSpace's
-                  # `layout accordion` on the same key. Tab bar appears, the
-                  # windows take turns in one tile, alt-h/l walks the tabs
-                  # (see binds:movefocus_cycles_groupfirst above).
-                  "${mod}, COMMA, togglegroup,"
-                  # alt-shift-comma = flip that bar between tabbed and stacked.
-                  # An exec rather than a dispatcher because Hyprland has no
-                  # dispatcher for it -- see toggleGroupbarMode for why the
-                  # mode has to be written to a file as well as set live.
-                  "${mod} SHIFT, COMMA, exec, ${toggleGroupbarMode}"
+                  "${mod} SHIFT, H, ${moveWindowDispatch}, l"
+                  "${mod} SHIFT, J, ${moveWindowDispatch}, d"
+                  "${mod} SHIFT, K, ${moveWindowDispatch}, u"
+                  "${mod} SHIFT, L, ${moveWindowDispatch}, r"
+                ]
+                # The group / split keys, which differ per layout -- spliced in
+                # here rather than appended at the end purely so the generated
+                # file keeps its existing order: on a dwindle host the rendered
+                # hyprland.conf is then byte-for-byte what it was before this
+                # option existed.
+                ++ groupBinds
+                ++ [
 
                   # alt-f = fullscreen
                   "${mod}, F, fullscreen, 0"
 
                   # Meta+Q = close window. Deliberately not on `mod`, exactly
                   # as in the KDE half: Alt+Q is a workspace key below.
-                  "SUPER, Q, killactive,"
+                  "SUPER, Q, ${dispatch "killactive"},"
 
                   # Launchers: alt-b/v/m, same three apps as KDE and AeroSpace.
                   "${mod}, B, exec, ${zen}"
@@ -1101,8 +1332,45 @@
                   "${pkgs.wl-clipboard}/bin/wl-paste --type image --watch ${pkgs.cliphist}/bin/cliphist store"
                   # Polkit agent -- see the NixOS half.
                   "${pkgs.hyprpolkitagent}/bin/hyprpolkitagent"
-                ];
-              };
+                ]
+                # hy3 is a compositor plugin, and in hyprlang mode a plugin can
+                # only be loaded from `exec-once` -- i.e. *after* the config has
+                # been parsed. That ordering is the one real hazard in the whole
+                # layout switch, so it was measured rather than assumed, with
+                # `Hyprland --verify-config` (the workflow the windowrule note
+                # further down already prescribes):
+                #
+                #   * `general:layout = hy3` naming a layout that is not
+                #     registered yet is NOT an error. Hyprland accepts it and
+                #     picks the layout up when the plugin registers it.
+                #   * the whole `plugin { hy3 { ... } }` block is NOT an error
+                #     either -- `plugin:` is a free-form bucket, so unknown
+                #     subkeys are tolerated and applied once the plugin lands.
+                #   * `bind = ..., hy3:movefocus, l` IS a hard error:
+                #     "Invalid dispatcher, requested "hy3:movefocus" does not
+                #     exist". Dispatchers resolve at parse time, and a bind
+                #     naming an unknown one is *dropped*, not deferred.
+                #
+                # So without the `&& hyprctl reload` below the session would
+                # come up with every hy3 bind missing and a config-error banner,
+                # and would only heal at the next wallpaper rotation -- whose
+                # post_hook happens to run `hyprctl reload`, up to
+                # noughty.hyprland.wallpaperInterval seconds later. Chaining the
+                # reload onto the load makes that immediate and deterministic.
+                #
+                # One command rather than two exec-once entries on purpose:
+                # separate entries are ordered by *spawn* only, so a standalone
+                # reload could re-parse before the load had finished registering
+                # the dispatchers. `config-only` keeps it from re-running
+                # monitor detection, which is what Home Manager's own onChange
+                # reload uses too.
+                #
+                # This is also why `wayland.windowManager.hyprland.plugins` is
+                # not used: it emits the bare `hyprctl plugin load` line with
+                # nothing to sequence a reload after it.
+                ++ lib.optional hy3 "${hyprctl} plugin load ${hy3Plugin} && ${hyprctl} reload config-only";
+              }
+              // layoutSettings;
             };
 
             # ---------------------------------------------------------------
