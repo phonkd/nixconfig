@@ -282,6 +282,18 @@
       "observability-sender"
     ];
     username = "phonkd";
+    # Public IP, not a tailnet address, and deliberately so. ext-mail is the
+    # last server to join the mesh (modules/tailnet.nix already covers it via
+    # the is.server gate — enrolling it was only ever a matter of deploying
+    # it). Its sshd is the hetzner-vm one on :5432, so `deploy mail` needs the
+    # port and key spelled out until Tailscale SSH is live here too:
+    #
+    #   deploy mail --ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"
+    #
+    # Keeping this off-tailnet is also the standing fix for the footgun in the
+    # nixconfig-ops runbook: activation restarts tailscaled and kills a deploy
+    # that is riding the tailnet itself. Over the public IP it cannot.
+    deploy.hostname = "157.180.27.152";
 
     extraModules =
       { self, inputs }:
