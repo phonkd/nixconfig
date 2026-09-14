@@ -536,20 +536,46 @@
         dir=${lib.escapeShellArg (toString wallpaperDir)}
         [ -d "$dir" ] || { echo "wallpaper dir $dir does not exist" >&2; exit 0; }
 
+        cache="''${XDG_CACHE_HOME:-$HOME/.cache}/current-wallpaper"
+        previous=""
+        [ -r "$cache" ] && previous="$(${pkgs.coreutils}/bin/cat "$cache")"
+
         # -print0/-z throughout: wallpaper filenames here contain spaces.
         # `shuf -n1` over the whole list rather than picking an index, so the
-        # set can change under us without an off-by-one.
-        image="$(${pkgs.findutils}/bin/find -L "$dir" -type f \
+        # set can change under us without an off-by-one. The previous
+        # wallpaper (read from the breadcrumb below) is excluded first, so
+        # back-to-back rotations -- periodic or via the manual keybind --
+        # don't land on the same image twice in a row.
+        list() {
+          ${pkgs.findutils}/bin/find -L "$dir" -type f \
             \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \
                -o -iname '*.webp' -o -iname '*.gif' -o -iname '*.bmp' \) \
-            -print0 \
+            -print0
+        }
+        image="$(list | ${pkgs.coreutils}/bin/grep -zv -Fx "$previous" \
           | ${pkgs.coreutils}/bin/shuf -z -n1 \
           | ${pkgs.coreutils}/bin/tr -d '\0')"
+
+        # A single-image directory excludes its only candidate above; fall
+        # back to the unfiltered listing rather than silently no-op'ing.
+        if [ -z "$image" ]; then
+          image="$(list | ${pkgs.coreutils}/bin/shuf -z -n1 | ${pkgs.coreutils}/bin/tr -d '\0')"
+        fi
 
         if [ -z "$image" ]; then
           echo "no images under $dir" >&2
           exit 0
         fi
+
+        # A different transition effect each rotation, picked here rather
+        # than left to awww's own `--transition-type random`, so the angle
+        # (wipe/wave) and circle position (grow/outer) get randomised too --
+        # `random` alone leaves those at their defaults every time.
+        transitions=(fade left right top bottom wipe wave grow center outer any)
+        transition="''${transitions[RANDOM % ''${#transitions[@]}]}"
+        angle=$((RANDOM % 360))
+        positions=(center top left right bottom top-left top-right bottom-left bottom-right)
+        pos="''${positions[RANDOM % ''${#positions[@]}]}"
 
         # swww was renamed to awww upstream, and nixpkgs keeps `swww` only as
         # a deprecation alias, so the real name is used throughout. The daemon
@@ -557,7 +583,9 @@
         # tick retries, so it is not fatal.
         ${pkgs.awww}/bin/awww img "$image" \
           --resize crop \
-          --transition-type fade \
+          --transition-type "$transition" \
+          --transition-angle "$angle" \
+          --transition-pos "$pos" \
           --transition-duration 1.5 \
           --transition-fps 60 || true
 
