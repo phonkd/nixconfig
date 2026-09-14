@@ -1,17 +1,52 @@
 # hy3 — i3/sway tiling layout for the Hyprland session
 
-**Repo(s):** nixconfig   **Status:** draft
+**Repo(s):** nixconfig   **Status:** phases 1–4 implemented, not yet rolled out
+
+## Where this stands
+
+Implemented in `modules/hyprland.nix` as `noughty.hyprland.layout`
+(`"dwindle"` | `"hy3"`, default `"dwindle"`). No host has opted in yet, so
+nothing has changed in practice — Step 5 (rollout) is what remains.
+
+Two corrections to what this plan originally said, both found by measuring:
+
+- **Step 1's three predicted outcomes were all wrong**, and so was the thing it
+  predicted would break. `general:layout = hy3` and the whole
+  `plugin { hy3 { … } }` block parse fine before the plugin loads. It is the
+  **binds** that hard-fail (`Invalid dispatcher, requested "hy3:movefocus"
+  does not exist`), and an unresolved bind is *dropped*, not deferred. The fix
+  is the plan's own fallback 1 — but it must be chained into the same command
+  as the load (`hyprctl plugin load … && hyprctl reload config-only`), because
+  two separate `exec-once` entries are ordered by spawn only. `configType`
+  stays `hyprlang`; the lua escape hatch was not needed.
+- **hy3 is no longer the only tabbing story.** Commit `0182324` landed
+  Hyprland's *native* tabbed/stacked groups on alt-comma, from a branch that
+  ran in parallel with this plan and was merged the same day — neither
+  supersedes the other. That module's comment argues against hy3 ("an
+  ABI-coupled plugin … none of what it adds beyond this is what the Mac layout
+  does"), which is a fair reading of the accordion requirement alone. So hy3 is
+  opt-in rather than a replacement, the native groups are kept intact for the
+  dwindle path, and alt-comma means "accordion" under both.
+
+The colour decision in Step 4 was also reversed, for a reason the plan did not
+know about: see "Tab config and theming" below.
 
 ## Goal
 
-Replace dwindle with [hy3](https://github.com/outfoxxed/hy3) as the layout for the
+Offer [hy3](https://github.com/outfoxxed/hy3) as an alternative layout for the
 Hyprland session (`modules/hyprland.nix`): explicit i3/sway-style split nodes
-instead of dwindle's automatic halving, plus hy3's tabbed groups. The point is
-predictability — with dwindle, where a new window lands depends on the focused
-window's aspect ratio; with hy3 you say where the split goes and it stays there.
+instead of dwindle's automatic halving, plus hy3's tabbed groups. Originally
+written as "replace dwindle"; it landed as an opt-in option instead, because
+the native tabbed groups arrived in parallel and cover the accordion case
+without a plugin.
+
+The point is predictability: with dwindle, where a new window lands depends on
+the focused window's aspect ratio; with hy3 you say where the split goes and it
+stays there.
 
 Additive in the same way the Hyprland session itself is additive: hy3 is a
-compositor plugin, KDE is untouched, and backing it out is flipping one option.
+compositor plugin, KDE is untouched, the dwindle path is byte-identical to what
+it was, and backing it out is flipping one option.
 
 ## Findings that shape the approach
 
@@ -41,8 +76,10 @@ Verified against this repo's actual pins, not the upstream README:
   names a layout that does not exist yet, and `plugin:hy3:*` keys belong to a
   plugin that has not registered them. This module already documents that
   unknown config keys are a **hard error, not a warning** (see the
-  `dwindle:pseudotile` and `windowrule` grammar notes). Step 1 below is to find
-  out which way this actually falls, because it decides the rest.
+  `dwindle:pseudotile` and `windowrule` grammar notes) -- which is what made
+  this look dangerous. Step 1 measured it, and the guess above is wrong in both
+  directions: the layout name and the `plugin:` keys are fine, the binds are
+  not. See Step 1.
 - **Escape hatch already exists.** `configType = "lua"` renders plugin loads as
   `hl.plugin.load(<path>)` at config-parse time, which is correctly ordered by
   construction. The module comment next to `configType` even says "`settings`
@@ -57,168 +94,228 @@ Verified against this repo's actual pins, not the upstream README:
 
 ## Approach
 
-Land it behind an option, smallest slice first.
+Land it behind an option, smallest slice first. Phases 1-3 are done; phase 4
+(rollout) is the remaining work.
 
-**Phase 1 — make hy3 loadable and provable.** Add the plugin, a
-`noughty.hyprland.layout` enum (`"dwindle"` | `"hy3"`, default `"dwindle"`), and
-gate the layout/keybind/plugin-config changes on it. Nothing changes for anyone
-until a host opts in. Prove the parse-order question with
-`Hyprland --verify-config` before deploying anything.
+**Phase 1 — make hy3 loadable and provable.** ✅ Plugin, the
+`noughty.hyprland.layout` enum, and the layout/keybind/plugin-config changes
+gated on it. Nothing changes for anyone until a host opts in. Parse order
+proven with `Hyprland --verify-config` before any deploy.
 
-**Phase 2 — bindings.** Swap the dispatchers hy3 requires, then add the group
-bindings.
+**Phase 2 — bindings.** ✅ Required dispatcher swaps, plus the group bindings
+— reusing `ALT, COMMA` rather than the new keys this plan first proposed.
 
-**Phase 3 — theming.** Wire hy3's tab colours into the matugen pipeline so tabs
-follow the wallpaper like every other surface in this session already does.
+**Phase 3 — theming.** ✅ Tab colours in the matugen pipeline, so tabs follow
+the wallpaper like every other surface. Gated on the layout.
 
-**Phase 4 — rollout**, then decide whether the option stays (see Open decisions).
+**Phase 4 — rollout.** ⬜ Not started; no host has opted in. Then decide
+whether the option stays (see Open decisions).
 
 ## Steps
 
-### 1. Prove the load order (do this first, it gates everything)
+### 1. Prove the load order — DONE, and the answer was none of the three
 
-Build a throwaway config with `layout = hy3` and a `plugin { hy3 { ... } }`
-block and run the compositor's own checker — the exact workflow the module
-header already prescribes:
+Run against `Hyprland --verify-config -c <candidate>`, this is what 0.55.4
+actually does. The prediction below was wrong in a way worth keeping on the
+page, because the wrong half is the half people assume:
+
+| config | verdict |
+|---|---|
+| `general:layout = hy3` with no plugin loaded | **fine.** Unregistered layout names are accepted and picked up when the plugin registers. |
+| the whole `plugin { hy3 { … } }` block | **fine.** `plugin:` is a free-form bucket; unknown subkeys are tolerated. |
+| `bind = …, hy3:movefocus, l` | **hard error.** `Invalid dispatcher, requested "hy3:movefocus" does not exist` — and the bind is *dropped*, not deferred. |
+
+So the hazard is entirely in the binds, and the fix is fallback 1 with one
+correction: the reload has to be **chained into the same command** as the
+load —
 
 ```
-Hyprland --verify-config -c /path/to/candidate.conf
+exec-once = <hyprctl> plugin load <libhy3.so> && <hyprctl> reload config-only
 ```
 
-Three outcomes:
+— not a second `exec-once` line. Separate entries are ordered by *spawn* only,
+so a standalone reload can re-parse before the load has finished registering
+the dispatchers. `config-only` avoids re-running monitor detection, which is
+what Home Manager's own onChange reload uses too.
 
-- **"config ok"** → the happy path; `exec-once` loading is fine, continue.
-- **errors on `plugin:hy3:*` only** → keep the plugin config out of the
-  HM-generated file and let hy3 use its defaults for now, or move it behind the
-  reload (see below).
-- **errors on `general:layout`** → hy3 cannot be configured this way in
-  hyprlang mode. Fall back, in order of preference:
-  1. append `hyprctl reload` to the plugin-load `exec-once` (one extra line,
-     cheapest);
-  2. flip `configType = "lua"` so `hl.plugin.load()` runs at parse time. This is
-     the correct fix but it re-renders the whole config, including the 0.55
-     `windowrule`/`layerrule` grammar the module spent real effort getting
-     right — so it is a fallback, not the opening move.
+Consequences worth knowing:
 
-### 2. Plugin + option
+- `configType` stays `hyprlang`. The lua escape hatch was not needed. (It is
+  real if it ever is — `hl.plugin.load` is in 0.55.4's
+  `share/hypr/stubs/hl.meta.lua`.)
+- Home Manager's `wayland.windowManager.hyprland.plugins` option is **not**
+  used, because it emits the bare `hyprctl plugin load` line with nothing to
+  sequence a reload after it. The module names the `.so` path directly instead
+  — the same `$out/lib/lib<pname>.so` that option would have derived.
+- Without the chained reload the session would still come up (config errors are
+  reported, not fatal), but with every hy3 bind missing until the next
+  wallpaper rotation's `hyprctl reload` — up to `wallpaperInterval` seconds.
+  That is the "free repair mechanism" in Findings; it is a fallback, not the
+  design.
+- `--verify-config` on the *generated* hy3 config still prints those dispatcher
+  errors, because it cannot load plugins. That is expected. The check that
+  matters is "zero **non**-dispatcher errors", which it passes.
 
-In `modules/hyprland.nix`:
+### 2. Plugin + option — DONE
 
-- NixOS half: add `layout` to `options.noughty.hyprland`:
-  ```nix
-  layout = lib.mkOption {
-    type = lib.types.enum [ "dwindle" "hy3" ];
-    default = "dwindle";
-    description = "Tiling layout for the Hyprland session.";
-  };
-  ```
-- Home half: `wayland.windowManager.hyprland.plugins =
-  lib.optional (cfg.layout == "hy3") pkgs.hyprlandPlugins.hy3;`
-- `general.layout = cfg.layout;` (currently hardcoded `"dwindle"`).
-- Gate the `dwindle` block (`preserve_split`) on `cfg.layout == "dwindle"` — it
-  is inert under hy3, and leaving it is the kind of dead config this module
-  deliberately doesn't carry.
-- `general.gaps_in = 8` / `border_size = 3` / `decoration.rounding = 12` stay,
-  but note `plugin:hy3:group_inset` (default 10) stacks on top of the gaps.
-  Expect one round of visual tuning.
+`noughty.hyprland.layout` (enum `"dwindle"` | `"hy3"`, default `"dwindle"`) in
+the NixOS half; the home half reads it off `osConfig` like `scale` and
+`colorMode` already do.
 
-### 3. Bindings
+Differences from the sketch this plan started with:
 
-hy3's README is explicit that `movefocus` and `movewindow` **must** be replaced
-or the layout misbehaves. Also swap `killactive` and `movetoworkspace`, which
-are group-aware in hy3.
+- **Not** `wayland.windowManager.hyprland.plugins` — see Step 1.
+- The `dwindle` block is gated as planned, and so are the `group` block,
+  `binds:movefocus_cycles_groupfirst` and the sourced `groupbar-mode.conf`,
+  which the plan predates.
+- Both layouts' settings live in one `layoutSettings` binding merged into
+  `settings` with `//`. It is a plain `if`, **not** `lib.mkIf`: Home Manager's
+  `settings` is a value type, not a submodule, so a nested `mkIf` is never
+  resolved — it would reach `toHyprconf` as an attrset with `_type = "if"` and
+  be rendered into the config file verbatim.
+- `group_inset` at 6 rather than hy3's default 10 (see Step 4).
 
-**Required swaps** (existing keys keep their meaning — only the dispatcher changes):
+**Regression evidence.** On the dwindle path the generated `hyprland.conf`
+comes out at the *identical store path* as before the change, and the matugen
+template contains no hy3 text at all. The `groupBinds` list is spliced at the
+original position in the bind list rather than appended, purely to keep that
+byte-identity. So a dwindle host is provably unaffected.
 
-| Key | today | under hy3 |
+### 3. Bindings — DONE
+
+All eight hy3 dispatchers bound here were confirmed present in `libhy3.so`
+(`strings libhy3.so | grep '^hy3:'`).
+
+**Required swaps** — existing keys keep their meaning, only the dispatcher
+changes:
+
+| Key | dwindle | hy3 |
 |---|---|---|
 | `ALT` + H/J/K/L | `movefocus, l/d/u/r` | `hy3:movefocus, l/d/u/r` |
-| `ALT SHIFT` + H/J/K/L | `movewindow, l/d/u/r` | `hy3:movewindow, l/d/u/r` |
+| `ALT SHIFT` + H/J/K/L | `movewindoworgroup, l/d/u/r` | `hy3:movewindow, l/d/u/r` |
 | `SUPER` + Q | `killactive` | `hy3:killactive` |
 | `ALT SHIFT` + Q/W/E/A/S/D/U/I/O | `movetoworkspace, N` | `hy3:movetoworkspace, N` |
 
 That last one is `workspaceBinds` — the `movetoworkspace` half of the `imap1`,
 not the `workspace` half.
 
-**New group bindings.** Key space is tight: `ALT` already owns H J K L F B V M
-and Q W E A S D U I O (workspaces), so the free `ALT` letters are C G N P R T X
-Y Z. Recommendation, following the module's own thesis of mirroring AeroSpace —
-AeroSpace binds `alt-slash` to "flip tiling axis" and `alt-comma` to "accordion",
-and hy3's tabs are this session's accordion:
+**`movewindoworgroup` is the trap in that table.** The dwindle side does *not*
+use plain `movewindow`: it uses `movewindoworgroup`, so the same four keys also
+move windows in and out of the native tab groups. Deriving it through a generic
+`"hy3:" + name` swap silently drops the `orgroup` half and breaks that on the
+dwindle path — caught only by diffing the generated config against main's. It
+is spelled out explicitly in the module for that reason.
 
-| Key | dispatcher | mnemonic |
+**Group bindings.** The plan originally proposed `ALT, R` / `ALT, T` for these.
+Superseded: the native-groups work took `ALT, COMMA` for "accordion" (the
+literal AeroSpace key), so hy3 **keeps that key** and the muscle memory
+survives the switch. `ALT SHIFT, COMMA` was "tabbed vs stacked" under the
+native groupbar; hy3 has no stacked mode, so it is reused for the other half of
+AeroSpace's layout pair.
+
+| Key | dwindle | hy3 |
 |---|---|---|
-| `ALT, R` | `hy3:changegroup, opposite` | **r**otate the split axis (AeroSpace `alt-slash`) |
-| `ALT, T` | `hy3:changegroup, toggletab` | **t**ab the group (AeroSpace `alt-comma`) |
-| `ALT, N` | `hy3:makegroup, h` | i3 `split h` — **n**ew split right |
-| `ALT SHIFT, N` | `hy3:makegroup, v` | i3 `split v` — new split down |
-| `ALT, P` | `hy3:changefocus, raise` | focus **p**arent (i3 `focus parent`) |
-| `ALT SHIFT, P` | `hy3:changefocus, lower` | focus child |
-| `SUPER, Tab` / `SUPER SHIFT, Tab` | `hy3:focustab, r` / `hy3:focustab, l` | cycle tabs |
-| `ALT, X` / `ALT SHIFT, X` | `hy3:expand, expand` / `hy3:expand, base` | e**x**pand node |
+| `ALT, COMMA` | `togglegroup` | `hy3:changegroup, toggletab` |
+| `ALT SHIFT, COMMA` | exec `toggleGroupbarMode` | `hy3:changegroup, opposite` (flip split axis, AeroSpace `alt-slash`) |
+| `ALT, N` / `ALT SHIFT, N` | — | `hy3:makegroup, h` / `, v` (i3 `split h`/`split v`) |
+| `ALT, P` / `ALT SHIFT, P` | — | `hy3:changefocus, raise` / `lower` (i3 focus parent/child) |
+| `SUPER, Tab` / `SUPER SHIFT, Tab` | — | `hy3:focustab, r` / `l` |
+| `ALT, X` / `ALT SHIFT, X` | — | `hy3:expand, expand` / `base` |
 
-Deliberately letters, not punctuation. The literal AeroSpace keys (`,` and `/`)
-are a trap on this keyboard: the layout is `ch`/`de_nodeadkeys`, where `/` is
-Shift+7, and the module already carries a note (at the screenshot binds) about
-keysym-vs-`code:` spelling biting exactly this way. Letters sidestep it.
+`SUPER, Tab` exists under hy3 but not dwindle because dwindle gets tab-cycling
+for free from `binds:movefocus_cycles_groupfirst`, which hy3 has no equivalent
+for.
+
+The keyboard caveat still stands for the *additions* — letters, not
+punctuation: the layout is `ch`/`de_nodeadkeys`, where `/` is Shift+7. `COMMA`
+is safe because it is unshifted there.
 
 `bindm` (`SUPER` + mouse drag) needs no change — it is float-drag, not a tiling
 dispatcher.
+
+Under hy3 the native `group` block, `binds:movefocus_cycles_groupfirst`, the
+`dwindle` block and the sourced `groupbar-mode.conf` are all dropped from the
+generated config: hy3 draws its own tabs, and the module does not carry dead
+config for the layout that is not in use.
 
 Full dispatcher list for later additions: `hy3:equalize`, `hy3:locktab`,
 `hy3:setswallow`, `hy3:setephemeral`, `hy3:warpcursor`, `hy3:togglefocuslayer`,
 `hy3:debugnodes`.
 
-### 4. Tab config and theming
+### 4. Tab config and theming — DONE, with the colour decision reversed
 
-```nix
-plugin.hy3 = {
-  tabs = { height = 22; padding = 6; radius = 6; border_width = 2;
-           render_text = true; text_font = "Inter"; text_height = 11; };
-  autotile = { enable = true; trigger_width = 800; trigger_height = 500; };
-};
-```
+Shipped config (`plugin.hy3`): `group_inset = 6` (deliberately below hy3's
+default of 10 — it stacks on `general:gaps_in = 8`, and 10 makes grouped nodes
+read as noticeably airier than the same windows under dwindle), tabs at
+`height 20 / padding 6 / radius 6 / border_width 2`, `render_text = true` in
+`JetBrainsMono Nerd Font` at `text_height 11` to match the native groupbar, and
+`autotile` on with `trigger_width 800` / `trigger_height 500`.
 
-`Inter` is already in `fonts.packages` on these hosts, so the tab text has a font
-without adding one.
+**Key names come from the plugin binary, not the README** —
+`strings libhy3.so | grep plugin:hy3`. Two traps this caught:
 
-For colours, follow the rule the module header sets out — *matugen only ever owns
-a separate `colors.*` file*. Concretely: add `$hy3_tab_active`,
-`$hy3_tab_active_border`, `$hy3_tab_inactive`, `$hy3_tab_text`, `$hy3_tab_urgent`
-(etc.) as **variables** to `hyprTemplate`, derived from the same Material You
-roles the borders already use (`primary` / `outline_variant` / `on_surface` /
-`error`), and reference those variables from `plugin.hy3.tabs.colors` in the
-HM-owned settings.
+- it is `plugin:hy3:tabs:**radius**`, not `rounding` (hy3 does not follow
+  Hyprland's own `decoration:rounding` spelling);
+- the colours are a nested `tabs { colors { … } }` section — `colors:active`,
+  `colors:active_border`, … — not Hyprland's `col.` prefix.
 
-Variables rather than a `plugin { hy3 { ... } }` block inside `colors.conf`, for
-two reasons: it keeps every `plugin:` key in the one file Step 1 actually
-verifies, and it keeps matugen ignorant of hy3's schema. The alternative — a
-full colours block in the template, matching how `general { col.active_border }`
-is done today — is more consistent-looking but doubles the parse-order surface.
+**The colours go in the matugen template after all**, i.e. the alternative this
+plan originally rejected. The reason the original argument missed: the seeding
+activation in `modules/hyprland.nix` writes an **empty** colours file when no
+wallpaper is readable, and an undefined hyprlang variable is a hard error —
+verified: `Error parsing gradient $x: failed to parse $x as a color`. Emitting
+`$hy3Tab*` variables from matugen and referencing them from hyprland.conf would
+therefore turn "no wallpaper yet" into "session config is broken". With the
+keys living in the generated file instead, an empty file just leaves hy3 on its
+own defaults and the session comes up.
 
-hy3's tab colour keys are `plugin:hy3:tabs:colors:{active, active_border,
-active_text, focused, focused_border, focused_text, inactive, inactive_border,
-inactive_text, urgent, urgent_border, urgent_text, locked, ...}`. Note tabs
-default to `blur = true`, which the `decoration.blur` block here already
-enables — consistent with the `caelestia-*` layerrules.
+This also makes hy3 consistent with how `general` and `group` already work in
+this module, which is the stronger argument in hindsight: matugen owns colour,
+hyprland.conf owns behaviour, and no file references a variable the other might
+not have defined.
 
-### 5. Rollout
+Roles mirror the native groupbar's on purpose, so a hy3 tab and a groupbar tab
+are the same surface in the same scheme: `primary`/`on_primary` active,
+`secondary` for the focused-but-not-active tab, `surface_container` +
+`outline_variant` inactive, `error`/`on_error` urgent. The block is gated on
+the layout, so a dwindle host's colours file gains no hy3 text at all.
 
-Deploy in this order, and it matters:
+### 5. Rollout — the remaining work
 
-1. **`g14`** — laptop, and Plasma is still in the SDDM session list. If hy3
-   wedges the session, log into KDE and fix it.
+Nothing has opted in yet. All three hosts still evaluate to `dwindle`, and the
+code is committed and on `main`, so this step is purely "flip one host and see".
+
+Deploy order, and it matters — the reasoning here was re-checked against the
+current tree and still holds:
+
+1. **`g14`** — laptop, `desktop = "kde"`, so Plasma is still in the SDDM
+   session list. If hy3 wedges the session, log into KDE and fix it.
 2. **`blac`** — same KDE fallback.
-3. **`z14` last.** There is *no* KDE on z14 (`desktop = "hyprland"` in
-   `lib/registry.nix`); Hyprland is the only session, and the login screen is
-   greetd/tuigreet rather than SDDM (`modules/desktop.nix`). A layout that
-   fails to load here leaves one session entry that does not come up. It is
-   not a lockout — tuigreet is a text UI on VT1, so `Ctrl+Alt+F2` gets a TTY —
-   but the fix is then `git revert` + `deploy z14` from that TTY, or booting
-   the previous generation from the boot menu.
+3. **`z14` last.** There is *no* KDE on z14 any more (`desktop = "hyprland"` in
+   `lib/registry.nix`, since `76625c3`); Hyprland is the only session, and the
+   login screen is greetd/tuigreet rather than SDDM (`modules/desktop.nix`, the
+   `de == "hyprland"` branch). A layout that fails here leaves the one session
+   entry not coming up. Not a lockout — tuigreet is a text UI on VT1, so
+   `Ctrl+Alt+F2` gets a TTY — but the fix is then `git revert` + `deploy z14`
+   from that TTY, or the previous generation from the boot menu.
 
 Each host flips `noughty.hyprland.layout = "hy3"` in its registry entry / host
 module. `deploy <host>` per `nixconfig-ops`.
+
+**What to check after the first flip**, in this order, because each one
+explains the next:
+
+```
+hyprctl plugin list          # hy3 present? if not, nothing below matters
+hyprctl getoption general:layout
+hyprctl binds | grep hy3     # the chained reload registered them?
+journalctl --user -u hyprland-session -b
+```
+
+The failure mode to expect, if the chained reload ever regresses, is
+*specifically* "hy3 tiles correctly but none of the alt-keys do anything" —
+that is dropped binds, not a broken plugin. A config-error banner at login that
+clears by itself is the same story.
 
 ### 6. Housekeeping (separate commit)
 
@@ -228,34 +325,47 @@ next person who reads hy3's install docs against this repo.
 
 ## Open decisions
 
+- **Does hy3 earn its place next to the native groups?** This is now the real
+  question, and it cannot be settled on paper — it needs one host running it.
+  The native-groups commit argues hy3 adds nothing the Mac layout wants, and
+  that is true *for the accordion*. What hy3 adds is the rest of the i3 tree:
+  explicit split containers (`hy3:makegroup`), focus-parent/child, and window
+  placement that does not depend on the focused window's aspect ratio. If after
+  a week on g14 you only ever use alt-comma, the honest answer is to drop hy3
+  and keep the native groups.
 - **Keep the `layout` option after rollout, or inline hy3?** Recommendation:
-  keep it. It costs ~6 lines, it is the whole rollback story for z14, and this
-  module already carries options at exactly this granularity (`scale`,
-  `colorMode`, `colorScheme`). Alternative: once all three hosts have run hy3
-  for a while, drop the option and the dwindle branch.
-- **Autotile on or off?** Recommended **on** with `trigger_width = 800` /
-  `trigger_height = 500` — hy3 defaults it off, but off means every single split
-  is manual, which is a big step down from dwindle for casual use. The trigger
-  sizes mean "only auto-split when the node is big enough to be worth splitting."
-  Alternative: `enable = false` for strict i3 behaviour.
-- **Bindings.** The table above is a proposal, not a constraint. The required
-  swaps in the first table are not optional; the second table is taste.
-- **`configType`.** Staying on `hyprlang` unless Step 1 forces the change. Named
-  here because if Step 1 goes badly it is a much larger change than the rest of
-  this plan combined, and that is worth knowing before starting.
+  keep it regardless. It is the whole rollback story for z14, which has no
+  second session, and the module already carries options at this granularity
+  (`scale`, `colorMode`, `colorScheme`). It is also what keeps both answers to
+  the question above cheap.
+- **Autotile on or off?** Shipped **on** (`trigger_width = 800` /
+  `trigger_height = 500`). hy3 defaults it off, but off means every split is
+  manual, a big step down from dwindle for casual use. Flip to
+  `enable = false` for strict i3 behaviour.
+- **`configType`.** Settled: stays `hyprlang`. Step 1 did not force the change.
 
 ## Risks / rollout
 
-- **Plugin fails to load silently** — the classic symptom of an ABI mismatch.
-  Should not happen here (nixpkgs builds hy3 against the same `pkgs.hyprland`),
-  but check with `hyprctl plugin list` and `journalctl --user -u hyprland-session`.
-- **Config parse errors** — mitigated by Step 1's `--verify-config` gate, which
-  is cheap and catches this before a deploy.
+- **Dropped binds, not a dead plugin, is the failure mode to expect.** If the
+  chained `hyprctl reload config-only` ever regresses, hy3 tiles correctly and
+  none of the alt-keys respond. See Step 1.
+- **Plugin fails to load silently** — the classic ABI-mismatch symptom. Should
+  not happen: `pkgs.hyprlandPlugins.hy3` 0.55.0 references the very same
+  `pkgs.hyprland` 0.55.4 store path the session runs (checked with
+  `nix-store -q --references`), and it substitutes from cache.nixos.org rather
+  than building. Confirm with `hyprctl plugin list`.
+- **Config parse errors** — gated by `--verify-config`, which is cheap. Note
+  that on a *generated hy3 config* it will always report the dispatcher errors,
+  because it cannot load plugins; the meaningful check is zero **non**-dispatcher
+  errors.
 - **A Hyprland bump desyncs the pair.** Both come from the same nixpkgs input,
-  so `pkgs.hyprland` and `pkgs.hyprlandPlugins.hy3` move together — this is
-  precisely the failure mode the README's flake-input route would have created.
-  Still worth a `hyprctl plugin list` after any nixpkgs bump.
+  so the two move together — precisely the failure the README's flake-input
+  route would have created. Still worth a `hyprctl plugin list` after a bump.
+- **An empty colours file is survivable**, and deliberately so — see Step 4.
+  This is why the tab palette is not referenced as `$variables`.
 - **Caelestia** should be unaffected: it is layer-shell, hy3 tabs are window
   decoration, and the `layerrule` blur rules target `caelestia-*` namespaces.
-  Untested in combination, so it is on the list to eyeball on g14 first.
-- **Back out:** `noughty.hyprland.layout = "dwindle"` and `deploy <host>`.
+  Untested in combination — eyeball it on g14 first.
+- **Back out:** `noughty.hyprland.layout = "dwindle"` and `deploy <host>`. On a
+  dwindle host the generated config is byte-identical to what it was before hy3
+  existed, so backing out is genuinely a no-op rather than an approximation.
