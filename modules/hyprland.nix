@@ -1417,13 +1417,15 @@
                   # waiting out the timer.
                   "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start hyprland-wallpaper.service"
 
-                  # Audio output switcher, on alt-0. A digit rather than a
-                  # letter because the letters are spoken for -- Q W E A S D
-                  # U I O are the nine workspaces -- and 0 is the one key the
-                  # workspace row does not reach, this session having no
-                  # workspace 10. `bind`, not `bindel`: it opens a menu, so
-                  # repeating it while the key is held would spawn a second
-                  # rofi on top of the first.
+                  # Audio output switcher, on alt-0. Nothing else can hold that
+                  # key: `workspaceKeys` above takes the first three digits (as
+                  # code:10/11/12) plus Q W E A S D and stops at nine, so 0 is
+                  # the one key on the number row the workspace set does not
+                  # reach -- this session has no workspace 10. That stays true
+                  # however the letter half of the list is rearranged.
+                  #
+                  # `bind`, not `bindel`: this opens a menu, and repeating it
+                  # while the key is held would stack a second rofi on the first.
                   "${mod}, 0, exec, ${sinkSwitcher}"
                 ]
                 ++ workspaceBinds;
