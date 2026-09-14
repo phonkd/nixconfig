@@ -728,6 +728,16 @@
                   touchpad = {
                     natural_scroll = false;
                     disable_while_typing = false;
+                    # macOS trackpad semantics: a physical click with two
+                    # fingers down is a right click, three a middle click.
+                    # libinput calls this the "clickfinger" click method; its
+                    # default is "button areas", where right-click lives in
+                    # the bottom-right corner of the pad and two fingers just
+                    # click left. Tapping already behaved the Mac way --
+                    # tap-to-click is on and libinput's tap button map is
+                    # 1/2/3 fingers = left/right/middle -- so this only closes
+                    # the gap for the pad's physical button.
+                    clickfinger_behavior = true;
                   };
                 };
 
