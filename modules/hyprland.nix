@@ -663,23 +663,18 @@
         # a deprecation alias, so the real name is used throughout. The daemon
         # is a separate unit; if it is not up yet this call fails and the next
         # tick retries, so it is not fatal.
-        # Bezier retimes the transition fast -> slow -> fast: it gets ahead
-        # of linear pace early, drifts behind through the middle, then
-        # catches up at the very end, while staying monotonic throughout (no
-        # overshoot/bounce -- verified against the raw parametric curve, not
-        # just eyeballed).
         #
-        # --transition-step was pinned to 2 at one point to force a gradual
-        # animation (default is 90 for every type except 'simple'), but that
-        # small a step glows at the moving edge -- too many blended frames
-        # there overshoot with the bezier retiming applied. Left at its
-        # default; --transition-duration is what should govern pacing.
+        # Easing and step are both left at awww's defaults on purpose. The
+        # default bezier (.54,0,.34,.99) is a conventional ease-in-out and
+        # reads better than the hand-rolled fast -> slow -> fast curve that
+        # used to be pinned here. --transition-step likewise: pinning it to 2
+        # forced a gradual animation but glowed at the moving edge, so pacing
+        # is left entirely to --transition-duration.
         ${pkgs.awww}/bin/awww img "$image" \
           --resize crop \
           --transition-type "$transition" \
           --transition-angle "$angle" \
           --transition-pos "$pos" \
-          --transition-bezier .25,.75,.75,.25 \
           --transition-duration 1 \
           --transition-fps 60 || true
 
