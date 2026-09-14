@@ -140,6 +140,7 @@
         ripgrep
         gh
         iftop
+        gnused
       ];
       programs.fzf = {
         enable = true;
