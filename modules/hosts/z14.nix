@@ -53,6 +53,26 @@
       services.upower.enable = true;
       services.power-profiles-daemon.enable = true;
 
+      # This lid has a real ambient light sensor. It shows up as an IIO device
+      # (`als`, HID usage 200041) behind the AMD sensor-fusion hub, with
+      # illuminance, colour-temperature and chromaticity channels -- so the
+      # hardware side of auto-brightness is not the problem on this machine.
+      #
+      # What was missing is a consumer. With nothing holding the device open,
+      # in_illuminance_sampling_frequency sits at 0 and in_illuminance_raw
+      # reads a flat 0 no matter how light the room is -- the HID sensor is
+      # only polled once something asks it to be, which is exactly what this
+      # daemon does. That reading-zero symptom is what sent us looking for a
+      # broken sensor; the sensor was fine and simply asleep.
+      #
+      # iio-sensor-proxy is also the interface every desktop auto-brightness
+      # implementation already speaks (GNOME's and KDE's both sit on
+      # net.hadess.SensorProxy), so enabling it here is the prerequisite for
+      # any of them rather than a commitment to one. Nothing on this host
+      # changes the backlight by itself yet -- see plans/auto-brightness-z14.md
+      # for what would, and why that last step is a taste call.
+      hardware.sensor.iio.enable = true;
+
       # AirPlay audio *out*, carried over from g14 -- it is about the Sonos
       # speakers on this LAN, not about the GA401, so it belongs on whichever
       # laptop is in use. z14 is the sender: reachable AirPlay receivers become

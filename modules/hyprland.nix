@@ -537,7 +537,15 @@
       # guarantees the user profile is on its PATH.
       zen = "${inputs.zen-browser.packages.${pkgs.system}.default}/bin/zen";
       kitty = "${config.programs.kitty.package}/bin/kitty";
-      spotify = "${pkgs.spotify}/bin/spotify";
+
+      # The two audio helpers, from their own files in modules/hyprland/.
+      # Both are perSystem packages rather than `writeShellScript` inlined into
+      # a bind, because both are far too much logic for a bind line and both
+      # are worth being able to run by hand -- `nix run .#hypr-sink-switcher`
+      # -- without bringing up a session. import-tree picks their files up
+      # automatically; there is no import list to add them to.
+      streamVolume = "${self.packages.${pkgs.system}.hypr-stream-volume}/bin/hypr-stream-volume";
+      sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
 
       # -- matugen templates -------------------------------------------------
       #
@@ -1193,10 +1201,22 @@
                   # as in the KDE half: Alt+Q is a workspace key below.
                   "SUPER, Q, ${dispatch "killactive"},"
 
-                  # Launchers: alt-b/v/m, same three apps as KDE and AeroSpace.
+                  # Launchers: alt-b/v -- two of the three apps KDE and
+                  # AeroSpace launch. Spotify was the third, on alt-m, and is
+                  # gone from here: alt-m now carries per-stream volume (see
+                  # the bindel block below), which is the key it was asked for.
+                  #
+                  # Dropping it costs nothing. Super+D's `combi` searches open
+                  # windows before .desktop entries, so typing "spotify" raises
+                  # the running instance and, with none running, falls through
+                  # to drun and starts one -- see the combi-modes comment in
+                  # programs.rofi.extraConfig. The package is installed
+                  # independently of this binding, by
+                  # users.users.phonkd.packages in modules/desktop.nix, so
+                  # dropping the last `pkgs.spotify` reference from this module
+                  # does not take Spotify out of the closure.
                   "${mod}, B, exec, ${zen}"
                   "${mod}, V, exec, ${kitty}"
-                  "${mod}, M, exec, ${spotify}"
 
                   # --- Below here: things Plasma provides for free and a bare
                   # --- compositor does not, so they have no counterpart in
@@ -1255,14 +1275,35 @@
                   # Force a wallpaper + colour scheme change now, instead of
                   # waiting out the timer.
                   "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start hyprland-wallpaper.service"
+
+                  # Audio output switcher, on alt-0. A digit rather than a
+                  # letter because the letters are spoken for -- Q W E A S D
+                  # U I O are the nine workspaces -- and 0 is the one key the
+                  # workspace row does not reach, this session having no
+                  # workspace 10. `bind`, not `bindel`: it opens a menu, so
+                  # repeating it while the key is held would spawn a second
+                  # rofi on top of the first.
+                  "${mod}, 0, exec, ${sinkSwitcher}"
                 ]
                 ++ workspaceBinds;
 
                 # Media and brightness keys. `bindel` repeats while held and
                 # works on the lock screen.
                 bindel = [
+                  # Device volume: the output as a whole.
                   "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
                   "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+
+                  # Application volume: the same M key on the other modifier,
+                  # moving every playback *stream* instead of the device. This
+                  # is the fader pavucontrol shows per-app, so Spotify can be
+                  # turned down without turning the laptop down -- and, unlike
+                  # the device binds above, it keeps working when a stream is
+                  # routed through the EasyEffects sink rather than straight at
+                  # the default output. See modules/hyprland/stream-volume.nix
+                  # for which nodes count as an application stream and why.
+                  "${mod}, M, exec, ${streamVolume} up"
+                  "${mod} SHIFT, M, exec, ${streamVolume} down"
                   ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
                   ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
                   "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
