@@ -46,7 +46,7 @@ let
     gigaplayer-server # gated on hostHasTag "gigaplayer-server"
     gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
-    work # bedag work setup; gated on hostHasTag "work"
+    work # work setup (private repo); gated on hostHasTag "work"
     containers # rootless podman for distrobox; gated on host.is.nixosDesktop
     # Everything KDE (modules/kde.nix): the session and the AeroThemePlasma
     # shell, gated on host.is.nixosDesktop AND desktop == "kde". Also declares

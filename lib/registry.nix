@@ -123,7 +123,7 @@
     tags = [
       "gigaplayer-client"
       "hyprland"
-      # The bedag work setup (modules/work/). z14 is the only Linux host that
+      # The work setup (modules/work/). z14 is the only Linux host that
       # carries it -- see plans/work-setup-on-nixos.md. Deliberately not on
       # blac or g14: the work ssh config ends in a `Host *` SOCKS catch-all,
       # which is not something to land on a machine by surprise.

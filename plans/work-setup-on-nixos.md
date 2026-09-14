@@ -4,13 +4,17 @@
 
 ## Goal
 
-Make the bedag work setup usable on a NixOS laptop (z14 first), not just the
-Mac. Today *none* of it lands on Linux: `homeModules.work` is imported by
-exactly one file (`modules/hosts/mac.nix`), the NixOS half is written into a
-namespace nothing reads, and the sing-box proxy every work ssh host depends on
-is a `launchd` agent. After this, `ssh sshgwcobe`, the `cmk*`/`bedag` aliases,
-the work gitconfig and the tunnel script all work on z14 the same way they do
-on the Mac.
+Make the work setup usable on a NixOS laptop (z14 first), not just the Mac.
+Today *none* of it lands on Linux: `homeModules.work` is imported by exactly
+one file (`modules/hosts/mac.nix`), the NixOS half is written into a namespace
+nothing reads, and the sing-box proxy every work ssh host depends on is a
+`launchd` agent. After this, the gateway ssh aliases, the work gitconfig and
+the tunnel script all work on z14 the same way they do on the Mac.
+
+**This repo is public; the work config is not.** Specifics — hostnames,
+gateway aliases, tunnel ports, script contents — stay in the private work repo
+and are deliberately not restated here. What follows is the wiring on the
+nixconfig side, which is this repo's own business.
 
 ## Approach
 
@@ -34,7 +38,7 @@ Four moves, smallest-useful-slice ordered so each is verifiable alone:
    option: that route exists only because macOS scoped resolvers are invisible
    to sing-box, and on Linux 127.0.0.1 is a dead resolver (`darwinModules.dns`
    is Mac-only; the laptops have no local dnsmasq).
-4. **De-macOS the bedag-setup modules.** `gsed`/`open -a`, the hardcoded
+4. **De-macOS the work repo's modules.** `gsed`/`open -a`, the hardcoded
    `/Users/phonkd` paths, and `/usr/bin/glab` all have to go or be guarded.
 
 ## Steps
@@ -49,20 +53,23 @@ Four moves, smallest-useful-slice ordered so each is verifiable alone:
 - [x] `lib/registry.nix`: add the `"work"` tag to z14.
 - [x] `modules/proxy.nix`: platform branch (launchd vs systemd user unit) +
       `homelabDnsServer` wrapper option (null on Linux).
-- [x] `modules/work/tools.nix`: add the five packages z14 was missing —
-      `glab`, `kubie`, `ejson`, `teleport`, `socat`.
+- [x] **Deleted `modules/work/tools.nix`.** It duplicated the private repo's own
+      tools.nix package list almost exactly, and both were imported — so the
+      public copy was redundant *and* an unnecessary disclosure of the work
+      toolchain. The missing packages were added to the private list instead.
 - [x] `modules/hosts/mac.nix` / `gui/default.nix`: unchanged behaviour — the Mac
       still gets `homeModules.proxy` from `gui-darwin`.
 
-**bedag-setup**
+**work repo** (private — details there, not here)
 
-- [x] `home-manager/ica-proxy.nix`: `gsed` → `${pkgs.gnused}/bin/sed`,
-      `open -a "Citrix Workspace"` → `xdg-open` on Linux; whole script guarded
-      so the Linux branch is honest about what it can do.
-- [x] `home-manager/shell.nix`: `/Users/phonkd` → `${config.home.homeDirectory}`,
-      `/usr/bin/glab` → `glab`, and fix the `initContent`-nested-inside-
-      `siteFunctions` bug (it has never taken effect on either platform).
-- [x] `bdg_gwup.sh`: `/Users/phonkd/.ssh/id_ed25519` → `$HOME/.ssh/id_ed25519`.
+- [x] `ica-proxy.nix`: `gsed` → `${pkgs.gnused}/bin/sed`, and the macOS-only
+      opener → `xdg-open` on Linux, guarded by platform.
+- [x] `shell.nix`: `/Users/phonkd` → `${config.home.homeDirectory}`, an absolute
+      `/usr/bin` path → PATH lookup, and a fix for the
+      `initContent`-nested-inside-`siteFunctions` bug (it has never taken
+      effect on either platform).
+- [x] The tunnel script: hardcoded Mac path to the ssh key → `$HOME`.
+- [x] Absorbed the package list that used to be duplicated in this repo.
 
 ## Open decisions
 
@@ -75,7 +82,7 @@ Four moves, smallest-useful-slice ordered so each is verifiable alone:
   *and* `requireFile` — it needs a manually downloaded installer, so it cannot
   be added non-interactively. The Linux `ica-proxy` branch rewrites the .ica and
   hands it to `xdg-open`, which does the right thing once a handler exists.
-  `remmina` (already in `work-tools`) covers plain RDP meanwhile.
+  `remmina` (in the private repo's package list) covers plain RDP meanwhile.
 - **Tag name `"work"`** rather than reusing `formFactor`/username — matches the
   existing `gigaplayer-client` / `reverse-proxy` idiom and keeps blac and g14
   opted out until asked for.
@@ -85,7 +92,7 @@ Four moves, smallest-useful-slice ordered so each is verifiable alone:
 
 ## Risks / rollout
 
-- The bedag `Host *` catch-all (`ProxyCommand socat - SOCKS:…:2080`) applies to
+- The work `Host *` catch-all (`ProxyCommand socat - SOCKS:…:2080`) applies to
   **every** ssh destination. On the Mac this is survived by the tailnet/homelab
   match blocks in `mac.nix` rendering *above* it. z14 has no such blocks: it
   reaches the homelab over the tailnet by name, and those names must not get

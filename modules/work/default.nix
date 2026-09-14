@@ -6,13 +6,20 @@
 }:
 
 {
-  # Cross-platform HM half of the bedag work setup. Imported by mac.nix
-  # directly, and on NixOS by `nixosModules.work` below.
+  # Cross-platform HM half of the work setup. Imported by mac.nix directly,
+  # and on NixOS by `nixosModules.work` below.
+  #
+  # Deliberately thin. The work config itself is private and lives in the
+  # separate work repo (imported by path in external.nix) -- this repo is
+  # public, so it carries only the wiring, never the content. There used to be
+  # a `work-tools` module here duplicating that repo's own tools.nix package
+  # list almost exactly; both were imported, so the public copy was redundant
+  # as well as a needless disclosure of the work toolchain. It is gone, and
+  # the private list is now the single source.
   flake.homeModules.work =
     { pkgs, ... }:
     {
       imports = [
-        self.homeModules.work-tools
         self.homeModules.work-external-config
         # NB: `homeModules.proxy` is deliberately NOT imported here even though
         # the work ssh config's `Host *` catch-all depends on it. On the Mac,
@@ -26,7 +33,7 @@
 
   # Everything that must NOT go through the work proxy.
   #
-  # bedag-setup's ssh.nix ends in a `Host *` catch-all whose ProxyCommand is
+  # The work repo's ssh.nix ends in a `Host *` catch-all whose ProxyCommand is
   # `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`, and ssh_config is
   # first-match-wins *per keyword*: a block that matches earlier but says
   # nothing about ProxyCommand still inherits the catch-all's. So bypassing it
@@ -34,7 +41,7 @@
   # the same reason modules/hosts/mac.nix spells it out on every tailnet entry.
   #
   # Ordering is in our favour: home-manager renders all `matchBlocks` first and
-  # only then `extraConfig` (which is where the whole bedag blob lands), so
+  # only then `extraConfig` (which is where that whole blob lands), so
   # anything declared here is guaranteed to sit above the catch-all.
   #
   # This is the Linux counterpart of those mac.nix blocks and is imported ONLY
@@ -90,7 +97,7 @@
       ...
     }:
     lib.mkIf (noughtyLib.hostHasTag "work") {
-      # Smartcard stack for the LinOTP yubikey that `bdg_gwup.sh` reads TOTPs
+      # Smartcard stack for the yubikey the work tunnel script reads TOTPs
       # from. `yubikey-manager` also arrives via modules/desktop.nix, but pcscd
       # and the udev rules do not, and without them ykman sees no device.
       services.pcscd.enable = lib.mkForce true;
