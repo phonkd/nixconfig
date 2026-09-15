@@ -82,6 +82,23 @@
           bindkey '^[[1;5D' backward-word
           bindkey '^[[H' beginning-of-line
           bindkey '^[[F' end-of-line
+
+          # Ctrl-R: fzf's picker over atuin's history, which (unlike zsh's)
+          # remembers the directory each command ran in. ctrl-d narrows to
+          # the current dir -- e.g. a try-rs scratch dir's tunnels and dumps.
+          # --reverse is newest-first, despite atuin's help calling it oldest-first.
+          _atuin_fzf_history() {
+            local selected
+            selected=$(atuin search --cmd-only --print0 --reverse --filter-mode global |
+              fzf --read0 --scheme=history --highlight-line --query="$LBUFFER" \
+                --prompt='all> ' --header='ctrl-d: this dir · ctrl-g: everywhere' \
+                --bind='ctrl-d:reload(atuin search --cmd-only --print0 --reverse --filter-mode directory)+change-prompt(dir> )' \
+                --bind='ctrl-g:reload(atuin search --cmd-only --print0 --reverse --filter-mode global)+change-prompt(all> )'
+            ) && LBUFFER=$selected
+            zle reset-prompt
+          }
+          zle -N _atuin_fzf_history
+          bindkey '^R' _atuin_fzf_history
         '';
         history = {
           size = 1000000;
@@ -142,10 +159,25 @@
         iftop
         gnused
       ];
+      # atuin only records history; Ctrl-R stays an fzf picker (initContent).
+      programs.atuin = {
+        enable = true;
+        flags = [
+          "--disable-ctrl-r"
+          "--disable-up-arrow"
+        ];
+        settings.update_check = false;
+      };
       programs.fzf = {
         enable = true;
         enableZshIntegration = true;
         enableFishIntegration = false;
+      }
+      # "" drops fzf's own ^R binding in favour of _atuin_fzf_history. Guarded
+      # like the option below: android's pinned home-manager only has the older
+      # historyWidgetCommand spelling.
+      // lib.optionalAttrs (options.programs.fzf ? historyWidget) {
+        historyWidget.command = "";
       }
       # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell is
       # unused. Guarded on the option existing because the android host pins a
