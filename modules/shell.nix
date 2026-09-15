@@ -29,7 +29,7 @@
           stealmusic = "yt-dlp -x --audio-format mp3 --embed-thumbnail --embed-metadata";
           k = lib.mkDefault "kubecolor";
           mystrom = "curl http://192.168.1.19/toggle";
-          nix-shell = "NIXPKGS_ALLOW_UNFREE=1 nix shell --impure";
+          nix-shelly = "NIXPKGS_ALLOW_UNFREE=1 nix shell --impure";
           kn = "kubens";
           kgp = "kubectl get pods";
           kgpw = "watch kubectl get pods";
