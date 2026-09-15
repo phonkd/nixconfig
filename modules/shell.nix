@@ -82,23 +82,6 @@
           bindkey '^[[1;5D' backward-word
           bindkey '^[[H' beginning-of-line
           bindkey '^[[F' end-of-line
-
-          # Ctrl-R: fzf's picker over atuin's history, which (unlike zsh's)
-          # remembers the directory each command ran in. ctrl-d narrows to
-          # the current dir -- e.g. a try-rs scratch dir's tunnels and dumps.
-          # --reverse is newest-first, despite atuin's help calling it oldest-first.
-          _atuin_fzf_history() {
-            local selected
-            selected=$(atuin search --cmd-only --print0 --reverse --filter-mode global |
-              fzf --read0 --scheme=history --highlight-line --query="$LBUFFER" \
-                --prompt='all> ' --header='ctrl-d: this dir · ctrl-g: everywhere' \
-                --bind='ctrl-d:reload(atuin search --cmd-only --print0 --reverse --filter-mode directory)+change-prompt(dir> )' \
-                --bind='ctrl-g:reload(atuin search --cmd-only --print0 --reverse --filter-mode global)+change-prompt(all> )'
-            ) && LBUFFER=$selected
-            zle reset-prompt
-          }
-          zle -N _atuin_fzf_history
-          bindkey '^R' _atuin_fzf_history
         '';
         history = {
           size = 1000000;
@@ -159,7 +142,8 @@
         iftop
         gnused
       ];
-      # atuin only records history; Ctrl-R stays an fzf picker (initContent).
+      # atuin only records history (with the directory each command ran in);
+      # it has no UI of its own here -- see ctrl-d on fzf's Ctrl-R below.
       programs.atuin = {
         enable = true;
         flags = [
@@ -173,11 +157,19 @@
         enableZshIntegration = true;
         enableFishIntegration = false;
       }
-      # "" drops fzf's own ^R binding in favour of _atuin_fzf_history. Guarded
-      # like the option below: android's pinned home-manager only has the older
-      # historyWidgetCommand spelling.
+      # Ctrl-R stays fzf's own widget over zsh history. ctrl-d swaps the list
+      # for atuin's commands run in the current dir (e.g. a try-rs scratch dir);
+      # the widget pastes non-history lines as-is. Only the dir view comes from
+      # atuin: `atuin import zsh` can't date NO_EXTENDED_HISTORY lines and
+      # scrambles their order. --reverse is newest-first, despite atuin's help.
+      # Each element needs its own quoting: HM joins them into one env var that
+      # fzf word-splits. Guarded because android's pinned home-manager predates
+      # historyWidget.
       // lib.optionalAttrs (options.programs.fzf ? historyWidget) {
-        historyWidget.command = "";
+        historyWidget.options = [
+          "--header='ctrl-d: only this dir'"
+          "--bind='ctrl-d:reload(atuin search --cmd-only --print0 --reverse --filter-mode directory)+change-prompt(dir> )'"
+        ];
       }
       # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell is
       # unused. Guarded on the option existing because the android host pins a
