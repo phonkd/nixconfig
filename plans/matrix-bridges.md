@@ -57,15 +57,124 @@ in `modules/observability.nix`** — its `obsHost` special-case is keyed on
 `hostname == "ext-mail"`, and any other host already falls through to
 `100.64.0.4`.
 
+### File layout: one `modules/chat.nix` for both halves
+
+`modules/chat.nix` — already stubbed on the main checkout, still untracked —
+holds **both** sides of this feature: the homeserver's NixOS module and the
+desktop clients' Home Manager module. That is the established shape here, not a
+novelty: `modules/kde.nix`, `modules/hyprland.nix` and `modules/desktop.nix` each
+define `flake.nixosModules.*` and `flake.homeModules.*` in one file, so the system
+half and the `$HOME` half of one feature stay next to each other. It supersedes
+the `modules/hetzner/matrix/matrix.nix` path named in the steps below — there is
+no second file, and nothing about the module needs to live under `hetzner/`
+(the tag decides where it lands, not the directory).
+
+`import-tree ./modules` (flake.nix) picks the file up automatically; nothing
+imports it by path. Two consequences worth stating plainly:
+
+- **Every `.nix` under `modules/` is evaluated**, so a mistake in this one file
+  breaks the whole flake — every host, not just the chat host.
+- **Untracked files are invisible to the flake.** `chat.nix` is not `git add`ed
+  yet, and that is the only reason the defects below are not already firing.
+
+Target skeleton:
+
+```nix
+{ self, inputs, ... }:
+{
+  # ── server half: the homeserver + bridges ──────────────────────────
+  flake.nixosModules.chat-server =
+    { config, pkgs, lib, noughtyLib, ... }:
+    {
+      config = lib.mkIf (noughtyLib.hostHasTag "chat-server") {
+        services.postgresql    = { /* … */ };
+        services.matrix-synapse = { /* … */ };
+        services.mautrix-whatsapp = { /* … */ };
+        services.mautrix-signal   = { /* … */ };
+        services.mautrix-discord  = { /* … */ };
+        services.nginx = { /* matrix.phonkd.net */ };
+        networking.firewall.allowedTCPPorts = [ 80 443 ];
+      };
+    };
+
+  # ── client half: what a desktop needs to talk to it ────────────────
+  flake.homeModules.chat =
+    { pkgs, ... }:
+    {
+      home.packages = [ pkgs.element-desktop ];
+    };
+}
+```
+
+Wiring, once the file is correct:
+
+- Server: add `chat-server` to `alwaysImport` in `modules/builder.nix`. It
+  self-gates on the tag, exactly like `mailserver` and `observability-server`
+  already there, so it is inert on all eight other hosts.
+- Client: import `self.homeModules.chat` from `flake.homeModules.gui-nixos`
+  (`modules/hosts/types/gui/default.nix`) — that is the list `blac`, `g14` and
+  `z14` already pull. The Mac gets an `element` **cask** in `gui-darwin` instead,
+  for the same reason `affine` and `discord` are casks there: HM links apps as
+  store symlinks that Spotlight will not index, so a nix-installed GUI app is
+  unlaunchable on Tahoe.
+
+### Defects in the current stub (verified, not read off)
+
+The stub as it stands does not merely need filling in — it breaks the flake the
+moment it is tracked. All three were confirmed by copying the file into a
+worktree and evaluating, not by inspection.
+
+1. **`flake.homeModules.desktop` collides with `modules/desktop.nix:10`** and is a
+   hard eval error. `flake.homeModules` is a `lazyAttrsOf raw` (`modules/parts.nix`),
+   whose merge function rejects a second definition outright:
+
+   ```
+   error: The option `flake.homeModules.desktop' is defined multiple times
+          while it's expected to be unique.
+   Definition values:
+   - In `…/modules/chat.nix': <function, args: {pkgs}>
+   - In `…/modules/desktop.nix': <function, args: {pkgs}>
+   ```
+
+   This is the whole flake failing to evaluate, so it would take every host down
+   with it, not just chat. **Fix:** name it `flake.homeModules.chat`. Renaming it
+   was verified to make both `.#homeModules.chat` and `.#nixosModules.chat-server`
+   evaluate clean. More generally: a second file can never *extend* an existing
+   home module by redefining its name — it either declares a new module that gets
+   imported alongside, or it edits `desktop.nix` directly.
+
+2. **`imports = [ self.nixosModules.desktop ];` inside `chat-server`** is a
+   copy-paste from `nvidia-desktop` (`modules/desktop.nix:348`) and does not
+   belong on a headless server — that module is the display-manager / desktop-
+   environment mapping (SDDM, greetd, GNOME). It is inert *today* because it
+   self-gates on `noughty.host.is.nixosDesktop`, so this one is latent rather
+   than fatal. It is still worth removing: `builder.nix`'s own comment warns that
+   function modules cannot be deduplicated by Nix, so if `chat-server` ever lands
+   on a desktop host this second import path produces duplicate definitions of
+   every unique option `desktop` declares. **Fix:** drop the `imports` entirely.
+
+3. **No gate on the `config` block.** As written, `chat-server` applies wherever
+   it is imported. Once it joins `alwaysImport` that means *everywhere*. **Fix:**
+   the `lib.mkIf (noughtyLib.hostHasTag "chat-server")` wrapper shown above, and
+   take `noughtyLib` from the module arguments — the stub's argument list omits it.
+
+Note the tag name drifts between this plan and the stub: the steps below say
+`matrix-server`, the stub module is `chat-server`. Settling on **`chat-server`**
+for both the module name and the registry tag, to match the file.
+
 ### Why a new VM rather than the mailserver VM
 
 Reusing `ext-mail` was the other candidate. Against it:
 
-- **`ext-mail` is the fleet's one hand-managed box.** It has no `deploy.hostname`
-  in `lib/registry.nix`, and it does not appear in `tailscale status` at all — it
-  never enrolled in the headscale mesh. Landing a service there means first
-  fixing enrolment + deploy plumbing, which is most of the cost of standing up a
-  fresh VM anyway.
+- ~~**`ext-mail` is the fleet's one hand-managed box.**~~ **Obsolete — this was
+  the strongest argument and it has since been answered.** `ext-mail` is a normal
+  deploy node now: the `worktree-mail-tailnet` branch gives it
+  `deploy.hostname = "157.180.27.152"` (its public IP, not a tailnet address —
+  deliberately, so that activation restarting `tailscaled` cannot kill the deploy
+  that is riding it), and `deploy mail` works. Note that branch is **not merged to
+  `main`** yet, so on `main` the registry stanza still has no `deploy.hostname`.
+  The three reasons below are what the new-VM recommendation now rests on, and
+  they are weaker than this one was.
 - **Mail is the one workload whose reputation is precious.** Deliverability, DKIM
   state and the ACME certs for `mail.phonkd.net` / `cal.phonkd.net` all live
   there. Synapse plus three bridges is the noisiest, most memory-hungry,
@@ -156,6 +265,15 @@ Ordered; each verifiable on its own.
 
 ### Phase 1 — homeserver up
 
+0. **Make the stub safe first.** `modules/chat.nix` exists untracked on the main
+   checkout and, as written, fails flake evaluation the moment it is `git add`ed
+   (see *Defects in the current stub* above). Before anything else: rename
+   `flake.homeModules.desktop` → `flake.homeModules.chat`, drop
+   `imports = [ self.nixosModules.desktop ]`, add `noughtyLib` to the
+   `chat-server` argument list and wrap its `config` in the tag gate. Verify with
+   `nix eval .#homeModules.chat --apply 'x: "ok"'` and the same for
+   `.#nixosModules.chat-server` — both must evaluate before the file is committed.
+   This step is independent of the host decision and can land today.
 1. **Provision the VM.** Hetzner CX22, x86_64, same project and private network as
    `ext-mail`/`observability`. Install NixOS the way those two were done. Open
    80/443 in the Hetzner cloud firewall. Record the public IP and the `/` + `/efi`
@@ -163,7 +281,7 @@ Ordered; each verifiable on its own.
 2. **DNS:** create `matrix.phonkd.net A <ip>` in Cloudflare. (SRV comes in step 8,
    once the server answers.)
 3. **`lib/registry.nix`:** add an `ext-matrix` stanza — `kind = "server"`,
-   `tags = [ "vm" "hetzner-vm" "matrix-server" "observability-sender" ]`,
+   `tags = [ "vm" "hetzner-vm" "chat-server" "observability-sender" ]`,
    `extraModules = [ self.nixosModules."ext-matrix" self.nixosModules."hetzner-vm" ]`.
    Leave `deploy.hostname` out until the box is on the tailnet (step 5).
 4. **`modules/hosts/matrix.nix`:** host identity module, mirroring
@@ -175,8 +293,9 @@ Ordered; each verifiable on its own.
    `tailnet.nix` gates on `is.server`, so it enrols itself with the sops
    `headscale_authkey`. Read the assigned `100.64.0.x` out of `tailscale status`,
    put it in `deploy.hostname`, and confirm `deploy matrix` works end to end.
-6. **`modules/hetzner/matrix/matrix.nix`** — the service module, gated on
-   `noughtyLib.hostHasTag "matrix-server"`, following the shape of
+6. **`modules/chat.nix`, server half** — `flake.nixosModules.chat-server`, gated on
+   `noughtyLib.hostHasTag "chat-server"` and added to `alwaysImport` in
+   `modules/builder.nix`, following the shape of
    `modules/hetzner/mail/mail.nix`:
    - `services.postgresql` — enable, `settings.listen_addresses = lib.mkForce ""`
      (landmine 1), `ensureDatabases` + `ensureUsers` for `matrix-synapse`,
@@ -230,6 +349,21 @@ Discord.
     differently from the other two: `settings.appservice` carries the database
     block, rather than a top-level `settings.database`.
 
+11b. **`modules/chat.nix`, client half** — `flake.homeModules.chat`, and the only
+    step that touches the desktops rather than the server. Put the Matrix client
+    in `home.packages` and import the module from `flake.homeModules.gui-nixos`
+    (`modules/hosts/types/gui/default.nix`), which is what `blac`, `g14` and `z14`
+    already pull. The Mac takes an `element` cask in `gui-darwin` instead, for the
+    Spotlight reason documented on `affine` and `discord` there.
+    Client choice (all three are in the pinned nixpkgs, versions checked):
+    `element-desktop` 1.12.26 — the reference client, the one to default to;
+    `nheko` 0.12.1 — native Qt, much lighter, weaker on spaces/threads;
+    `fluffychat` 2.6.0 — Flutter, phone-shaped. Recommending `element-desktop`
+    because the bridges' admin flows are all bot DMs with `!wa`-style commands and
+    Element is where those are actually tested.
+    Verify: log the desktop client in against `https://matrix.phonkd.net` and
+    confirm the bridged portal rooms from steps 9–11 appear.
+
 ### Phase 3 — polish, once it is actually being used
 
 12. **Backups.** Nothing in this repo currently backs anything up, and this is the
@@ -256,11 +390,25 @@ Discord.
 
 ## Open decisions
 
-- **New VM vs. the mailserver VM.** Recommending a new `ext-matrix` for the
-  reasons above. If cost or box-count wins instead, the delta is: enrol `ext-mail`
-  in the tailnet and give it `deploy.hostname` first (it has neither today), add
-  the matrix vhosts to its existing nginx, and accept that a bridge OOM can take
-  mail with it. Everything else in this plan is unchanged.
+- **New VM vs. the mailserver VM — reopened.** Still recommending a new
+  `ext-matrix`, but less strongly than before: the "ext-mail is hand-managed"
+  argument is gone now that it is a deploy node, so the case rests only on
+  blast-radius isolation (mail reputation, bridge OOM, one nginx serving two
+  release cycles). If box-count or the €4/month wins, the delta is smaller than
+  this plan originally implied — add the `chat-server` tag to the existing
+  `ext-mail` stanza, add the matrix vhosts to its nginx, and accept that a bridge
+  OOM can take mail with it. Note the `worktree-mail-tailnet` branch has to reach
+  `main` either way before `deploy mail` is reproducible from a clean checkout.
+  **Nothing about `modules/chat.nix` changes with this decision** — it is gated on
+  a tag, so which host wears the tag is a one-line registry edit. That is the
+  reason to fix and land the module (step 0) without waiting for this call.
+- **Where the client half lives.** `modules/chat.nix` holding both halves is the
+  recommendation and matches `kde.nix` / `hyprland.nix` / `desktop.nix`. The
+  alternative — server module here, client packages appended to the existing
+  `homeModules.desktop` in `desktop.nix` — splits one feature across two files and
+  is what the current stub half-attempted by redefining that name. Not
+  recommended, and note it is not merely a style call: redefining the name is the
+  eval error in defect 1.
 - **`server_name = "phonkd.net"` (recommended) vs `"matrix.phonkd.net"`.** The
   latter needs no SRV record and no well-known at all, but the MXIDs
   (`@phonkd:matrix.phonkd.net`) are permanent and ugly. Recommending `phonkd.net`
