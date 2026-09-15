@@ -14,6 +14,7 @@
     {
       imports = [
         self.homeModules.shell
+        self.homeModules.try-devshell
         self.homeModules.system-minimal
         self.homeModules.code-editors
       ];
