@@ -593,7 +593,8 @@
       # drawn over the capture before it goes anywhere. Tool keys inside
       # satty, since they are nowhere in its --help: z arrow, r rectangle,
       # e ellipse, i line, b brush, t text, g highlight, m numbered marker,
-      # u blur, c crop, p pointer. Enter commits, Escape discards.
+      # u blur, c crop, p pointer. Enter copies *and* saves a file; Escape
+      # copies to the clipboard and keeps no file.
       #
       # The seam is grimblast's own `edit` action rather than a pipe. `edit`
       # writes the capture to a temp file and runs $GRIMBLAST_EDITOR with that
@@ -612,6 +613,16 @@
       # and never writes the file. Hence no `--early-exit`, and a trailing
       # `exit` inside the list, which runs all three in order.
       #
+      # Escape is the other half of that, and it is not satty's default --
+      # upstream's is a bare `exit`, i.e. throw the capture away. Here it
+      # copies first, so neither exit from the editor can lose the shot:
+      # Enter means "clipboard and keep a file", Escape means "clipboard
+      # only". Nothing reachable from the editor discards, which is what
+      # makes the annotate step safe to put on the primary screenshot keys
+      # at all -- the old `copysave` was unconditional, and a GUI that can
+      # silently eat a capture is a downgrade however good its arrows are.
+      # The same trailing-`exit` ordering applies, for the same reason.
+      #
       # --copy-command rather than satty's native GTK clipboard: a Wayland
       # clipboard offer dies with the process that made it and satty exits
       # straight after copying. wl-copy forks a small daemon that keeps
@@ -627,6 +638,7 @@
           --filename "$1" \
           --output-filename "$dir/%Y%m%d_%H%M%S.png" \
           --actions-on-enter save-to-clipboard,save-to-file,exit \
+          --actions-on-escape save-to-clipboard,exit \
           --copy-command ${pkgs.wl-clipboard}/bin/wl-copy
         ${pkgs.coreutils}/bin/rm -f "$1"
       '';
@@ -1390,13 +1402,12 @@
                   # screen still while you select, so menus and hover states
                   # can be captured.
                   #
-                  # The annotate step is a deliberate behaviour change and the
-                  # one thing here that can lose a capture: satty commits on
-                  # Enter and *discards* on Escape, where `copysave` was
-                  # unconditional and instant. Plain Print below is kept on the
-                  # old no-GUI path precisely so that instant route still
-                  # exists -- annotation is the considered shot, Print is the
-                  # reflex one.
+                  # The annotate step adds a confirmation `copysave` did not
+                  # have, but it cannot lose a capture: both ways out of satty
+                  # copy to the clipboard, and only Enter also writes a file
+                  # (see `sattyEdit`). What it does cost is immediacy, so plain
+                  # Print below stays on the old no-GUI path -- annotation is
+                  # the considered shot, Print is the reflex one.
                   #
                   # On Alt+Shift, and on `code:` rather than the keysyms
                   # `1`/`2`/`3`. The keysym spelling is a live trap on this
