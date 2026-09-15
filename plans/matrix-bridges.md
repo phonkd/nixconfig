@@ -180,9 +180,11 @@ Reusing `ext-mail` was the other candidate. Against it:
   there. Synapse plus three bridges is the noisiest, most memory-hungry,
   most-frequently-restarted workload in the fleet; a bridge OOM or a Synapse
   schema migration should not be able to take mail down.
-- **:80/:443 contention.** `modules/hetzner/mail/mail.nix` already owns nginx and
-  both ACME vhosts there. Adding `matrix.phonkd.net` is possible but couples two
-  unrelated release cycles onto one nginx.
+- **One nginx serving two release cycles.** Not port *contention* — 80/443 is a
+  single nginx and `matrix.phonkd.net` would simply be a third vhost beside
+  `mail.` and `cal.` (see the port map below). The cost is coupling: one nginx
+  config and one reload path shared between mail and a Synapse that changes far
+  more often, and a broken matrix vhost takes the webmail/CalDAV vhosts with it.
 - A CX22 is ~€4/month. The isolation is worth more than that.
 
 The cost of a new VM is one more box to bootstrap (disk UUIDs, age key, tailnet
@@ -194,6 +196,46 @@ series: `205-builder` is x86_64-only, so an aarch64 host would lose build offloa
 and compile its own closures. 4 GB is comfortable (synapse ~0.5–1 GB, postgres
 ~250 MB, each Go bridge ~100–200 MB); 2 GB would be tight once WhatsApp history
 backfill runs.
+
+### Port map: does synapse fit next to mail?
+
+Checked by evaluating `nixosConfigurations.ext-mail.config`, not by reading the
+module — and the bridge ports are the modules' own defaults, read the same way.
+
+`ext-mail` as it stands: firewall open on **25, 80, 443, 465, 993, 5432**; sshd on
+**5432**; dovecot, postfix, rspamd + a redis instance for it, radicale on
+**5232** (localhost, proxied from the `cal.phonkd.net` vhost). **Postgres is not
+enabled there today.**
+
+| the chat stack wants | ext-mail today | verdict |
+|---|---|---|
+| synapse `127.0.0.1:8008` | free | fine |
+| mautrix-whatsapp `29318` | free | fine |
+| mautrix-signal `29328` | free | fine |
+| mautrix-discord `29334` | free | fine |
+| nginx `80` / `443` | nginx (`mail.`, `cal.`) | **shared nginx, not a conflict** |
+| postgres `5432` | **sshd `0.0.0.0:5432`** | **collides — see landmine 1** |
+
+So the only genuine collision is postgres, and it is **not** an argument either way
+on the host decision: `hetzner-vm.nix` puts sshd on 5432 for *every* host carrying
+that tag, so a fresh `ext-matrix` hits exactly the same thing. It is landmine 1,
+unconditional, and `listen_addresses = lib.mkForce ""` is the fix in both shapes.
+
+Two details specific to reusing `ext-mail`:
+
+- **5432 is in that host's public `allowedTCPPorts`** (it has to be — it is the
+  ssh port). A postgres that ever gained `listen_addresses = "*"` would therefore
+  be publicly reachable, not merely locally bound. Another reason the
+  unix-socket-only setting is mandatory rather than tidy.
+- **Which service loses the bind is a race, not a defined order.** Nothing in
+  systemd orders sshd against postgresql. In practice sshd binds first and
+  postgres fails with `EADDRINUSE` — the chat stack dies, mail and ssh survive.
+  The other branch is the bad one: postgres first means sshd cannot bind and the
+  box is unreachable except via the Hetzner console. (A `deploy` that did this
+  would trip deploy-rs magic rollback, since the confirmation never lands.)
+
+Also worth noting: federation rides **443** via the SRV record, so nothing here
+needs synapse's traditional **8448** — it stays closed in both shapes.
 
 ### Identity / domain
 
@@ -231,9 +273,12 @@ serving the two well-known JSON files from the apex deliberately.
 1. **Postgres vs sshd both want :5432.** `modules/hosts/types/server/hetzner-vm.nix`
    sets `services.openssh.ports = [ 5432 ]`, and nixpkgs' postgresql module sets
    `listen_addresses = if cfg.enableTCPIP then "*" else "localhost"` — i.e. it
-   binds `127.0.0.1:5432` even with `enableTCPIP = false`. sshd binds
-   `0.0.0.0:5432`, so whichever starts second fails to bind and the box comes up
-   half-dead. **Fix:** `services.postgresql.settings.listen_addresses =
+   binds `127.0.0.1:5432` even with `enableTCPIP = false` — confirmed by
+   evaluating the module, not read off it. sshd binds `0.0.0.0:5432`, and the two
+   conflict. Nothing orders them, so which one loses is a race: in practice sshd
+   binds first and postgres fails with `EADDRINUSE` (chat dead, mail and ssh
+   fine), but the other branch leaves the box unreachable except via the Hetzner
+   console. **Fix:** `services.postgresql.settings.listen_addresses =
    lib.mkForce "";` — unix-socket-only. Everything on this host (synapse and all
    three bridges) connects via `host=/run/postgresql` anyway.
 2. **Per-host disk UUIDs.** `hetzner-vm.nix` hardcodes `fileSystems."/"` and
