@@ -40,6 +40,11 @@
       home.packages = with pkgs; [
         dracula-theme
         yt-dlp
+        # Visual disk-usage analyzer -- the requested "squirreldisk" is dead
+        # weight in nixpkgs (unfree, marked broken there, and dropped
+        # entirely from unstable once it depended on the removed webkitgtk
+        # 4.0), so this is the maintained stand-in doing the same job.
+        qdirstat
         # AFFiNE desktop client for the self-hosted server on 201 (see
         # plans/affine.md). Linux-only on purpose: on the Mac, HM apps are
         # symlinks into /nix/store under ~/Applications/Home Manager Apps,
