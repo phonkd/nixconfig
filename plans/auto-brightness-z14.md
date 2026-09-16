@@ -1,8 +1,7 @@
 # auto-brightness on z14
 
-**Repo(s):** nixconfig   **Status:** in-progress — the sensor is switched on and
-on `main`; the backlight-driving half is a decision, not a blocker (see
-Recommendation)
+**Repo(s):** nixconfig   **Status:** done — both halves are on `main`. The
+sensor is live and wluma consumes it.
 
 ## Verdict
 
@@ -149,25 +148,81 @@ it is pleasant is a matter of taste rather than correctness — unlike everythin
 above it, which is just "make the hardware work". Flipping it is a one-line
 follow-up once the sensor is confirmed live.
 
-## Open question — needs the user
+> **Since superseded.** The sensor was confirmed live and wluma landed in
+> `modules/hosts/z14.nix`. It was not a one-liner: see the next section for the
+> config and unit nixpkgs does not install, and for the threshold rescaling the
+> sensor's 0.1 scale forced.
 
-The one thing that could not be tested from here: **does the sensor track actual
-room light?** Confirming that needs someone to physically cover it and watch the
-number move, which no amount of shell can do.
+## What the wluma half needed, and the two surprises in it
 
-After the rebuild:
+`services.udev` rules and the `video` group are **not** part of this, though
+every wluma guide prescribes them. `Backlight::new` probes the sysfs file by
+writing its own value back to it and only falls through to
+`org.freedesktop.login1.Session.SetBrightness` when that fails — which it does
+here, `brightness` being `root:root 0644`. That D-Bus path is the same one
+`brightnessctl` and the existing `Super+I` binds use, and it works because the
+caller owns the active session, not because of any group. Confirmed by running
+wluma as `phonkd` (groups: `dialout wheel networkmanager`):
 
 ```
-$ monitor-sensor          # from iio-sensor-proxy; prints light level changes live
+Using DBUS for /sys/class/backlight/amdgpu_bl1 to change brightness value
 ```
 
-or read the raw channel while covering the sensor with a hand:
+Adding the rule would only flip it to the direct-write branch and leave the
+backlight group-writable in exchange for nothing.
+
+**The ALS thresholds had to be rescaled.** wluma computes lux the way IIO
+does — `(in_illuminance_raw + offset) * scale` — and this sensor's scale is
+`0.1`, offset `0`. A lit room at night reads `raw=17`, i.e. 1.7 lux, which
+wluma casts to `u64` as `1`. Upstream's default ladder does not leave `night`
+until 20 lux, so the panel would have sat in the darkest profile permanently
+and wluma would have had exactly one bucket to learn in. Compressed onto the
+range this sensor actually produces:
+
+```toml
+thresholds = { 0 = "night", 1 = "dark", 3 = "dim", 10 = "normal", 30 = "bright", 100 = "outdoors" }
+```
+
+The bright end is extrapolated — it cannot be measured from a shell at night.
+To retune, read `in_illuminance_raw` in the conditions that feel mis-graded,
+divide by 10, and move the neighbouring threshold. Getting one wrong degrades
+gently: thresholds only bucket the sensor, and wluma still learns a preferred
+brightness inside each bucket.
+
+## The open question is answered: the sensor tracks
+
+It was not confirmable at the time of writing, needing someone to watch the
+number move. It moved on its own between two readings an hour apart, and the
+sampling frequency is no longer pinned:
 
 ```
-$ cat /sys/bus/iio/devices/iio:device0/in_illuminance_sampling_frequency   # expect non-zero now
-$ cat /sys/bus/iio/devices/iio:device0/in_illuminance_raw                  # cover the bezel, re-read
+in_illuminance_sampling_frequency   10.000000   (was 0.000000)
+in_illuminance_raw                  2  →  17     (was pinned at 0)
+iio-sensor-proxy                    active
+net.hadess.SensorProxy HasAmbientLight  true
 ```
 
-The ALS sits in the top bezel near the webcam. If the value moves, wluma is
-worth enabling; if it stays pinned at 0 with a non-zero sampling frequency, the
-sensor really is dead and this stops here.
+## Verification
+
+wluma run against the generated `/etc/xdg/wluma/config.toml`, under the live
+Hyprland session:
+
+```
+Detected support for wlr-screencopy-unstable-v1 protocol
+Detected support for ext-image-copy-capture-v1 protocol
+Using output 'Samsung Display Corp. ATNA40CT06-0   (eDP-1)' for config 'eDP-1'
+Using ext-image-copy-capture-v1 protocol to request frames
+Processing frame in DRM format XR24
+[keyboard-asus] Learning Entry { lux: "dark", luma: 0, brightness: 3 }
+[eDP-1] Learning Entry { lux: "dark", luma: 21, brightness: 191520 }
+```
+
+Both outputs learn, the capture path negotiates without being told which
+protocol to use, and the rescaled thresholds put a lit night-time room in
+`dark` rather than `night`.
+
+`capturer = "wayland"` keeps protocol selection with wluma rather than naming
+one, since Hyprland's support has moved over time. Screen-contents dimming is
+left on: it is the half most likely to feel wrong at first, and on this OLED
+also the half most worth having. `capturer = "none"` reverts to ALS-only and
+changes nothing else.
