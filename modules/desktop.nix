@@ -325,7 +325,15 @@
         pulse.enable = true;
       };
 
-      # Make the volume of EasyEffects' virtual sink mean something.
+      # Make the volume of EasyEffects' virtual sink mean something -- on the
+      # hosts that asked for it.
+      #
+      # The switch is `noughty.hyprland.loudnessKnob`, declared in
+      # modules/hyprland.nix because the Alt+M binds it also controls live
+      # there, and this rule exists only to serve those binds. The two move
+      # together on purpose: a host with the rule and no binds gains nothing
+      # and loses a cosmetic mute, and a host with the binds and no rule gets
+      # two keys that appear to do nothing at all.
       #
       # EasyEffects builds its filter chain off `easyeffects_sink`'s MONITOR
       # ports, and a monitor tap is taken BEFORE the node's volume and mute
@@ -347,14 +355,15 @@
       # are what reach it in time. Setting it at runtime with pw-cli instead
       # silences the monitor on the next volume change rather than attenuating
       # it -- a dead end, already investigated, do not repeat it.
-      services.pipewire.extraConfig.pipewire."60-easyeffects-volume" = {
-        "node.rules" = [
-          {
-            matches = [ { "node.name" = "easyeffects_sink"; } ];
-            actions.update-props = { "monitor.channel-volumes" = true; };
-          }
-        ];
-      };
+      services.pipewire.extraConfig.pipewire."60-easyeffects-volume" =
+        lib.mkIf config.noughty.hyprland.loudnessKnob {
+          "node.rules" = [
+            {
+              matches = [ { "node.name" = "easyeffects_sink"; } ];
+              actions.update-props = { "monitor.channel-volumes" = true; };
+            }
+          ];
+        };
 
       system.stateVersion = "26.05";
 

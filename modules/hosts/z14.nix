@@ -167,6 +167,25 @@
         "context.modules" = [ { name = "libpipewire-module-raop-discover"; } ];
       };
 
+      # Alt+M drives the volume of easyeffects_sink, upstream of the effects,
+      # instead of the output device. This host's preset (z14.json in the
+      # laptop-speakers repo) lifts bass as a function of level -- multiband
+      # band0 in "Boosting" -- so a pre-effects volume is a tone control: down
+      # for bassy quiet listening, up for clean and loud, which is the Sonos
+      # behaviour these speakers otherwise lack. Measured: dropping that knob
+      # from 100% to 50% takes the chain's bass/mid ratio from 3.4 to 6.2.
+      #
+      # Host-scoped rather than a desktop default because the knob is only
+      # worth its confusion where the preset is tuned for it; elsewhere it is a
+      # second, invisible volume under the real one. g14's preset happens to
+      # carry the same Boosting band0, so enabling it there is this one line --
+      # but it has not been listened to on those speakers, and this is a tuning
+      # judgement, not a capability check.
+      #
+      # The switch also pulls in the PipeWire node rule in modules/desktop.nix
+      # that makes that sink's volume reach the chain at all.
+      noughty.hyprland.loudnessKnob = true;
+
       # See acpMixerPaths above for what this is fixing and what was measured.
       # asDropin because both units come from their own packages via
       # systemd.packages: a plain definition here would replace the packaged

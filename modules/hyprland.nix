@@ -114,6 +114,34 @@
           description = "Seconds between wallpaper (and colour scheme) changes.";
         };
 
+        loudnessKnob = lib.mkOption {
+          type = lib.types.bool;
+          # Off by default and opted into per host, because it is only worth
+          # anything where the EasyEffects preset lifts bass as a function of
+          # LEVEL -- that is what turns a pre-effects volume into a tone
+          # control rather than a second, invisible volume. z14's preset does
+          # (multiband band0 in "Boosting"); a host whose preset does not would
+          # get an Alt+M that silently attenuates underneath the real volume
+          # key, with no OSD to show it. See modules/hyprland/ee-volume.nix.
+          #
+          # Both halves of the mechanism hang off this one switch: the Alt+M
+          # binds below, and the `monitor.channel-volumes` node rule in
+          # modules/desktop.nix without which those binds move a volume that
+          # nothing in the graph listens to. Enabling it on another host is
+          # therefore a one-line change here and nothing else -- which is the
+          # reason the rule is not simply set for every desktop. It also makes
+          # muting easyeffects_sink real rather than cosmetic, and that is not
+          # a change to ship to a host that never touches that sink.
+          default = false;
+          description = ''
+            Bind Alt+M / Alt+Shift+M to the volume of `easyeffects_sink` -- the
+            node upstream of the EasyEffects chain, so it drives a level-driven
+            preset's bass lift instead of just making things quieter. Also
+            enables the PipeWire rule that makes that sink's volume reach the
+            chain. Only useful on hosts whose output preset is tuned for it.
+          '';
+        };
+
         scale = lib.mkOption {
           type = lib.types.str;
           # 1 = 100%. Deliberately not "auto": Hyprland's auto-scaling picks a
@@ -276,6 +304,7 @@
       colorMode = cfg.colorMode or "dark";
       colorScheme = cfg.colorScheme or "scheme-tonal-spot";
       scale = cfg.scale or "1";
+      loudnessKnob = cfg.loudnessKnob or false;
 
       layout = cfg.layout or "dwindle";
       hy3 = layout == "hy3";
@@ -1530,19 +1559,27 @@
                   # Device volume: the output as a whole.
                   "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
                   "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-
-                  # Loudness: the same M key on the other modifier, moving the
-                  # volume of `easyeffects_sink` -- which is BEFORE the effects,
-                  # where the device binds above are after them. The preset's
-                  # bass lift is level-driven, so this is the knob that changes
-                  # how the speakers sound rather than just how loud they are:
-                  # down for bassy quiet listening, up for clean and loud. It
-                  # deliberately does not move the OSD, because the OSD follows
-                  # the default sink. See modules/hyprland/ee-volume.nix, and
-                  # LOUDNESS.md in the laptop-speakers repo for why this is two
-                  # keys rather than a patched shell.
+                ]
+                # Loudness: the same M key on the other modifier, moving the
+                # volume of `easyeffects_sink` -- which is BEFORE the effects,
+                # where the device binds above are after them. On a host whose
+                # preset lifts bass as a function of level, this is the knob
+                # that changes how the speakers *sound* rather than how loud
+                # they are: down for bassy quiet listening, up for clean and
+                # loud. It deliberately does not move the OSD, because the OSD
+                # follows the default sink.
+                #
+                # Opt-in per host (noughty.hyprland.loudnessKnob), because on a
+                # host without such a preset it would be a second, invisible
+                # attenuator stacked under the real volume key. See
+                # modules/hyprland/ee-volume.nix, and LOUDNESS.md in the
+                # laptop-speakers repo for why this is two keys rather than a
+                # patched shell.
+                ++ lib.optionals loudnessKnob [
                   "${mod}, M, exec, ${eeVolume} up"
                   "${mod} SHIFT, M, exec, ${eeVolume} down"
+                ]
+                ++ [
                   ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
                   ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
                   "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
