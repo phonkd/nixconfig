@@ -4,7 +4,9 @@
 `flake = false` input)   **Status:** Phase 1 done — the Linux half is packaged,
 merged to `main`, and **deployed and verified on g14** (2026-09-16). blac picks
 it up whenever it next boots NixOS. Phase 2 — the Windows half — is hand-work on
-blac that cannot be done from nix; see "The Windows half" below.
+the Windows peer that cannot be done from nix; see "The Windows half" below.
+**g14 is the Linux end of every pairing**; the Windows end can be blac *or* z14,
+both of which are dual-boot.
 
 ## Goal
 
@@ -24,6 +26,11 @@ is explicitly Linux↔Windows and has no macOS support at all.
 Note this means blac's *NixOS* side is not the peer. The packages still land
 there — the gate below catches it and the cost is zero — so a Linux↔Linux
 g14 ↔ blac pairing stays available whenever blac is booted into NixOS instead.
+
+**z14 booted into Windows is an equally valid peer**, and the better one for a
+first test since it is to hand. That does not contradict the "z14 is blocked"
+finding recorded below: what is blocked is z14 as the *Linux* half, which needs
+CUDA. As the Windows half it is unconstrained. See "What that leaves".
 
 Upstream is [gfhdhytghd/viewflow](https://github.com/gfhdhytghd/viewflow): a Rust
 workspace (`viewflowd`) plus CMake/ObjC++ native backends per platform, GPL-3.0,
@@ -94,17 +101,60 @@ exist.
 |---|---|---|---|
 | blac-Windows → g14 | WGC + MFT/VPL | RTX (CUDA) | **the easy direction** — g14 needs only the packages below |
 | g14 → blac-Windows | RTX (NVENC) | D3D11 layered window | works, but g14 additionally needs a capture plugin in its Hyprland (Phase 3) |
+| **z14-Windows → g14** | WGC + MFT (AMD VCN) | RTX (CUDA) | **works, and is the cheapest test bench we own** — see below |
+| g14 → z14-Windows | RTX (NVENC) | D3D11 layered window | works, same Phase 3 caveat as the blac row |
 | g14 ↔ blac-NixOS | both RTX | both RTX | still available whenever blac boots NixOS |
-| z14 ↔ anything | — | — | **blocked** upstream, AMD-only host |
+| z14-**Linux** ↔ anything | — | — | **blocked** upstream — CUDA-only Linux path, AMD-only host |
 | blac/g14 → Mac | RTX (NVENC) | VideoToolbox | works, needs the macOS phases + TCC pain |
 | Mac → blac/g14 | ScreenCaptureKit | RTX (CUDA) | works, worst TCC pain |
 
 g14 is an RTX 3050 Ti Laptop GPU (confirmed over ssh), blac is the RTX desktop.
 
-**The asymmetry in the first two rows is the thing to plan around.**
-blac-Windows → g14 works with nothing but the packages this plan ships, because
-the Linux presenter (`linux-reverse`) is a plain Wayland client plus CUDA. The
-other direction needs point 4 below satisfied on g14 first.
+**z14 is dual-boot too, and that reopens it as a peer.** An earlier revision of
+this plan said flatly that z14 could not participate. That was wrong in scope:
+it is true only of **z14 running Linux**, where `linux-reverse` needs CUDA and
+the 840M cannot provide it. Booted into Windows, z14 has no such constraint,
+because the Windows path never touches CUDA — see "The Windows side needs no
+NVIDIA" below. The 840M's VCN block does have a hardware encoder; confirmed on
+the box via VAAPI entrypoints, which is the same silicon Windows exposes through
+AMF/Media Foundation:
+
+```
+VAProfileH264Main : VAEntrypointEncSlice
+VAProfileHEVCMain : VAEntrypointEncSlice
+VAProfileAV1Profile0 : VAEntrypointEncSlice
+```
+
+So **g14-Linux ↔ z14-Windows is a real pairing**, and it is the most convenient
+one to prove the stack with: both machines are laptops that are actually to hand,
+whereas blac's NixOS side has been offline for weeks and its Windows side has to
+be booted specially. g14 is already deployed and verified, so the only work left
+for that test is building the Windows binaries on z14 — the same checklist as
+blac, in "The Windows half".
+
+**The asymmetry in the direction rows is the thing to plan around.**
+Windows → g14 (from either blac or z14) works with nothing but the packages this
+plan ships, because the Linux presenter (`linux-reverse`) is a plain Wayland
+client plus CUDA. The Linux → Windows direction needs point 4 below satisfied on
+g14 first. **Test the Windows → g14 direction first**; it is the one that needs
+no deferred work.
+
+### The Windows side needs no NVIDIA
+
+Worth stating explicitly, because the Linux half's hard CUDA requirement invites
+the assumption that the whole project is NVIDIA-only. It is not — there is not a
+single CUDA/NVENC/NVIDIA reference anywhere under `platform/windows-*`.
+
+`platform/windows-reverse/hardware_encoder.cpp:13-29` picks its backend from the
+DXGI adapter at runtime: oneVPL when the vendor ID is `0x8086` (Intel) and the
+codec is 2, Media Foundation otherwise, with VPL falling back to MFT on a failed
+start unless forced. MFT then uses whatever hardware encoder the GPU driver
+exposes — NVENC on NVIDIA, VCN/VCE on AMD, QSV on Intel. `VIEWFLOW_REVERSE_ENCODER=vpl|mft`
+forces the choice. The presenter is plain D3D11/D2D1/DXGI and equally neutral.
+
+The vendor lock is therefore a property of upstream's *Linux* GPU path, not of
+the protocol: on Windows they got neutrality for free by going through Media
+Foundation, and on Linux they wrote straight to CUDA and never abstracted it.
 
 **4. The source additionally needs the HyprCapture plugin loaded** in the
 running compositor on the *source* host — `docs/hyprcapture-integration.md`
@@ -223,7 +273,7 @@ The original step list follows, as the record of what was planned.
    44220). Both machines are on the tailnet, so pair over `100.64.0.x` and skip
    LAN exposure entirely.
 
-## The Windows half (Phase 2) — hand-work on blac
+## The Windows half (Phase 2) — hand-work on the Windows peer
 
 **This cannot come from nix and no amount of effort here will change that.** The
 Windows targets need MSVC, the Windows SDK, WGC (`Windows.Graphics.Capture`) and
@@ -232,7 +282,13 @@ no releases, no tags, and `tools/package-windows-msi.py` is a packaging script
 for artefacts you have already built yourself, not a download.
 
 So the Linux side is deployed and the Windows side is a checklist. Run all of it
-from blac booted into Windows.
+from whichever machine is booted into Windows — **blac or z14; the steps are
+identical and none of them depend on the GPU vendor**, so the 840M needs nothing
+extra. Paths below say `C:\Viewflow` on either.
+
+For a first test, z14 is the easier peer: it is to hand, whereas blac's Windows
+side has to be booted specially. Do the **Windows → g14** direction, which needs
+nothing on g14 beyond what is already installed.
 
 **The one rule that matters: build from the same rev.** `767739c1037eab84e7b5ba235056ec6b09b0e692`,
 exactly what the `viewflow` input in `flake.nix` is pinned to. The QUIC control
@@ -349,18 +405,30 @@ degrade, it refuses each other.
    Windows side. This is upstream's better-tested axis, so it is an improvement
    rather than a concession. blac's NixOS side keeps the packages anyway, so the
    Linux↔Linux pair remains available for free.
-2. **z14 participation.** *Unchanged, and worth restating because it is the
-   obvious next question:* **not implementable.** Verified again at the pinned
-   rev while packaging — `platform/linux-reverse/CMakeLists.txt` opens with
-   `find_package(CUDAToolkit REQUIRED)` and the decoder creates only
-   `AV_HWDEVICE_TYPE_CUDA`. z14 is AMD-only, so it can be neither source nor
-   presenter. The only route is porting `platform/linux-reverse` to VAAPI, which
-   means replacing the whole CUDA/GL-interop decode path —
-   `av_hwdevice_ctx_create` is the small part; the `cuGraphicsGLRegisterImage` →
-   `cuMemcpy2D` → GL texture interop in `gpu_decoder.cpp:115-130` is the real
-   work. Upstream shows no interest in a non-NVIDIA Linux path. **If g14 is too
-   loud/slow to live with, the answer is a different peer or a different tool,
-   not z14.**
+2. **z14 participation.** **Resolved, and the earlier "not implementable" was
+   wrong in scope — it is an OS question, not a hardware one.**
+
+   - **z14 running Linux: still blocked.** Verified again at the pinned rev
+     while packaging — `platform/linux-reverse/CMakeLists.txt` opens with
+     `find_package(CUDAToolkit REQUIRED)` and the decoder creates only
+     `AV_HWDEVICE_TYPE_CUDA`, with no VAAPI or CPU path anywhere. The 840M
+     cannot satisfy that in either role. The only route would be porting
+     `platform/linux-reverse` to VAAPI, which means replacing the whole
+     CUDA/GL-interop decode path — `av_hwdevice_ctx_create` is the small part;
+     the `cuGraphicsGLRegisterImage` → `cuMemcpy2D` → GL texture interop in
+     `gpu_decoder.cpp:115-130` is the real work. Upstream shows no interest in a
+     non-NVIDIA Linux path.
+   - **z14 running Windows: works, and is the recommended first test.** z14 is
+     dual-boot. The Windows stack never touches CUDA, and the 840M's VCN block
+     has a hardware H.264/HEVC/AV1 encoder (confirmed on the box). So
+     z14-Windows → g14-Linux needs nothing that is not already built and
+     deployed on the g14 side.
+
+   What this does *not* do is make z14 a replacement for g14 as the **Linux**
+   half of a pair — that is the CUDA-locked role, and it stays closed. So if the
+   goal is "stop using g14 because it is loud and slow", this is a test bench,
+   not a fix: it lets the stack be evaluated on hardware that is actually to
+   hand, with g14 still doing the Linux job.
 3. ~~**Whether to build at all before committing.**~~ **Resolved: built.** A
    `nix build .#viewflow` is a *package* build, not a `nixosConfigurations.<x>`
    toplevel, so it is inside the repo rule. All three packages were built before
