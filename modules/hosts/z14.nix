@@ -238,6 +238,28 @@
       # Getting one wrong degrades gently -- the thresholds only bucket the
       # sensor, and wluma still learns your preferred brightness inside each
       # bucket.
+      # Where the learning actually lives, since nothing in Nix expresses it:
+      # ~/.local/share/wluma/<output-name>.yaml, one file per entry in the
+      # config below -- eDP-1.yaml and keyboard-asus.yaml. They are plain YAML
+      # of {lux, luma, brightness} triples, a hundred-odd bytes each, and
+      # bounded by the number of lux buckets rather than by time. Being user
+      # state outside the store they survive rebuilds and rollbacks, which is
+      # the point; deleting them is how you make wluma forget and start over.
+      #
+      # Ranges, measured, because "does this panel have more than two usable
+      # levels" is a fair question: the panel's max_brightness is 399000 and
+      # it resolves 1% steps distinctly (191520 -> 195510 -> 199500 gave three
+      # different actual_brightness readings), so there is plenty for wluma to
+      # learn in. Note actual_brightness does not echo what you set -- the
+      # amdgpu scale is "non-linear" and the kernel maps requests through a
+      # curve -- which costs nothing here, since wluma both learns and replays
+      # in set-space.
+      #
+      # asus::kbd_backlight is the coarse one: max_brightness is 3, so four
+      # levels including off. That is enough for the behaviour worth having
+      # from it (dark room on, daylight off) but the steps are visible, and
+      # listing it below hands wluma control of a key light that otherwise
+      # only moves when you press the key for it.
       environment.etc."xdg/wluma/config.toml".text = ''
         [als.iio]
         path = "/sys/bus/iio/devices"
