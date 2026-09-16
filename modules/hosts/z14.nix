@@ -139,15 +139,38 @@
       # weights are read per token, over LPDDR5x shared with the CPU); the
       # iGPU earns its keep on prompt processing, not on tokens/s.
       #
-      # user/group are set explicitly rather than left to the module's default
-      # DynamicUser. A dynamic uid puts the model store under
-      # /var/lib/private/ollama with ownership that is only stable for the
-      # lifetime of the unit, which is a poor home for a 17 GiB blob store you
-      # want to move in by hand or keep across a rebuild.
+      # user/group are set so the module's `staticUser` branch creates a real
+      # ollama system user. Note this does *not* escape systemd's DynamicUser
+      # state layout -- the module sets DynamicUser unconditionally in
+      # serviceConfig, so StateDirectory still resolves through
+      # /var/lib/ollama -> private/ollama, and /var/lib/private is 0700 root.
+      # What the static user buys is a stable uid: the 17 GiB blob store stays
+      # chown-able and keeps its ownership across restarts and rebuilds, which
+      # a rotating dynamic uid does not.
+      #
+      # OLLAMA_CONTEXT_LENGTH: ollama's own default is derived from VRAM and
+      # lands on a useless 4096 here. 32768 was measured, not guessed --
+      # generation is 3.294 tok/s at 32K against 3.286 tok/s at 4K, i.e. free.
+      # It is free because KV at 32K (1920 MiB) pushes ~1.8 GiB of weights back
+      # onto the CPU, and the CPU reads them over the same LPDDR5x the iGPU
+      # would; nothing is lost by moving that boundary.
+      #
+      # Headroom, should you want more: KV costs ~60 KiB/token, measured. The
+      # 48 Gated DeltaNet layers are linear-attention and contribute a flat
+      # ~150 MiB whatever the context, so only the 16 Gated Attention layers
+      # scale -- which is why a 262K-native model is affordable here at all.
+      # 64K would need 3.75 GiB of KV (~20.7 GiB of 25 GiB total, tight but
+      # reachable); 128K needs 7.5 GiB and will not fit beside a desktop on a
+      # host with no swap. Raising amdgpu.gttsize/ttm.pages_limit to enlarge
+      # the 18.5 GiB heap was considered and dropped: it only moves the
+      # CPU/GPU split, which the benchmark above shows costs nothing.
       services.ollama = {
         enable = true;
         package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.ollama-vulkan;
-        environmentVariables.OLLAMA_IGPU_ENABLE = "1";
+        environmentVariables = {
+          OLLAMA_IGPU_ENABLE = "1";
+          OLLAMA_CONTEXT_LENGTH = "32768";
+        };
         user = "ollama";
         group = "ollama";
       };
