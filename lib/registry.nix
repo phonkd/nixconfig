@@ -141,8 +141,19 @@
     # AMD only. This is load-bearing rather than documentation: it is what keeps
     # nvidia-desktop's config block off (it gates on gpu.hasNvidia) while the
     # shared desktop baseline still arrives through that module's unconditional
-    # `imports`. No `compute` -- the 840M is an iGPU and nothing here schedules
-    # work onto it.
+    # `imports`.
+    #
+    # Still no `compute`, though something does now schedule work onto the
+    # 840M: modules/hosts/z14.nix runs ollama against it through Vulkan. The
+    # field stays unset because setting it would make this *less* accurate,
+    # not more -- `compute.acceleration` is derived from `compute.vendor`, so
+    # "amd" would imply hasROCm, and ROCm is precisely what does not work on
+    # gfx1153. modules/builder.nix also copies only vendor/vram/unified out of
+    # the registry and drops `acceleration`, so the "vulkan" enum value that
+    # would say the true thing cannot be spelled here anyway. Nothing reads
+    # hasROCm or hasCuda today, so the question is moot until something does --
+    # at which point teach builder.nix to pass `acceleration` through, then
+    # set it here.
     gpu = {
       vendors = [ "amd" ];
     };
