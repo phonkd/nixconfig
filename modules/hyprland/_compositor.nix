@@ -233,6 +233,15 @@ in
         # underneath.
         "match:title (Authentication Required), float on"
         "match:title (Authentication Required), stay_focused on"
+        # satty, the annotation editor the screenshot binds hand their
+        # capture to (see `sattyEdit` in the scope module). Tiled, it
+        # gets slotted into whatever the workspace already has open and
+        # the canvas ends up sharing a column with the window that was
+        # just captured; floating, it comes up over the top, which is
+        # how it actually behaves -- one capture, annotate, Enter or
+        # Escape, gone. The class is the package's own StartupWMClass
+        # (share/applications/satty.desktop), not a guess.
+        "match:class ^com\\.gabm\\.satty$, float on"
       ];
 
       # What turns Caelestia's transparency into glass rather than a
