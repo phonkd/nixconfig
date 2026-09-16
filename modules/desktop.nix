@@ -305,6 +305,37 @@
         pulse.enable = true;
       };
 
+      # Make the volume of EasyEffects' virtual sink mean something.
+      #
+      # EasyEffects builds its filter chain off `easyeffects_sink`'s MONITOR
+      # ports, and a monitor tap is taken BEFORE the node's volume and mute
+      # stage by default -- so that recording what is playing does not come out
+      # quiet just because the volume is down. Sensible for a recorder, wrong
+      # here: it means the sink's own volume lands on a path nothing in the
+      # graph listens to, and turning it does nothing at all.
+      #
+      # This moves the tap to after the volume stage, which is what makes the
+      # Alt+M loudness knob in modules/hyprland/ee-volume.nix work -- the
+      # preset's bass lift is level-driven, so the knob that changes the tone
+      # has to attenuate what the chain receives. It also means muting that
+      # sink now really mutes, where it used to be cosmetic, and that anything
+      # capturing easyeffects_sink.monitor records at the knob's level.
+      #
+      # `node.rules` rather than a WirePlumber rule: the property is read when
+      # the adapter is built, and easyeffects_sink is created through the
+      # server-side `support.null-audio-sink` factory, so the core's own rules
+      # are what reach it in time. Setting it at runtime with pw-cli instead
+      # silences the monitor on the next volume change rather than attenuating
+      # it -- a dead end, already investigated, do not repeat it.
+      services.pipewire.extraConfig.pipewire."60-easyeffects-volume" = {
+        "node.rules" = [
+          {
+            matches = [ { "node.name" = "easyeffects_sink"; } ];
+            actions.update-props = { "monitor.channel-volumes" = true; };
+          }
+        ];
+      };
+
       system.stateVersion = "26.05";
 
       systemd.tmpfiles.rules = [

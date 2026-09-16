@@ -7,7 +7,7 @@
 # `libpipewire-module-raop-discover`. Switching between "laptop speakers" and
 # "the Sonos in the kitchen" is the whole point of the key.
 #
-# Packaged as a perSystem package like modules/hyprland/stream-volume.nix, and
+# Packaged as a perSystem package like modules/hyprland/ee-volume.nix, and
 # for the same reasons: too much logic for a bind line, and worth being able to
 # run by hand (`nix run .#hypr-sink-switcher`) without a session. import-tree
 # picks this file up on its own; modules/hyprland.nix only names the package.
@@ -62,7 +62,7 @@
           # Which sink is default right now, by node.name. Read from the
           # `default` metadata rather than `wpctl status`, whose default marker
           # is a `*` glyph inside a box-drawing tree -- the same reason
-          # stream-volume.nix does not parse that output either. The value is
+          # ee-volume.nix does not parse that output either. The value is
           # JSON, so jq reads the name out instead of a second regex.
           default_name="$(
             ${pkgs.pipewire}/bin/pw-metadata -n default 2>/dev/null \

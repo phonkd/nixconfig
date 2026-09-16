@@ -582,7 +582,7 @@
       # are worth being able to run by hand -- `nix run .#hypr-sink-switcher`
       # -- without bringing up a session. import-tree picks their files up
       # automatically; there is no import list to add them to.
-      streamVolume = "${self.packages.${pkgs.system}.hypr-stream-volume}/bin/hypr-stream-volume";
+      eeVolume = "${self.packages.${pkgs.system}.hypr-ee-volume}/bin/hypr-ee-volume";
       sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
 
       # -- Screenshots: capture, then annotate -------------------------------
@@ -1470,7 +1470,7 @@
                   #
                   # `bind`, not `bindel`: this opens a menu, and repeating it
                   # while the key is held would stack a second rofi on the first.
-                  "${mod}, code:19, exec, ${sinkSwitcher}"
+                  "SUPER, code:19, exec, ${sinkSwitcher}"
                 ]
                 ++ workspaceBinds;
 
@@ -1481,16 +1481,18 @@
                   "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
                   "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
 
-                  # Application volume: the same M key on the other modifier,
-                  # moving every playback *stream* instead of the device. This
-                  # is the fader pavucontrol shows per-app, so Spotify can be
-                  # turned down without turning the laptop down -- and, unlike
-                  # the device binds above, it keeps working when a stream is
-                  # routed through the EasyEffects sink rather than straight at
-                  # the default output. See modules/hyprland/stream-volume.nix
-                  # for which nodes count as an application stream and why.
-                  "${mod}, M, exec, ${streamVolume} up"
-                  "${mod} SHIFT, M, exec, ${streamVolume} down"
+                  # Loudness: the same M key on the other modifier, moving the
+                  # volume of `easyeffects_sink` -- which is BEFORE the effects,
+                  # where the device binds above are after them. The preset's
+                  # bass lift is level-driven, so this is the knob that changes
+                  # how the speakers sound rather than just how loud they are:
+                  # down for bassy quiet listening, up for clean and loud. It
+                  # deliberately does not move the OSD, because the OSD follows
+                  # the default sink. See modules/hyprland/ee-volume.nix, and
+                  # LOUDNESS.md in the laptop-speakers repo for why this is two
+                  # keys rather than a patched shell.
+                  "${mod}, M, exec, ${eeVolume} up"
+                  "${mod} SHIFT, M, exec, ${eeVolume} down"
                   ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
                   ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
                   "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
