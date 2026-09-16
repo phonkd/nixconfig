@@ -31,6 +31,67 @@
       lib,
       ...
     }:
+    let
+      # The internal mic, and why it was unusable rather than merely quiet.
+      #
+      # ALC294 exposes two capture gain controls, and PipeWire's
+      # alsa-card-profile concatenates them into one slider because its
+      # analog-input-mic.conf marks both `volume = merge`:
+      #
+      #   Capture     ADC      0..63, 0.75 dB/step   -17.25 .. +30 dB
+      #   Mic Boost   pre-amp  0..3,  10   dB/step     0     .. +30 dB
+      #
+      # So the slider spans -17.25 .. +60 dB, and unity gain lands at 10% of
+      # it. Everything above roughly 15% is gain this capsule cannot survive.
+      # Measured on this machine with nobody talking: ambient room noise alone
+      # drove the ADC to peak 0.99997 (RMS -14.5 dBFS) at 100% and peak 0.62 at
+      # 80%. Speech into that is clipped in the analog domain, before any
+      # encoder sees it -- which is why it read as "atrocious quality" rather
+      # than as a hot mic. The capsule is fine: at unity it captures a loud
+      # tone cleanly, and a quiet room sits at RMS 0.00066.
+      #
+      # That also explains the other half of the symptom. The only
+      # non-destructive part of the slider is its bottom tenth, so anything
+      # that "turns the mic down" -- a user dragging it, or an app's AGC --
+      # lands in a range where the useful settings are a couple of percent
+      # apart. It had ended up at 0%, which PipeWire applies as a literal
+      # software multiply by zero: capture returned all-zero samples, not faint
+      # audio.
+      #
+      # The fix is to stop offering the gain rather than to pick a good spot on
+      # a bad scale, since nothing keeps an app from moving it back:
+      #
+      #   Mic Boost  volume = zero      pinned at 0 dB, out of the curve
+      #   Capture    volume-limit = 33  steps above 33 (+7.5 dB) disabled
+      #
+      # which leaves a -17.25 .. +7.5 dB slider with unity at ~75%. Measured
+      # after the change, at 100%: peak 0.016 against the old 0.99997, a ~49 dB
+      # drop in noise floor at the top of the slider and no clipping anywhere
+      # on it.
+      #
+      # ACP_PATHS_DIR is the supported override for these files and takes a
+      # whole directory rather than a single file, so the derivation copies
+      # upstream's and rewrites one entry. Both units get it below: the ALSA
+      # SPA plugin is loaded into pipewire and wireplumber alike, and
+      # wireplumber's monitor is what actually builds the ACP device. The greps
+      # are build-time assertions -- if a PipeWire bump reshapes
+      # analog-input-mic.conf, this fails loudly at build instead of silently
+      # reverting to a +60 dB mic.
+      acpMixerPaths = pkgs.runCommand "z14-acp-mixer-paths" { } ''
+        mkdir -p "$out"
+        cp -rL ${config.services.pipewire.package}/share/alsa-card-profile/mixer/paths/. "$out"/
+        chmod -R u+w "$out"
+        awk '
+          /^\[Element /                { sec = $0 }
+          sec == "[Element Capture]"   && /^volume = merge$/ { print; print "volume-limit = 33"; next }
+          sec == "[Element Mic Boost]" && /^volume = merge$/ { print "volume = zero"; next }
+                                       { print }
+        ' "$out"/analog-input-mic.conf > "$out"/analog-input-mic.conf.new
+        mv "$out"/analog-input-mic.conf.new "$out"/analog-input-mic.conf
+        grep -qx 'volume-limit = 33' "$out"/analog-input-mic.conf
+        grep -qx 'volume = zero' "$out"/analog-input-mic.conf
+      '';
+    in
     lib.mkIf (config.noughty.host.name == "z14") {
       networking.hostName = "z14";
 
@@ -104,6 +165,19 @@
       services.pipewire.raopOpenFirewall = true; # UDP 6001-6002: RAOP control + timing
       services.pipewire.extraConfig.pipewire."10-airplay" = {
         "context.modules" = [ { name = "libpipewire-module-raop-discover"; } ];
+      };
+
+      # See acpMixerPaths above for what this is fixing and what was measured.
+      # asDropin because both units come from their own packages via
+      # systemd.packages: a plain definition here would replace the packaged
+      # unit wholesale instead of adding one line to it.
+      systemd.user.services.pipewire = {
+        overrideStrategy = "asDropin";
+        environment.ACP_PATHS_DIR = "${acpMixerPaths}";
+      };
+      systemd.user.services.wireplumber = {
+        overrideStrategy = "asDropin";
+        environment.ACP_PATHS_DIR = "${acpMixerPaths}";
       };
 
       # Local LLM inference on the Radeon 840M. Three non-obvious choices here,
