@@ -221,8 +221,32 @@ Both outputs learn, the capture path negotiates without being told which
 protocol to use, and the rescaled thresholds put a lit night-time room in
 `dark` rather than `night`.
 
-`capturer = "wayland"` keeps protocol selection with wluma rather than naming
-one, since Hyprland's support has moved over time. Screen-contents dimming is
-left on: it is the half most likely to feel wrong at first, and on this OLED
-also the half most worth having. `capturer = "none"` reverts to ALS-only and
-changes nothing else.
+## Screen-contents dimming is off, because it crashes Hyprland
+
+The capture half shipped enabled and had to be turned back off within the
+hour. wluma negotiates `ext-image-copy-capture-v1` without complaint, and then
+every frame it requests is a chance to segfault the compositor inside
+Hyprland's own screencopy path:
+
+```
+Screenshare::CScreenshareFrame::copyDmabuf()
+  -> Render::IHyprRenderer::beginRender
+  -> Render::GL::CHyprGLRenderer::initRenderBuffer
+  -> Render::GL::CGLRenderbuffer::~CGLRenderbuffer()   SIGSEGV
+```
+
+Three identical crash reports in `~/.cache/hyprland/` inside ninety seconds,
+after which Hyprland's watchdog stopped relaunching normally and came back as
+`Hyprland --watchdog-fd 4 --safe-mode` — the stock config and none of this
+repo's, which from the outside just looks like "my Hyprland config is gone".
+
+The bug is Hyprland 0.55.4's, not wluma's: wluma only requests frames through
+a protocol the compositor advertises. But the blast radius is the whole
+session, so `capturer = "none"` until this Hyprland is behind us. That is
+avoidance rather than mitigation — the `none` capturer never touches Wayland,
+it feeds a constant luma every 200ms — so the ambient-light half, which is the
+entire reason wluma is here, is unaffected.
+
+**Worth retrying on a Hyprland bump.** Set `capturer = "wayland"` in
+`modules/hosts/z14.nix`, rebuild, and watch `~/.cache/hyprland/` for new crash
+reports.
