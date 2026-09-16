@@ -21,6 +21,7 @@ let
     dispatch
     eeVolume
     kitty
+    loudnessKnob
     mod
     moveWindowDispatch
     groupBinds
@@ -203,19 +204,27 @@ in
     # Device volume: the output as a whole.
     "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
     "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-
-    # Loudness: the same M key on the other modifier, moving the
-    # volume of `easyeffects_sink` -- which is BEFORE the effects,
-    # where the device binds above are after them. The preset's
-    # bass lift is level-driven, so this is the knob that changes
-    # how the speakers sound rather than just how loud they are:
-    # down for bassy quiet listening, up for clean and loud. It
-    # deliberately does not move the OSD, because the OSD follows
-    # the default sink. See modules/hyprland/ee-volume.nix, and
-    # LOUDNESS.md in the laptop-speakers repo for why this is two
-    # keys rather than a patched shell.
+  ]
+  # Loudness: the same M key on the other modifier, moving the
+  # volume of `easyeffects_sink` -- which is BEFORE the effects,
+  # where the device binds above are after them. On a host whose
+  # preset lifts bass as a function of level, this is the knob
+  # that changes how the speakers *sound* rather than how loud
+  # they are: down for bassy quiet listening, up for clean and
+  # loud. It deliberately does not move the OSD, because the OSD
+  # follows the default sink.
+  #
+  # Opt-in per host (noughty.hyprland.loudnessKnob), because on a
+  # host without such a preset it would be a second, invisible
+  # attenuator stacked under the real volume key. See
+  # modules/hyprland/ee-volume.nix, and LOUDNESS.md in the
+  # laptop-speakers repo for why this is two keys rather than a
+  # patched shell.
+  ++ lib.optionals loudnessKnob [
     "${mod}, M, exec, ${eeVolume} up"
     "${mod} SHIFT, M, exec, ${eeVolume} down"
+  ]
+  ++ [
     ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
     "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"

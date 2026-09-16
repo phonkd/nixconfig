@@ -44,6 +44,34 @@ in
       description = "Seconds between wallpaper (and colour scheme) changes.";
     };
 
+    loudnessKnob = lib.mkOption {
+      type = lib.types.bool;
+      # Off by default and opted into per host, because it is only worth
+      # anything where the EasyEffects preset lifts bass as a function of
+      # LEVEL -- that is what turns a pre-effects volume into a tone
+      # control rather than a second, invisible volume. z14's preset does
+      # (multiband band0 in "Boosting"); a host whose preset does not would
+      # get an Alt+M that silently attenuates underneath the real volume
+      # key, with no OSD to show it. See modules/hyprland/ee-volume.nix.
+      #
+      # Both halves of the mechanism hang off this one switch: the Alt+M
+      # binds in _keybinds.nix, and the `monitor.channel-volumes` node rule
+      # in modules/desktop.nix without which those binds move a volume that
+      # nothing in the graph listens to. Enabling it on another host is
+      # therefore a one-line change here and nothing else -- which is the
+      # reason the rule is not simply set for every desktop. It also makes
+      # muting easyeffects_sink real rather than cosmetic, and that is not
+      # a change to ship to a host that never touches that sink.
+      default = false;
+      description = ''
+        Bind Alt+M / Alt+Shift+M to the volume of `easyeffects_sink` -- the
+        node upstream of the EasyEffects chain, so it drives a level-driven
+        preset's bass lift instead of just making things quieter. Also
+        enables the PipeWire rule that makes that sink's volume reach the
+        chain. Only useful on hosts whose output preset is tuned for it.
+      '';
+    };
+
     scale = lib.mkOption {
       type = lib.types.str;
       # 1 = 100%. Deliberately not "auto": Hyprland's auto-scaling picks a

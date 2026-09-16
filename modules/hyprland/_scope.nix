@@ -39,6 +39,7 @@ rec {
   colorMode = cfg.colorMode or "dark";
   colorScheme = cfg.colorScheme or "scheme-tonal-spot";
   scale = cfg.scale or "1";
+  loudnessKnob = cfg.loudnessKnob or false;
 
   layout = cfg.layout or "dwindle";
   hy3 = layout == "hy3";

@@ -94,6 +94,26 @@
           "gtk-application-prefer-dark-theme" = lib.mkDefault 1;
         };
       };
+
+      # The GTK4 line above is not enough on its own, and that is the whole
+      # reason EasyEffects -- and every other libadwaita app -- came up light
+      # on a dark desktop: libadwaita deliberately ignores
+      # `gtk-application-prefer-dark-theme`. It takes light-vs-dark from
+      # AdwStyleManager, which follows the XDG portal's
+      # `org.freedesktop.appearance color-scheme`, and xdg-desktop-portal-gtk
+      # answers that from exactly this dconf key.
+      #
+      # Unset (or `prefer-light`) means libadwaita loads its *light*
+      # stylesheet, so every name modules/hyprland.nix does not override --
+      # card_bg_color, sidebar_bg_color, dialog_bg_color -- stays white. A
+      # window painted a dark `window_bg_color` full of white cards is what
+      # "some apps are in light mode" actually looks like.
+      #
+      # mkDefault for the same reason as the gtk block above: modules/kde.nix
+      # flips it to prefer-light for the Windows 7 look.
+      dconf.settings."org/gnome/desktop/interface".color-scheme =
+        lib.mkDefault "prefer-dark";
+
       programs.thunderbird.enable = true;
     };
   flake.nixosModules.desktop =
@@ -305,7 +325,15 @@
         pulse.enable = true;
       };
 
-      # Make the volume of EasyEffects' virtual sink mean something.
+      # Make the volume of EasyEffects' virtual sink mean something -- on the
+      # hosts that asked for it.
+      #
+      # The switch is `noughty.hyprland.loudnessKnob`, declared in
+      # modules/hyprland.nix because the Alt+M binds it also controls live
+      # there, and this rule exists only to serve those binds. The two move
+      # together on purpose: a host with the rule and no binds gains nothing
+      # and loses a cosmetic mute, and a host with the binds and no rule gets
+      # two keys that appear to do nothing at all.
       #
       # EasyEffects builds its filter chain off `easyeffects_sink`'s MONITOR
       # ports, and a monitor tap is taken BEFORE the node's volume and mute
@@ -327,14 +355,15 @@
       # are what reach it in time. Setting it at runtime with pw-cli instead
       # silences the monitor on the next volume change rather than attenuating
       # it -- a dead end, already investigated, do not repeat it.
-      services.pipewire.extraConfig.pipewire."60-easyeffects-volume" = {
-        "node.rules" = [
-          {
-            matches = [ { "node.name" = "easyeffects_sink"; } ];
-            actions.update-props = { "monitor.channel-volumes" = true; };
-          }
-        ];
-      };
+      services.pipewire.extraConfig.pipewire."60-easyeffects-volume" =
+        lib.mkIf config.noughty.hyprland.loudnessKnob {
+          "node.rules" = [
+            {
+              matches = [ { "node.name" = "easyeffects_sink"; } ];
+              actions.update-props = { "monitor.channel-volumes" = true; };
+            }
+          ];
+        };
 
       system.stateVersion = "26.05";
 

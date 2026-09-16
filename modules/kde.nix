@@ -696,6 +696,17 @@ in
           gtk4.extraConfig."gtk-application-prefer-dark-theme" = 0;
         };
 
+        # The libadwaita half of the line above: GTK4 apps ignore
+        # gtk-application-prefer-dark-theme and read this instead (see the
+        # long note in modules/desktop.nix). Without it an Aero-themed Plasma
+        # session still handed EasyEffects and friends a dark stylesheet.
+        #
+        # The key is user-wide, not per-session, so on these hosts it reaches
+        # the Hyprland session too; modules/hyprland.nix scopes it back for
+        # the duration of that session, exactly as it already does for the
+        # wallpaper-derived GTK colours.
+        dconf.settings."org/gnome/desktop/interface".color-scheme = "prefer-light";
+
         # The Aero cursor for GTK/X apps. Plasma's own cursor is set by the
         # setup wizard; this is again the half that doesn't read kcminputrc.
         home.pointerCursor = {

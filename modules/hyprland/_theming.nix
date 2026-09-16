@@ -19,8 +19,10 @@
 let
   inherit (matugen)
     clearGtkColors
+    declaredColorScheme
     matugenConfig
     rotate
+    setColorScheme
     ;
 
   inherit (scope)
@@ -194,14 +196,17 @@ in
   # immediately after ExecStart returns.
   systemd.user.services.hyprland-gtk-colors = {
     Unit = {
-      Description = "Scope the wallpaper-derived GTK colours to the Hyprland session";
+      Description = "Scope the GTK colour scheme and wallpaper colours to the Hyprland session";
       PartOf = [ "hyprland-session.target" ];
     };
     Service = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = "${pkgs.coreutils}/bin/true";
-      ExecStop = "${clearGtkColors}";
+      ExecStart = "${setColorScheme "prefer-${colorMode}"}";
+      ExecStop = [
+        "${clearGtkColors}"
+        "${setColorScheme declaredColorScheme}"
+      ];
     };
     Install.WantedBy = [ "hyprland-session.target" ];
   };
