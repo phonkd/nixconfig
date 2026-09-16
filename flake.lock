@@ -1528,6 +1528,7 @@
         "slop-trove": "slop-trove",
         "sops-nix": "sops-nix",
         "try-rs": "try-rs",
+        "viewflow": "viewflow",
         "wrapper-modules": "wrapper-modules",
         "zen-browser": "zen-browser"
       }
@@ -1852,6 +1853,23 @@
       "original": {
         "owner": "pyproject-nix",
         "repo": "uv2nix",
+        "type": "github"
+      }
+    },
+    "viewflow": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1789280055,
+        "narHash": "sha256-okBXEDkfqhNxR2Ww1fMkKLIXIMiPjvrANIQVQ4g5QaU=",
+        "owner": "gfhdhytghd",
+        "repo": "viewflow",
+        "rev": "767739c1037eab84e7b5ba235056ec6b09b0e692",
+        "type": "github"
+      },
+      "original": {
+        "owner": "gfhdhytghd",
+        "repo": "viewflow",
+        "rev": "767739c1037eab84e7b5ba235056ec6b09b0e692",
         "type": "github"
       }
     },

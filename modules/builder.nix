@@ -46,6 +46,7 @@ let
     gigaplayer-server # gated on hostHasTag "gigaplayer-server"
     gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
+    viewflow # gated on hostHasTag "hyprland" AND host.gpu.hasNvidia (blac, g14)
     work # work setup (private repo); gated on hostHasTag "work"
     containers # rootless podman for distrobox; gated on host.is.nixosDesktop
     # Everything KDE (modules/kde.nix): the session and the AeroThemePlasma
