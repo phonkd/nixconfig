@@ -174,5 +174,108 @@
         user = "ollama";
         group = "ollama";
       };
+
+      # Auto-brightness, the consumer half. hardware.sensor.iio above only
+      # wakes the ALS up; this is what finally does something with it.
+      # plans/auto-brightness-z14.md has the survey that picked wluma over
+      # clight and a hand-rolled timer. The reason that mattered: it ships no
+      # lux->brightness curve at all, it *learns* one -- it watches what you
+      # set by hand at a given light level and converges on that, which works
+      # with the existing Super+I habit instead of against it.
+      #
+      # Two things this needs that the package does not give us. nixpkgs'
+      # wluma builds only $out/bin/wluma: its postPatch carefully rewrites the
+      # paths inside upstream's 90-wluma-backlight.rules and wluma.service and
+      # then installs neither.
+      #
+      # 1. A config. Upstream's default names intel_backlight and a Dell
+      #    keyboard; this is amdgpu_bl1 and asus::kbd_backlight. wluma
+      #    resolves config through the xdg crate's search path and /etc/xdg is
+      #    first in XDG_CONFIG_DIRS here, so environment.etc suffices -- no
+      #    home-manager file needed. The unit sets XDG_CONFIG_DIRS anyway,
+      #    because a systemd *user* service does not inherit the login shell's
+      #    environment and would otherwise silently fall back to the config
+      #    compiled into the binary.
+      # 2. A unit, bound to hyprland-session.target rather than
+      #    graphical-session.target for the same reason everything in
+      #    modules/hyprland.nix is. z14 has no Plasma session today; the
+      #    convention is part of what keeps it that way.
+      #
+      # What is deliberately *not* here is the third thing every wluma guide
+      # tells you to add: upstream's 90-wluma-backlight.rules, and the "video"
+      # group that rule grants. They are unnecessary, and would make things
+      # slightly worse. Backlight::new probes the sysfs file by writing its
+      # own value back to it, and only falls through to
+      # org.freedesktop.login1.Session.SetBrightness when that fails -- which
+      # it does here, the file being root:root 0644. That D-Bus path is the
+      # same one brightnessctl and the existing Super+I binds already use, and
+      # it works because the caller owns the active session, not because of
+      # any group. Verified by running wluma as phonkd, who is in dialout,
+      # wheel and networkmanager only: "Using DBUS for
+      # /sys/class/backlight/amdgpu_bl1 to change brightness value". Adding
+      # the rule would only flip it to the direct-write branch and leave the
+      # backlight group-writable for the privilege of doing so.
+
+      # The thresholds are the one part that had to be measured rather than
+      # copied, and upstream's defaults would have quietly broken this.
+      #
+      # wluma reports lux as IIO does: (in_illuminance_raw + offset) * scale.
+      # This sensor's scale is 0.1 and its offset 0, so a lit room at night
+      # reads raw=17, i.e. 1.7 lux -- and wluma casts that to u64, so 1.
+      # Against upstream's ladder, which only leaves "night" at 20 lux, this
+      # panel would sit in the darkest profile permanently and wluma would
+      # have exactly one bucket to learn in. The numbers below are that ladder
+      # compressed onto the range this sensor actually produces.
+      #
+      # With these, a lit room at night classifies as "dark" -- confirmed by
+      # running wluma against this file: `Learning Entry { lux: "dark",
+      # luma: 21, brightness: 191520 }`.
+      #
+      # They are a starting point, not a calibration: the top half is
+      # extrapolated, because the bright end cannot be measured from a shell
+      # at night. To retune, read in_illuminance_raw in the conditions that
+      # feel mis-graded, divide by 10, and move the neighbouring threshold.
+      # Getting one wrong degrades gently -- the thresholds only bucket the
+      # sensor, and wluma still learns your preferred brightness inside each
+      # bucket.
+      environment.etc."xdg/wluma/config.toml".text = ''
+        [als.iio]
+        path = "/sys/bus/iio/devices"
+        thresholds = { 0 = "night", 1 = "dark", 3 = "dim", 10 = "normal", 30 = "bright", 100 = "outdoors" }
+
+        [[output.backlight]]
+        name = "eDP-1"
+        path = "/sys/class/backlight/amdgpu_bl1"
+        capturer = "wayland"
+
+        [[keyboard]]
+        name = "keyboard-asus"
+        path = "/sys/class/leds/asus::kbd_backlight"
+      '';
+
+      # capturer = "wayland" lets wluma negotiate whichever capture protocol
+      # the compositor offers rather than naming one -- it knows
+      # ext-image-copy-capture-v1, wlr-screencopy and wlr-export-dmabuf, and
+      # Hyprland's support for the three has moved over time. Against this
+      # Hyprland it advertises wlr-screencopy and ext-image-copy-capture and
+      # picks the latter, then hands frames to Vulkan as DRM format XR24.
+      # Naming a protocol explicitly would only make that break on an upgrade.
+      #
+      # Screen-contents dimming is the half most likely to feel wrong at
+      # first, and on an OLED (this panel is a Samsung ATNA40CT06) also the
+      # half most worth having. Setting capturer = "none" above reverts to
+      # ALS-only and changes nothing else.
+      systemd.user.services.wluma = {
+        description = "Adaptive brightness from ambient light and screen contents";
+        partOf = [ "hyprland-session.target" ];
+        after = [ "hyprland-session.target" ];
+        wantedBy = [ "hyprland-session.target" ];
+        environment.XDG_CONFIG_DIRS = "/etc/xdg";
+        serviceConfig = {
+          ExecStart = lib.getExe pkgs.wluma;
+          Restart = "always";
+          RestartSec = 2;
+        };
+      };
     };
 }
