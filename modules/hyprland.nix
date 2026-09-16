@@ -888,6 +888,31 @@
         @define-color accent_color {{colors.primary.default.hex}};
         @define-color destructive_bg_color {{colors.error.default.hex}};
         @define-color destructive_fg_color {{colors.on_error.default.hex}};
+
+        /* The names above cover the window, but libadwaita builds most of an
+           app out of these -- boxed lists, preference pages, sidebars,
+           dialogs. EasyEffects is almost entirely AdwPreferencesPage, so
+           leaving them at the stylesheet's own values is what made it read as
+           a different theme from everything around it. */
+        @define-color card_bg_color {{colors.surface_container.default.hex}};
+        @define-color card_fg_color {{colors.on_surface.default.hex}};
+        @define-color dialog_bg_color {{colors.surface_container_high.default.hex}};
+        @define-color dialog_fg_color {{colors.on_surface.default.hex}};
+        @define-color sidebar_bg_color {{colors.surface_container_low.default.hex}};
+        @define-color sidebar_fg_color {{colors.on_surface.default.hex}};
+        @define-color sidebar_backdrop_color {{colors.surface.default.hex}};
+        @define-color secondary_sidebar_bg_color {{colors.surface_container_low.default.hex}};
+        @define-color secondary_sidebar_fg_color {{colors.on_surface.default.hex}};
+        @define-color headerbar_backdrop_color {{colors.surface.default.hex}};
+        @define-color thumbnail_bg_color {{colors.surface_container.default.hex}};
+        @define-color thumbnail_fg_color {{colors.on_surface.default.hex}};
+        @define-color success_color {{colors.tertiary.default.hex}};
+        @define-color success_bg_color {{colors.tertiary.default.hex}};
+        @define-color success_fg_color {{colors.on_tertiary.default.hex}};
+        @define-color warning_bg_color {{colors.tertiary.default.hex}};
+        @define-color warning_fg_color {{colors.on_tertiary.default.hex}};
+        @define-color error_bg_color {{colors.error.default.hex}};
+        @define-color error_fg_color {{colors.on_error.default.hex}};
       '';
 
       # Where each template lands. Everything under $XDG_CONFIG_HOME so the
@@ -959,6 +984,31 @@
         done
         ${gtkNudge}
       '';
+
+      # Same session-state problem one level up, and the one that actually
+      # decides whether a GTK4 app is light or dark. libadwaita ignores
+      # `gtk-application-prefer-dark-theme` entirely and follows the XDG
+      # portal's `org.freedesktop.appearance color-scheme`, which
+      # xdg-desktop-portal-gtk answers from this dconf key -- so the
+      # @define-color lines above only ever recolour the stylesheet libadwaita
+      # already picked. Get the key wrong and EasyEffects draws white cards on
+      # a wallpaper-dark window.
+      #
+      # It is user-wide like everything else here, and on the hosts that also
+      # run Plasma modules/kde.nix deliberately sets it to prefer-light for the
+      # Windows 7 look. So it is scoped the same way as the colour files: set
+      # to match `colorMode` for as long as the Hyprland session runs, put back
+      # to whatever Home Manager declared when it stops.
+      declaredColorScheme =
+        (config.dconf.settings."org/gnome/desktop/interface" or { }).color-scheme
+          or "prefer-dark";
+      setColorScheme =
+        value:
+        pkgs.writeShellScript "hyprland-color-scheme-${value}" ''
+          set -u
+          ${pkgs.dconf}/bin/dconf write /org/gnome/desktop/interface/color-scheme \
+            ${lib.escapeShellArg "'${value}'"} 2>/dev/null || true
+        '';
 
       # Flip the groupbar between tabbed (titles side by side, i3's "tabbed")
       # and stacked (titles listed one per row, i3's "stacking"). Hyprland has
@@ -2037,14 +2087,17 @@
             # immediately after ExecStart returns.
             systemd.user.services.hyprland-gtk-colors = {
               Unit = {
-                Description = "Scope the wallpaper-derived GTK colours to the Hyprland session";
+                Description = "Scope the GTK colour scheme and wallpaper colours to the Hyprland session";
                 PartOf = [ "hyprland-session.target" ];
               };
               Service = {
                 Type = "oneshot";
                 RemainAfterExit = true;
-                ExecStart = "${pkgs.coreutils}/bin/true";
-                ExecStop = "${clearGtkColors}";
+                ExecStart = "${setColorScheme "prefer-${colorMode}"}";
+                ExecStop = [
+                  "${clearGtkColors}"
+                  "${setColorScheme declaredColorScheme}"
+                ];
               };
               Install.WantedBy = [ "hyprland-session.target" ];
             };
