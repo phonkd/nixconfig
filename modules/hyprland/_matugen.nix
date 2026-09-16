@@ -286,22 +286,24 @@ rec {
     $gs set $key "$current" 2>/dev/null || true
   '';
 
-  # GTK config is *user-wide*, not per-session, and these hosts also run
-  # Plasma -- where modules/kde.nix deliberately installs a Windows 7 GTK
-  # theme to match AeroThemePlasma. Left alone, the gtk.css imports below
-  # would repaint that session's GTK apps in wallpaper colours too, which
-  # is a visible regression nobody asked for.
+  # GTK config is *user-wide*, not per-session. This exists because these
+  # hosts also ran Plasma, where modules/kde.nix installed a Windows 7 GTK
+  # theme to match AeroThemePlasma: left alone, the gtk.css imports below
+  # would have repainted that session's GTK apps in wallpaper colours too.
   #
   # So the two GTK colour files are treated as session state: emptied when
   # the Hyprland session stops, refilled by the first wallpaper rotation
   # when it starts (within seconds -- the timer's OnActiveSec is 3). An
-  # empty file is still a valid @import target, so Plasma just gets the
-  # theme's own colours, exactly as before this module existed.
+  # empty file is still a valid @import target, so what is left is whatever
+  # theme modules/desktop.nix declared.
   #
-  # The one hole is an unclean exit (a crash, or pulling the power), which
-  # leaves the files populated for the next Plasma login. Recover by
-  # emptying them by hand, or by starting and cleanly leaving Hyprland
-  # once. Not worth more machinery than that.
+  # KDE is gone and there is no other session to protect any more, so this
+  # is kept for the smaller reason rather than the original one: outside a
+  # Hyprland session the declared theme should be what applies, not the
+  # colours of whatever wallpaper happened to be up last. An unclean exit
+  # (a crash, or pulling the power) still leaves the files populated;
+  # recover by emptying them by hand, or by starting and cleanly leaving
+  # Hyprland once. Not worth more machinery than that.
   clearGtkColors = pkgs.writeShellScript "hyprland-clear-gtk-colors" ''
     set -u
     for f in ${lib.escapeShellArgs [ generated.gtk3 generated.gtk4 ]}; do
@@ -319,11 +321,13 @@ rec {
   # already picked. Get the key wrong and EasyEffects draws white cards on
   # a wallpaper-dark window.
   #
-  # It is user-wide like everything else here, and on the hosts that also
-  # run Plasma modules/kde.nix deliberately sets it to prefer-light for the
-  # Windows 7 look. So it is scoped the same way as the colour files: set
-  # to match `colorMode` for as long as the Hyprland session runs, put back
-  # to whatever Home Manager declared when it stops.
+  # It is user-wide like everything else here -- it had to be scoped because
+  # modules/kde.nix set it to prefer-light for the Windows 7 look on the
+  # hosts that also ran Plasma. Same disposition as the colour files above:
+  # the scoping outlives KDE because "the declared value when no session is
+  # running" is the right resting state either way. Set to match `colorMode`
+  # for as long as the Hyprland session runs, put back to whatever Home
+  # Manager declared when it stops.
   declaredColorScheme =
     (config.dconf.settings."org/gnome/desktop/interface" or { }).color-scheme
       or "prefer-dark";

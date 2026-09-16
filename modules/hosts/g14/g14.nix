@@ -172,7 +172,6 @@ usb:v27C6p538D*
           serviceConfig.Restart = "no";
           wantedBy = lib.mkForce [ ];
         };
-        services.upower.enable = true;
 
         # EasyEffects preset. The daemon is enabled for every NixOS desktop
         # (services.easyeffects in modules/desktop.nix), but this preset is
@@ -255,8 +254,9 @@ usb:v27C6p538D*
         # proprietary non-minutiae matcher, which is not available here.
         #
         # Do NOT "fix" this by lowering bz3_threshold. `fprintAuth` defaults to
-        # services.fprintd.enable, so this sits in front of sudo and sddm, and a
-        # threshold low enough to admit these scores authenticates on noise.
+        # services.fprintd.enable, so this sits in front of sudo and the login
+        # greeter (sddm once, greetd now), and a threshold low enough to admit
+        # these scores authenticates on noise.
         #
         # Everything above (the libfprint graft, the driver patch,
         # scripts/goodix-521d-provision.sh) is correct and stays: the sensor is

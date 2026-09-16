@@ -69,16 +69,20 @@
       # GTK configuration
       gtk = {
         enable = true;
-        # Plasma rewrites ~/.gtkrc-2.0 at runtime (KDE's GTK bridge), so every
-        # rebuild HM found an unmanaged file and tried to back it up -- failing
-        # the moment a .hm-backup from an earlier rebuild was already there
-        # ("Existing file '.gtkrc-2.0.hm-backup' would be clobbered"). The
-        # content is generated from the settings below, so there is nothing
-        # worth preserving: overwrite it and skip the backup entirely.
+        # Kept from the KDE era: Plasma rewrote ~/.gtkrc-2.0 at runtime (KDE's
+        # GTK bridge), so every rebuild HM found an unmanaged file and tried to
+        # back it up -- failing the moment a .hm-backup from an earlier rebuild
+        # was already there ("Existing file '.gtkrc-2.0.hm-backup' would be
+        # clobbered"). Nothing writes that file behind HM's back any more, but
+        # the content is generated from the settings below either way, so there
+        # is still nothing worth preserving and no reason to start backing it
+        # up again.
         gtk2.force = true;
-        # mkDefault throughout: on KDE hosts modules/kde.nix replaces the
-        # whole look with a light Windows 7 one, and a GTK stack still set to
-        # dark Nordic would be the one thing left contradicting it.
+        # mkDefault throughout so a host or a session module can replace the
+        # whole look without mkForce. Nothing does today -- modules/hyprland/
+        # only layers wallpaper-derived @define-colors on top of this theme --
+        # but this is where the Windows 7 rice used to take over, and the
+        # defaults are still the right shape for the next thing that wants it.
         theme = lib.mkDefault {
           package = pkgs.nordic;
           name = "Nordic-darker";
@@ -104,13 +108,15 @@
       # answers that from exactly this dconf key.
       #
       # Unset (or `prefer-light`) means libadwaita loads its *light*
-      # stylesheet, so every name modules/hyprland.nix does not override --
+      # stylesheet, so every name modules/hyprland/ does not override --
       # card_bg_color, sidebar_bg_color, dialog_bg_color -- stays white. A
       # window painted a dark `window_bg_color` full of white cards is what
       # "some apps are in light mode" actually looks like.
       #
-      # mkDefault for the same reason as the gtk block above: modules/kde.nix
-      # flips it to prefer-light for the Windows 7 look.
+      # mkDefault for the same reason as the gtk block above. It is also the
+      # value modules/hyprland/_matugen.nix reads as `declaredColorScheme` and
+      # restores when the session stops, so this is the resting state of the
+      # key and not just its initial one.
       dconf.settings."org/gnome/desktop/interface".color-scheme =
         lib.mkDefault "prefer-dark";
 
@@ -161,21 +167,22 @@
       services.xserver.enable = true;
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
       services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
-      # The KDE branch -- SDDM, Plasma 6, the AeroThemePlasma shell and the
-      # KConfig defaults that come with it -- lives in modules/kde.nix, gated
-      # on this same `noughty.host.desktop`. Everything below is DE-agnostic.
+      # There used to be a third branch here: KDE -- SDDM, Plasma 6 and the
+      # AeroThemePlasma shell, in modules/kde.nix. It is gone, and with it the
+      # only session blac and g14 had besides Hyprland; both now read
+      # `desktop = "hyprland"` in the registry and take the branch below.
 
-      # Hyprland-only desktops (z14, `desktop = "hyprland"`): greetd running
-      # tuigreet, deliberately *not* SDDM. SDDM is the KDE branch's alone now
-      # (modules/kde.nix). Its Wayland greeter is a Qt/Plasma-shaped thing that
-      # leans on pieces a KDE-less host never installs -- a cursor theme above
-      # all -- and without them it comes up drawing no pointer at all. The
-      # greeter is still there and still takes keyboard input, but with nothing
-      # to point with the session dropdown is unreachable, so you are stuck
-      # with whatever entry happened to be preselected. tuigreet has no such
-      # failure mode: it is a text UI on VT1, so it needs no compositor, no Qt
-      # theme and no cursor, and it reads the very same wayland-sessions
-      # entries `programs.hyprland.enable` installs -- session picker on F3.
+      # Hyprland desktops (blac, g14, z14 -- every NixOS desktop today):
+      # greetd running tuigreet, deliberately *not* SDDM. SDDM's Wayland
+      # greeter is a Qt/Plasma-shaped thing that leans on pieces a KDE-less
+      # host never installs -- a cursor theme above all -- and without them it
+      # comes up drawing no pointer at all. The greeter is still there and
+      # still takes keyboard input, but with nothing to point with the session
+      # dropdown is unreachable, so you are stuck with whatever entry happened
+      # to be preselected. tuigreet has no such failure mode: it is a text UI
+      # on VT1, so it needs no compositor, no Qt theme and no cursor, and it
+      # reads the very same wayland-sessions entries
+      # `programs.hyprland.enable` installs -- session picker on F3.
       services.greetd = lib.mkIf (de == "hyprland") {
         enable = true;
         # tuigreet draws on the VT directly, so systemd's boot chatter would
@@ -200,13 +207,14 @@
           "--sessions ${sessionsWithoutUwsm}/share/wayland-sessions"
         ];
       };
-      # Same Plymouth invariant the comment below assumes -- kde.nix sets it
-      # for KDE hosts, so a KDE-less desktop needs its own mkDefault.
+      # The Plymouth invariant the quiet-boot params below assume. kde.nix used
+      # to set this for the KDE hosts (PlymouthVista needed something to
+      # theme); this is the only place that turns it on now. mkDefault so a
+      # host can still opt out of the boot splash.
       boot.plymouth.enable = lib.mkIf (de == "hyprland") (lib.mkDefault true);
 
       # --- Quiet boot ---------------------------------------------------
-      # Desktops boot behind Plymouth (modules/kde.nix turns it on for KDE
-      # hosts, the branch above for Hyprland-only ones), so
+      # Desktops boot behind Plymouth (the branch above turns it on), so
       # the kernel/udev/stage-1 chatter underneath just flickers past the
       # splash -- nobody reads it, and on a failed boot you drop to a console
       # anyway. Deliberately NOT applied to servers: when one of those fails
@@ -236,6 +244,28 @@
       programs.steam.enable = true;
       services.hardware.bolt.enable = true;
       services.gvfs.enable = true;
+
+      # --- What Plasma used to provide for free -------------------------
+      # These came with services.desktopManager.plasma6 on blac and g14, and
+      # had to be asked for by hand on z14, the one host that never ran it.
+      # With modules/kde.nix gone there is no desktop environment on any of
+      # them, so the baseline owns them and z14 stops being the special case.
+      #
+      # upower: battery/AC state on D-Bus. The status bar reads it, and so
+      # does anything that wants to know the lid is on mains.
+      services.upower.enable = lib.mkDefault true;
+      # power-profiles-daemon: the performance/balanced/power-saver switch.
+      # g14 in particular would have lost this the moment Plasma left -- it
+      # had upower of its own but never ppd, because plasma6.nix was supplying
+      # it. tlp stays off everywhere; the two fight over the same CPU governor.
+      services.power-profiles-daemon.enable = lib.mkDefault true;
+      # A Secret Service (org.freedesktop.secrets). KDE's ksecretd owned that
+      # name, and the ProtonVPN app below needs *something* to own it or its
+      # login has nowhere to put a token. gnome-keyring is the DE-agnostic
+      # implementation; the PAM line is what unlocks it with the password
+      # already typed at greetd, rather than prompting a second time.
+      services.gnome.gnome-keyring.enable = true;
+      security.pam.services.greetd.enableGnomeKeyring = true;
       users.users.phonkd.extraGroups = [
         "dialout"
         # "wheel" must stay declared: NixOS resets a declarative user's
@@ -279,9 +309,9 @@
         #
         # Needs two things beyond the package, both already true here: the
         # "networkmanager" group above (the app drives NM), and a Secret
-        # Service for its login, which KDE's ksecretd already provides
-        # (it owns org.freedesktop.secrets — so no gnome-keyring, which
-        # would only add a second keyring and a second unlock prompt).
+        # Service for its login. That used to be KDE's ksecretd, which owned
+        # org.freedesktop.secrets on its own; with KDE gone it is
+        # gnome-keyring, enabled in the baseline block above.
         proton-vpn
         # Tray applet for tailscale — its exit-node picker is how the 201-mono
         # exit node gets toggled by hand, so there is no wrapper script for it.

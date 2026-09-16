@@ -1,23 +1,22 @@
-# Hyprland: a second, fully declarative session on the KDE desktops (blac,
-# g14). On z14 there is no KDE at all (`desktop = "hyprland"` in
-# lib/registry.nix) and this is the *only* session -- modules/desktop.nix's
-# plain-SDDM branch is what gives it a login screen instead.
+# Hyprland: the fully declarative session on every NixOS desktop here -- blac,
+# g14 and z14, all three `desktop = "hyprland"` in lib/registry.nix. It is the
+# *only* session on each; modules/desktop.nix's greetd/tuigreet branch is what
+# gives it a login screen. Back it out by dropping the "hyprland" host tag in
+# lib/registry.nix, which leaves the host with no session at all.
 #
-# On blac/g14 this is *additive*. KDE is untouched -- SDDM simply grows a
-# "Hyprland" entry next to "Plasma", and every systemd user unit in this tree is
-# bound to `hyprland-session.target`, which only Hyprland ever starts. Log in
-# to Plasma and nothing here runs. Back it out by dropping the "hyprland" host
-# tag in lib/registry.nix.
+# It was not always the only one. blac and g14 ran KDE -- Plasma 6 under
+# AeroThemePlasma, from a modules/kde.nix that no longer exists -- and this was
+# the second entry in SDDM's session menu next to it. Every systemd user unit
+# in this tree is still bound to `hyprland-session.target`, which is why that
+# arrangement worked and why nothing here leaks into a session it did not
+# start. Two things below are inherited from that era on purpose:
 #
-# Three things are mirrored from the Plasma side on purpose, because the point
-# is that the two sessions feel the same:
-#
-#   * Keybindings, from modules/kde.nix -- which in turn mirrors
+#   * Keybindings, which came from modules/kde.nix -- which in turn mirrored
 #     AeroSpace on the Mac. Alt is Option. See the table further down.
-#   * A rotating wallpaper, like modules/kde.nix's Plasma slideshow.
-#   * ...and the new part: the colour scheme is re-derived from each wallpaper
-#     as it changes, and pushed into the shell, the compositor, the launcher,
-#     the lock screen and GTK.
+#   * A rotating wallpaper, which was Plasma's slideshow first.
+#   * ...and the part that was new here: the colour scheme is re-derived from
+#     each wallpaper as it changes, and pushed into the shell, the compositor,
+#     the launcher, the lock screen and GTK.
 #
 # The shell is Caelestia (programs.caelestia, in _shell.nix), adopted in place
 # of a hand-written Quickshell bar -- see plans/caelestia-shell.md. It is a
@@ -64,11 +63,13 @@
 # `gtk.gtk{3,4}.extraCss` anyway means the file stays HM's and only the colours
 # are ours, which stops being luck the moment someone sets a GTK4 theme.)
 #
-# The second GTK problem is scope, and it is not hypothetical: gtk.css is
-# *user-wide*, while everything else here is per-session. These hosts also run
-# Plasma, with a deliberate Windows 7 GTK theme from modules/kde.nix. See
-# `clearGtkColors` in _matugen.nix for how the wallpaper colours are kept out
-# of it.
+# The second GTK problem is scope: gtk.css is *user-wide*, while everything
+# else here is per-session. That mattered when these hosts also ran Plasma
+# under a deliberate Windows 7 GTK theme -- wallpaper colours bleeding into
+# that session were a visible regression. Hyprland is the only session now, so
+# the machinery in `clearGtkColors` (_matugen.nix) has nothing left to protect;
+# it stays because it is also what restores the declared theme between
+# sessions, which is still the right resting state.
 #
 # Where things are
 # ----------------

@@ -27,13 +27,14 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "desktop";
-    desktop = "kde";
+    desktop = "hyprland";
     tags = [
       "gaming"
       "gigaplayer-client"
-      # A second session next to Plasma, not a replacement -- `desktop` above
-      # still picks SDDM + Plasma 6, and "Hyprland" just appears alongside it
-      # in the session menu. See modules/hyprland.nix and plans/hyprland.md.
+      # The only session on this host. It used to sit next to Plasma -- this
+      # field read "kde" and SDDM offered both -- but KDE is gone from the repo
+      # and Hyprland is what is left. See modules/hyprland/ and
+      # plans/hyprland.md.
       "hyprland"
     ];
     username = "phonkd";
@@ -57,10 +58,10 @@
         # off to 205-builder. Supplies the nixremote key via sops and pins 205's
         # host key.
         self.nixosModules.builder-client
-        # Hyprland as a second session (gated on the "hyprland" tag above).
-        # Named here rather than in modules/builder.nix's alwaysImport purely
-        # to keep this change off a file a concurrent refactor is rewriting;
-        # it self-gates and would be equally at home there.
+        # Hyprland -- the session (gated on the "hyprland" tag above). Named
+        # here rather than in modules/builder.nix's alwaysImport purely to
+        # keep the change that introduced it off a file a concurrent refactor
+        # was rewriting; it self-gates and would be equally at home there.
         self.nixosModules.hyprland
       ];
   };
@@ -69,10 +70,10 @@
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "laptop";
-    desktop = "kde";
+    desktop = "hyprland";
     tags = [
       "gigaplayer-client"
-      # Second session alongside Plasma -- see the note on blac's tag.
+      # The only session -- see the note on blac's tag.
       "hyprland"
     ];
     username = "phonkd";
@@ -97,7 +98,7 @@
         # silently fell back to compiling the closure on the laptop after the
         # builder failed to answer.
         self.nixosModules.builder-client
-        # Hyprland as a second session -- see the note on blac's entry.
+        # Hyprland -- see the note on blac's entry.
         self.nixosModules.hyprland
       ];
   };
@@ -108,13 +109,13 @@
   # a Radeon 840M iGPU with no dGPU, no ROG firmware and no fingerprint reader.
   # See plans/z14-zenbook.md.
   #
-  # Unlike blac/g14 there is no KDE/Plasma here at all -- Hyprland (below) is
-  # the only session. `desktop` still has to be non-null: it also drives
+  # Hyprland (below) is the only session -- as it now is on blac and g14 too.
+  # `desktop` still has to be non-null: it also drives
   # noughty.host.is.nixosDesktop, which the whole desktop baseline
-  # (modules/desktop.nix) and modules/hyprland.nix key off, so it can't just
-  # become null. "hyprland" names the DE-less case rather than reusing "kde"
-  # -- see the greetd/tuigreet branch in modules/desktop.nix, which is the
-  # login screen a host with no Plasma installed gets instead of SDDM.
+  # (modules/desktop.nix) and modules/hyprland/ key off, so it can't just
+  # become null. "hyprland" is the value every NixOS desktop here carries --
+  # see the greetd/tuigreet branch in modules/desktop.nix, which is the login
+  # screen it selects.
   z14 = {
     kind = "computer";
     platform = "x86_64-linux";
@@ -167,8 +168,7 @@
         # as g14 does -- without it the laptop compiles every host's closure
         # itself. Supplies the nixremote key via sops and pins 205's host key.
         self.nixosModules.builder-client
-        # Hyprland -- the only session on this host, unlike blac/g14 where
-        # it sits next to Plasma.
+        # Hyprland -- the session, same as blac/g14.
         self.nixosModules.hyprland
       ];
   };

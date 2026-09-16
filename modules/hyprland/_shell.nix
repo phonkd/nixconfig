@@ -34,8 +34,9 @@
       enable = true;
       # Only ever start under Hyprland. The module's default is
       # config.wayland.systemd.target, i.e. graphical-session.target,
-      # which the Plasma session reaches too -- that would drop this
-      # shell on top of the Plasma panel.
+      # which any graphical session reaches -- that is what used to
+      # drop this shell on top of the Plasma panel, and it would do
+      # the same to whatever session came next.
       target = "hyprland-session.target";
     };
 

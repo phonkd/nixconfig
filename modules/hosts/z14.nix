@@ -18,10 +18,12 @@
 # carries hardware.cpu.amd.updateMicrocode. Importing the profiles would add a
 # whole unpinned repo fetch to restate settings we already have.
 #
-# upower and power-profiles-daemon are the one thing that stopgap g14/Plasma
-# era got for free (Plasma's module enables both) and this host now has to ask
-# for explicitly, having no desktop environment of its own -- see below. tlp
-# stays off: it fights power-profiles-daemon over the same CPU governor.
+# upower and power-profiles-daemon were the one thing the stopgap g14/Plasma
+# era got for free (plasma6.nix enables both) and this host, having no desktop
+# environment of its own, had to ask for explicitly. They live in the shared
+# desktop baseline (modules/desktop.nix) now that no host runs Plasma either,
+# so the two lines that used to be here are gone. tlp stays off wherever ppd
+# runs: the two fight over the same CPU governor.
 { inputs, ... }:
 {
   flake.nixosModules.z14 =
@@ -108,12 +110,6 @@
       # CPU do its own frequency scaling instead of acpi-cpufreq, which is the
       # more power-efficient path on recent Ryzen parts.
       boot.kernelParams = [ "amd_pstate=active" ];
-
-      # No modules/kde.nix on this host to bring these in for free (see the
-      # header comment) -- explicit, the way g14 also does for its own
-      # reasons.
-      services.upower.enable = true;
-      services.power-profiles-daemon.enable = true;
 
       # This lid has a real ambient light sensor. It shows up as an IIO device
       # (`als`, HID usage 200041) behind the AMD sensor-fusion hub, with
@@ -291,8 +287,8 @@
       #    compiled into the binary.
       # 2. A unit, bound to hyprland-session.target rather than
       #    graphical-session.target for the same reason everything in
-      #    modules/hyprland.nix is. z14 has no Plasma session today; the
-      #    convention is part of what keeps it that way.
+      #    modules/hyprland/ is: it should come up with the session and
+      #    not with any other one that might be added later.
       #
       # What is deliberately *not* here is the third thing every wluma guide
       # tells you to add: upstream's 90-wluma-backlight.rules, and the "video"

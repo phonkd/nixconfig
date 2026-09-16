@@ -31,13 +31,10 @@
       ];
       networking.hostName = "blac";
 
-      # blac's screen is OLED, so the one permanently-lit element on it -- the
-      # taskbar -- gets hidden until the pointer asks for it. g14 is an LCD and
-      # deliberately keeps its panel; see modules/kde.nix, which also drives
-      # the wallpaper slideshow (the other half of the same burn-in story, and
-      # on by default for every KDE host).
-      noughty.kde.panelAutoHide = true;
-
+      # blac's screen is OLED. The taskbar-auto-hide half of the burn-in story
+      # left with KDE (`noughty.kde.panelAutoHide`); the other half -- the
+      # rotating wallpaper -- is now Hyprland's, on by default for every host
+      # through `noughty.hyprland.wallpaperDir` in modules/hyprland/.
       networking.enableIPv6 = false;
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 

@@ -24,7 +24,6 @@ let
     hy3
     hy3Plugin
     hyprctl
-    kdeOwnsCursor
     layout
     layoutSettings
     monitorsConf
@@ -103,24 +102,21 @@ in
       # auto-placed, at noughty.hyprland.scale (1 = 100%).
       monitor = ",preferred,auto,${scale}";
 
-      # The cursor half of `env` is conditional, and the condition is
-      # who installed the theme. `home.pointerCursor` is *user-wide*
-      # state, so on a KDE host modules/kde.nix owns it
-      # (AeroThemePlasma's "aero-drop") and exports XCURSOR_THEME/SIZE
-      # as session variables -- Hyprland inherits the same cursor
-      # Plasma uses, and naming a second theme here would name one not
-      # actually installed. On a Hyprland-only host this module is the
-      # one installing it (see `home.pointerCursor` below), so it can
-      # safely name it, and does: session variables reach Hyprland
-      # only via the login shell that greetd starts it from, and this
-      # makes the pointer independent of that path. No HYPRCURSOR_* --
-      # bibata ships XCursor only, and pointing hyprcursor at a theme
-      # it cannot find is a warning and a fallback, not an upgrade.
+      # The cursor half of `env` names the theme this module installs
+      # itself (`home.pointerCursor` in _session.nix). It is spelled
+      # out here rather than left to the environment because session
+      # variables reach Hyprland only via the login shell greetd
+      # starts it from, and this makes the pointer independent of that
+      # path. It used to be conditional: `home.pointerCursor` is
+      # *user-wide* state, so on a KDE host modules/kde.nix owned it
+      # (AeroThemePlasma's "aero-drop") and naming a second theme here
+      # would have named one not actually installed. No KDE, no
+      # condition. Still no HYPRCURSOR_* -- bibata ships XCursor only,
+      # and pointing hyprcursor at a theme it cannot find is a warning
+      # and a fallback, not an upgrade.
       env = [
         "QT_QPA_PLATFORM,wayland;xcb"
         "MOZ_ENABLE_WAYLAND,1"
-      ]
-      ++ lib.optionals (!kdeOwnsCursor) [
         "XCURSOR_THEME,${cursorName}"
         "XCURSOR_SIZE,${toString cursorSize}"
       ];
@@ -178,9 +174,9 @@ in
 
       input = {
         # Swiss German, no dead keys -- carried over from the old
-        # Hyprland config in git history. Plasma gets this from its
-        # own keyboard settings, which is why there is no equivalent
-        # line in the KDE modules.
+        # Hyprland config in git history. Plasma took this from its
+        # own keyboard settings, which is why the KDE modules never
+        # had an equivalent line to inherit.
         kb_layout = "ch";
         kb_variant = "de_nodeadkeys";
         follow_mouse = 1;

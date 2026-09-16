@@ -1,29 +1,5 @@
 {
   "nodes": {
-    "aerothemeplasma": {
-      "inputs": {
-        "flake-parts": [
-          "flake-parts"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1780325566,
-        "narHash": "sha256-VFPUOpXX6u3amwm77VogCqRpnniWAv+T/n5PrjBxhOs=",
-        "owner": "nyakase",
-        "repo": "aerothemeplasma-nix",
-        "rev": "2d80b3832bdc28b413a1b259e0d7223e357309f7",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nyakase",
-        "repo": "aerothemeplasma-nix",
-        "rev": "2d80b3832bdc28b413a1b259e0d7223e357309f7",
-        "type": "github"
-      }
-    },
     "aquamarine": {
       "inputs": {
         "hyprutils": [
@@ -1503,7 +1479,6 @@
     },
     "root": {
       "inputs": {
-        "aerothemeplasma": "aerothemeplasma",
         "caelestia": "caelestia",
         "claude-code-nix": "claude-code-nix",
         "deploy-rs": "deploy-rs",

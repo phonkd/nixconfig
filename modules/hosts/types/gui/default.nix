@@ -47,13 +47,6 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.gaming
-        # The $HOME half of modules/kde.nix: the GTK side of the Windows 7 look
-        # (AeroThemePlasma covers Qt/Plasma), the AeroSpace-parity global
-        # shortcuts, Linver, and the wallpaper/panel layout. Self-gating -- it
-        # checks osConfig.noughty.host.desktop and does nothing on a non-KDE
-        # desktop. The per-host knobs are `noughty.kde.*`, declared by the
-        # NixOS half in alwaysImport.
-        self.homeModules.kde
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
         self.homeModules.zed-editor
