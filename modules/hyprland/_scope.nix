@@ -25,11 +25,6 @@ rec {
   hostTags = osConfig.noughty.host.tags or [ ];
   enabled = osConfig == null || builtins.elem "hyprland" hostTags;
 
-  # True on the hosts that also run the KDE session (blac, g14). There
-  # modules/kde.nix's home module owns `home.pointerCursor` and this one
-  # must keep its hands off it; on a Hyprland-only host (z14) kde.nix is
-  # inert and nothing sets a cursor at all unless this module does.
-  kdeOwnsCursor = (osConfig.noughty.host.desktop or null) == "kde";
   cursorName = "Bibata-Modern-Classic";
   cursorSize = 24;
 
@@ -266,20 +261,19 @@ rec {
 
   # -- Keybindings -------------------------------------------------------
   #
-  # Straight from modules/kde.nix, which is itself AeroSpace's
-  # Option-key layout with Option spelled Alt. `mod` is the knob for the
+  # Inherited from modules/kde.nix, which was itself AeroSpace's Option-key
+  # layout with Option spelled Alt. `mod` is the knob for the
   # window-management half: set it to SUPER and focus, movement, grouping,
-  # fullscreen and the launchers all move off Alt at once, exactly like its
-  # KDE counterpart.
+  # fullscreen and the launchers all move off Alt at once.
   #
   # It is no longer *every* bind, and the workspace keys are the exception
   # -- they sit on SUPER unconditionally now, for the reasons written out
   # at workspaceKeys below. Flipping `mod` to SUPER would collide them with
   # the window-management set rather than move them.
   #
-  # The Alt-vs-menu-mnemonics caveat from the KDE module applies here too:
-  # on Linux Alt+<letter> is also how Qt/GTK apps reach their menu bars,
-  # and a compositor bind wins over the focused app.
+  # The Alt-vs-menu-mnemonics caveat the KDE module carried applies here
+  # too: on Linux Alt+<letter> is also how Qt/GTK apps reach their menu
+  # bars, and a compositor bind wins over the focused app.
   mod = "ALT";
 
   # The whole number row, 1..9, onto workspaces 1..9 -- and on SUPER, not
@@ -301,11 +295,11 @@ rec {
   # both free, the latter only because the screenshot binds vacated it in
   # the same change.
   #
-  # modules/kde.nix and modules/aerospace.nix both still run the older
-  # layouts -- KDE the 123/QWE/ASD grid, the Mac the all-letters QWE/ASD/UIO
-  # set that AeroSpace's binder forces. The three sessions agreeing was
-  # always a nicety rather than a constraint, and this one is a Hyprland
-  # keyboard decision.
+  # modules/aerospace.nix still runs the older layout -- the all-letters
+  # QWE/ASD/UIO set that AeroSpace's binder forces; modules/kde.nix ran the
+  # 123/QWE/ASD grid until it was removed. The sessions agreeing was always
+  # a nicety rather than a constraint, and this one is a Hyprland keyboard
+  # decision.
   #
   # Spelled `code:` rather than `1`..`9`, and that is not cosmetic. Every
   # one of these keys also carries a SHIFT bind (send-to-workspace), and
@@ -334,7 +328,7 @@ rec {
     ]) workspaceKeys
   );
 
-  # Launchers. Absolute store paths, for the same reason the KDE half uses
+  # Launchers. Absolute store paths, for the same reason the KDE half used
   # them: `exec` is run by the compositor, not by a login shell, so nothing
   # guarantees the user profile is on its PATH.
   zen = "${inputs.zen-browser.packages.${pkgs.system}.default}/bin/zen";
@@ -418,7 +412,7 @@ rec {
 
   # -- Display settings GUI ----------------------------------------------
   #
-  # nwg-displays is the arrange-your-monitors dialog Plasma has and a bare
+  # nwg-displays is the arrange-your-monitors dialog Plasma had and a bare
   # compositor does not: position, resolution, refresh rate, scale,
   # rotation, mirroring, applied live via hyprctl and then written out.
   #

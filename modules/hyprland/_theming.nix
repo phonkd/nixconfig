@@ -180,8 +180,9 @@ in
   # anything another module has put in extraCss.
   #
   # The import is unconditional because gtk.css is user-wide, but the
-  # *target* is session-scoped -- see clearGtkColors above. Under
-  # Plasma the imported file is empty and this is a no-op.
+  # *target* is session-scoped -- see clearGtkColors above. Outside a
+  # Hyprland session the imported file is empty and this is a no-op,
+  # which is what used to keep the colours out of Plasma.
   gtk.gtk3.extraCss = ''
     @import url("file://${generated.gtk3}");
   '';
@@ -190,8 +191,9 @@ in
   '';
 
   # Empties the GTK colour files when the Hyprland session ends, so
-  # Plasma keeps its own GTK theme. Nothing to do on start: the
-  # wallpaper timer refills them moments later. RemainAfterExit is
+  # the declared GTK theme is what applies outside it -- this is what
+  # used to leave Plasma's own theme alone. Nothing to do on start:
+  # the wallpaper timer refills them moments later. RemainAfterExit is
   # what makes ExecStop run at session teardown rather than
   # immediately after ExecStart returns.
   systemd.user.services.hyprland-gtk-colors = {
@@ -212,7 +214,7 @@ in
   };
 
   # The wallpaper daemon. Bound to hyprland-session.target, so it
-  # never comes up under Plasma.
+  # comes up with the session and not before it.
   systemd.user.services.awww-daemon = {
     Unit = {
       Description = "awww (swww) wallpaper daemon";
@@ -349,8 +351,9 @@ in
 
         # ...except the GTK pair, which must start out EMPTY. gtk.css
         # is user-wide, so a seeded-with-colours file would recolour
-        # the Plasma session's GTK apps from the next login onwards,
-        # before Hyprland had ever been used. They are filled in by
+        # GTK apps from the next login onwards, before Hyprland had
+        # ever been used -- which on the KDE hosts meant recolouring
+        # the Plasma session. They are filled in by
         # the first wallpaper rotation inside a Hyprland session and
         # emptied again when it ends (see clearGtkColors).
         ${pkgs.coreutils}/bin/truncate -s 0 \

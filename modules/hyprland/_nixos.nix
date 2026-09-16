@@ -23,11 +23,11 @@ in
   options.noughty.hyprland = {
     wallpaperDir = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      # Same tree the Plasma slideshow uses (noughty.kde.wallpaperDir).
-      # Deliberately a separate option rather than a reference to the KDE
-      # one: the two sessions should be able to disagree, and this module
-      # must not break if the KDE module is renamed or reshaped.
-      # Searched recursively, like Plasma's ImageWallpaper::findAll.
+      # The same tree Plasma's slideshow used to walk, back when
+      # noughty.kde.wallpaperDir existed alongside this. It was deliberately
+      # a separate option rather than a reference to the KDE one, which is
+      # why removing that module cost this one nothing.
+      # Searched recursively, as Plasma's ImageWallpaper::findAll did.
       default = "/home/phonkd/Downloads/Walls";
       description = ''
         Directory of wallpapers, searched recursively. Each rotation picks
@@ -38,8 +38,8 @@ in
 
     wallpaperInterval = lib.mkOption {
       type = lib.types.ints.positive;
-      # Matches noughty.kde.wallpaperInterval. As there, the reason the
-      # rotation exists is OLED burn-in, not variety.
+      # Inherited from noughty.kde.wallpaperInterval, and for the same
+      # reason it had: the rotation exists for OLED burn-in, not variety.
       default = 300;
       description = "Seconds between wallpaper (and colour scheme) changes.";
     };
@@ -171,14 +171,15 @@ in
     programs.hyprlock.enable = true;
     security.pam.services.hyprlock = { };
 
-    # Plasma brings its own polkit agent; a bare Hyprland session has none,
-    # and without one every pkexec prompt (ProtonVPN, mounting, ...) fails
-    # silently. Started from the session, not as a system service.
+    # Nothing else provides a polkit agent -- Plasma used to bring one on the
+    # KDE hosts, and a bare Hyprland session has none. Without one every
+    # pkexec prompt (ProtonVPN, mounting, ...) fails silently. Started from
+    # the session, not as a system service.
     security.polkit.enable = true;
 
-    # Fonts. The KDE session gets its own from AeroThemePlasma's Segoe set,
-    # which is a Windows 7 look and not what this session wants. These are
-    # the ones the bar/rofi/kitty configs in this module actually name:
+    # Fonts. The KDE session used to bring its own -- AeroThemePlasma's Segoe
+    # set, a Windows 7 look and never what this session wanted. These are the
+    # ones the bar/rofi/kitty configs in this module actually name:
     #   * JetBrainsMono Nerd Font -- the bar's glyphs (the battery icons in
     #     shell.qml) are Nerd Font private-use codepoints, so without a
     #     patched font the bar is a row of tofu boxes.

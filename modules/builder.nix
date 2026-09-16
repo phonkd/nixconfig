@@ -49,10 +49,6 @@ let
     viewflow # gated on hostHasTag "hyprland" AND host.gpu.hasNvidia (blac, g14)
     work # work setup (private repo); gated on hostHasTag "work"
     containers # rootless podman for distrobox; gated on host.is.nixosDesktop
-    # Everything KDE (modules/kde.nix): the session and the AeroThemePlasma
-    # shell, gated on host.is.nixosDesktop AND desktop == "kde". Also declares
-    # `noughty.kde.*` unconditionally, so a host module can set it.
-    kde
 
     # Server baseline (gated on host.is.server).
     server-globalconfig

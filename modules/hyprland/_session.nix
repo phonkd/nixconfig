@@ -16,7 +16,6 @@ let
     cursorName
     cursorSize
     generated
-    kdeOwnsCursor
     ;
 in
 {
@@ -193,17 +192,15 @@ in
     hyprpolkitagent
   ];
 
-  # Cursor theme -- but only where nobody else defines one. On
-  # blac/g14 modules/kde.nix owns this (AeroThemePlasma's
-  # "aero-drop") and a second unconditional definition here would
-  # collide with it, which is why this used to be absent entirely.
-  # That was wrong for a Hyprland-only host: with kde.nix inert,
-  # *nothing* set a cursor, so no cursor theme was installed for the
-  # user and XCURSOR_THEME went unset. Clients then ask for a
+  # Cursor theme. This module is the only thing that sets one now:
+  # modules/kde.nix used to own it on blac/g14 (AeroThemePlasma's
+  # "aero-drop"), which is why this was once gated to stay off those
+  # hosts. With no cursor set at all, no theme is installed for the
+  # user and XCURSOR_THEME goes unset; clients then ask for a
   # "default" theme that is not on disk and simply draw no pointer --
-  # which is how this was found, staring at a login screen with an
-  # invisible mouse.
-  home.pointerCursor = lib.mkIf (!kdeOwnsCursor) {
+  # which is how the gap was found in the first place, staring at a
+  # login screen with an invisible mouse.
+  home.pointerCursor = {
     enable = true;
     package = pkgs.bibata-cursors;
     name = cursorName;

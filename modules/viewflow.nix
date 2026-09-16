@@ -252,10 +252,10 @@ in
   #
   # `hyprland` tag AND hasNvidia == blac and g14, and nothing else. The tag is
   # load-bearing beyond taste: the *source* role talks Hyprland IPC and needs a
-  # capture plugin in the running compositor, and both blac and g14 carry
-  # Hyprland as a second session next to Plasma. z14 has the tag but is AMD, so
+  # capture plugin in the running compositor. z14 has the tag but is AMD, so
   # the GPU half of the gate is what keeps a CUDA closure off a laptop that
-  # could never run it.
+  # could never run it. (Every desktop carries the tag now that KDE is gone;
+  # it used to mark the hosts running Hyprland *as well as* Plasma.)
   flake.nixosModules.viewflow =
     {
       pkgs,

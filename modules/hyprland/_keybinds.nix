@@ -32,10 +32,11 @@ let
 in
 {
   # -------------------------------------------------------------
-  # Keybindings -- the KDE set, verbatim where KDE has an
-  # equivalent action. See modules/kde.nix for the
-  # reasoning behind each choice; only the differences are noted
-  # here.
+  # Keybindings -- the KDE set, carried over verbatim wherever KDE
+  # had an equivalent action. modules/kde.nix, which held the
+  # reasoning behind each choice, is gone; what mattered is
+  # restated inline below, and the differences are noted where
+  # they are.
   # -------------------------------------------------------------
   bind = [
     # alt-h/j/k/l = focus left/down/up/right
@@ -79,7 +80,7 @@ in
     "SUPER, Q, ${dispatch "killactive"},"
 
     # Launchers: alt-b/v -- two of the three apps KDE and
-    # AeroSpace launch. Spotify was the third, on alt-m, and is
+    # AeroSpace launched. Spotify was the third, on alt-m, and is
     # gone from here: alt-m now carries per-stream volume (see
     # the bindel block below), which is the key it was asked for.
     #
@@ -95,14 +96,14 @@ in
     "${mod}, B, exec, ${zen}"
     "${mod}, V, exec, ${kitty}"
 
-    # --- Below here: things Plasma provides for free and a bare
-    # --- compositor does not, so they have no counterpart in
+    # --- Below here: things Plasma provided for free and a bare
+    # --- compositor does not, so they never had a counterpart in
     # --- modules/kde.nix.
 
     # Launcher on Super+D -- the key the pre-GNOME Hyprland config
     # in this repo's history used ($mainMod, D, exec, $menu), so
     # it is the muscle memory that predates the KDE session.
-    # Deliberately NOT Alt+Space: that is KRunner's key on the
+    # Deliberately NOT Alt+Space: that was KRunner's key on the
     # Plasma side, and Alt is already the workspace modifier here.
     #
     # `combi` rather than `drun`: it searches open windows *and*
@@ -112,7 +113,7 @@ in
     # and their order live in programs.rofi.extraConfig below.
     "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show combi"
     # Float toggle -- AeroSpace's alt-space, which KDE could not
-    # have because KRunner owns that key. Super+Space here.
+    # have because KRunner owned that key. Super+Space here.
     "SUPER, SPACE, togglefloating,"
     "SUPER, E, exec, ${pkgs.nautilus}/bin/nautilus"
     "SUPER, L, exec, ${pkgs.hyprlock}/bin/hyprlock"
@@ -237,7 +238,7 @@ in
     "SUPER SHIFT, N, exec, ${pkgs.playerctl}/bin/playerctl previous"
   ];
 
-  # Drag to move/resize, as on the KDE side.
+  # Drag to move/resize, as on the KDE side before it.
   bindm = [
     "SUPER, mouse:272, movewindow"
     "SUPER, mouse:273, resizewindow"

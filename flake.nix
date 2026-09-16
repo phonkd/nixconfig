@@ -81,22 +81,6 @@
     # The build does not land on the laptop: g14 is a builder-client, so the
     # quickshell compile offloads to 205-builder like everything else.
     caelestia.url = "github:caelestia-dots/shell";
-    # AeroThemePlasma -- the Windows 7 shell for Plasma 6 -- packaged for
-    # NixOS. Sole consumer: modules/kde.nix.
-    #
-    # PINNED, and the pin is load-bearing. This flake rebuilds libplasma and
-    # plasma-workspace from *our* nixpkgs with the aeroshell patches applied,
-    # so its revision has to match our Plasma. Upstream HEAD moved to Plasma
-    # 6.7 in 6198329; against nixos-26.05's libplasma 6.6.6 that patch loses
-    # 4 of 7 hunks in tooltiparea.h and the build dies. 2d80b38 is the last
-    # revision on the 6.6 series. Unpin it when nixpkgs reaches Plasma 6.7,
-    # and not before -- a flake update that silently follows HEAD breaks the
-    # desktop build, not just the theme.
-    aerothemeplasma = {
-      url = "github:nyakase/aerothemeplasma-nix/2d80b3832bdc28b413a1b259e0d7223e357309f7";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.flake-parts.follows = "flake-parts";
-    };
     sops-nix.url = "github:Mic92/sops-nix";
     # deploy-rs: `deploy <host>` builds (offloaded to 205 via nix.buildMachines)
     # and activates a NixOS host with magic rollback. Nodes are generated from
@@ -153,7 +137,7 @@
     # `flake = false`: upstream has no flake.nix, no releases and no tags.
     #
     # PINNED to a rev, deliberately not following HEAD, and the pin is
-    # load-bearing in a way the aerothemeplasma pin is not: the QUIC control
+    # load-bearing rather than cautious: the QUIC control
     # protocol version ("protocol 2.1") is negotiated *between peers*, so a
     # half-updated pair simply refuses each other. Bumping this rev means
     # rebuilding the Linux side AND rebuilding the Windows binaries on blac by

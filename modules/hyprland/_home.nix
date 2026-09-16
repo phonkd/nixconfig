@@ -1,6 +1,5 @@
-# Hyprland, Home Manager half: the actual session. Self-gates the same way the
-# KDE home modules do -- on osConfig -- so it is inert if it is ever imported
-# on a host without the tag.
+# Hyprland, Home Manager half: the actual session. Self-gates on osConfig, so
+# it is inert if it is ever imported on a host without the tag.
 #
 # This file does nothing but assemble. The shared scope is built once and
 # handed to every section, which is what lets the sections stay ordinary
