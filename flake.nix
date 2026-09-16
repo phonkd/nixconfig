@@ -147,6 +147,23 @@
     # the package is built with uv2nix against the upstream-pinned
     # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
     hermes-agent.url = "github:NousResearch/hermes-agent";
+    # viewflow -- cross-device window sharing (g14 <-> blac-on-Windows).
+    # See plans/viewflow.md and modules/viewflow.nix.
+    #
+    # `flake = false`: upstream has no flake.nix, no releases and no tags.
+    #
+    # PINNED to a rev, deliberately not following HEAD, and the pin is
+    # load-bearing in a way the aerothemeplasma pin is not: the QUIC control
+    # protocol version ("protocol 2.1") is negotiated *between peers*, so a
+    # half-updated pair simply refuses each other. Bumping this rev means
+    # rebuilding the Linux side AND rebuilding the Windows binaries on blac by
+    # hand, in the same change. Upstream is pre-alpha and rewrites its own
+    # runtime weekly; an implicit `nix flake update` that dragged in a new
+    # protocol version would break both halves of the pair at once.
+    viewflow = {
+      url = "github:gfhdhytghd/viewflow/767739c1037eab84e7b5ba235056ec6b09b0e692";
+      flake = false;
+    };
     # slop-trove: personal-data embedding/search platform (own repo, "the thing").
     slop-trove = {
       url = "github:phonkd/slop-trove";
