@@ -22,11 +22,12 @@
 # era got for free (Plasma's module enables both) and this host now has to ask
 # for explicitly, having no desktop environment of its own -- see below. tlp
 # stays off: it fights power-profiles-daemon over the same CPU governor.
-{ ... }:
+{ inputs, ... }:
 {
   flake.nixosModules.z14 =
     {
       config,
+      pkgs,
       lib,
       ...
     }:
@@ -103,6 +104,52 @@
       services.pipewire.raopOpenFirewall = true; # UDP 6001-6002: RAOP control + timing
       services.pipewire.extraConfig.pipewire."10-airplay" = {
         "context.modules" = [ { name = "libpipewire-module-raop-discover"; } ];
+      };
+
+      # Local LLM inference on the Radeon 840M. Three non-obvious choices here,
+      # each of which cost a wrong turn to find.
+      #
+      # 1. Vulkan, not ROCm. rocminfo reports this iGPU as gfx1153, and
+      #    nixpkgs' rocmPackages.clr.gpuTargets stops at gfx1151 -- so rocBLAS
+      #    ships no code objects for this part, and ollama-rocm would need
+      #    HSA_OVERRIDE_GFX_VERSION to masquerade as gfx1102 and hope the ISA
+      #    is close enough. RADV needs none of that: it enumerates the device
+      #    natively as "RADV GFX1153". The vulkan build is also a 34 MiB
+      #    closure against ollama-rocm's 2.2 GiB of ROCm libraries.
+      #
+      # 2. OLLAMA_IGPU_ENABLE. Ollama finds the device and then deliberately
+      #    discards it -- "dropping integrated GPU; to enable, set
+      #    OLLAMA_IGPU_ENABLE=1" -- on the general theory that an iGPU is not
+      #    worth the trouble. Without this the host silently falls back to CPU
+      #    and the GPU never appears in `ollama ps`.
+      #
+      # 3. The unstable pin. nixos-26.05 carries ollama 0.32.3, and the
+      #    registry refuses it: pulling qwen3.8 returns HTTP 412 "requires a
+      #    newer version of Ollama". Qwen3.8 support landed in 0.32.13 and
+      #    Flash-Next in 0.33.1; unstable is on 0.34.0. Drop this override once
+      #    26.05 catches up -- nothing else here wants the newer version.
+      #
+      # Why a 27B fits at all: RADV exposes the 6 GiB BIOS UMA carve-out and
+      # the ~12.5 GiB GTT aperture as a single 18.5 GiB heap, so a 16.5 GiB
+      # q4_K_M 27B sits entirely in GPU-addressable memory with no partial
+      # offload. GTT pages *are* ordinary system RAM though, so a loaded model
+      # is charged against the same 25 GiB the desktop is using, and this host
+      # has no swap -- keep an eye on num_ctx before blaming the GPU. Token
+      # generation stays memory-bandwidth-bound either way (all ~16.5 GiB of
+      # weights are read per token, over LPDDR5x shared with the CPU); the
+      # iGPU earns its keep on prompt processing, not on tokens/s.
+      #
+      # user/group are set explicitly rather than left to the module's default
+      # DynamicUser. A dynamic uid puts the model store under
+      # /var/lib/private/ollama with ownership that is only stable for the
+      # lifetime of the unit, which is a poor home for a 17 GiB blob store you
+      # want to move in by hand or keep across a rebuild.
+      services.ollama = {
+        enable = true;
+        package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.ollama-vulkan;
+        environmentVariables.OLLAMA_IGPU_ENABLE = "1";
+        user = "ollama";
+        group = "ollama";
       };
     };
 }
