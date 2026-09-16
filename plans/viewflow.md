@@ -1,9 +1,10 @@
 # viewflow — cross-device window sharing
 
 **Repo(s):** nixconfig (this repo only — upstream is consumed as a pinned
-`flake = false` input)   **Status:** Phase 1 landed (the Linux half is packaged
-and on blac + g14). Phase 2 — the Windows half — is hand-work on blac that
-cannot be done from nix; see "The Windows half" below.
+`flake = false` input)   **Status:** Phase 1 done — the Linux half is packaged,
+merged to `main`, and **deployed and verified on g14** (2026-09-16). blac picks
+it up whenever it next boots NixOS. Phase 2 — the Windows half — is hand-work on
+blac that cannot be done from nix; see "The Windows half" below.
 
 ## Goal
 
@@ -387,14 +388,57 @@ degrade, it refuses each other.
   `--input-native` for view-only Hyprland sharing").
 - **Rollout.** g14 is not a deploy-rs target (laptops are deploy *clients*, no
   `deploy.hostname` in the registry), so it does not go through `deploy g14`.
-  Two routes, both fine:
-  - from g14 itself, once the commit is on `main` in its own checkout:
-    `sudo nixos-rebuild switch --flake ~/git/nixconfig#g14`
-  - or remotely from another machine holding the commit, which avoids needing
-    the repo on g14 at all:
-    `nixos-rebuild switch --flake .#g14 --target-host g14 --sudo`
+  It also **cannot be rebuilt with `--target-host` from another machine**, which
+  is worth writing down because it looks like it should work and fails in a way
+  that would be actively harmful if forced:
+
+  ```
+  error: access to absolute path '/etc/nixos/hardware-configuration.nix'
+         is forbidden in pure evaluation mode (use '--impure' to override)
+  ```
+
+  g14's registry entry (like blac's and z14's) imports
+  `/etc/nixos/hardware-configuration.nix` by absolute path. Evaluating that from
+  another machine reads *that machine's* hardware config — so `--impure` there
+  would not fix it, it would bake the wrong hardware into g14's system. The
+  absolute path is exactly why laptops are deploy *clients* and not deploy-rs
+  nodes; the deploy nodes reference no absolute paths.
+
+  So the evaluation has to happen on g14. Two routes:
+  - from g14's own checkout, once the commit is on `main` there:
+    `sudo nixos-rebuild switch --flake ~/git/nixconfig#g14 --impure`
+  - or stage the committed tree on g14 without touching its git checkout —
+    what was actually done here, since `main` is never pushed and g14's
+    checkout therefore cannot see a fresh commit:
+
+    ```sh
+    git archive --format=tar HEAD \
+      | ssh root@g14 'mkdir -p /tmp/nixconfig-vf && tar -x -C /tmp/nixconfig-vf'
+    ssh root@g14 'cd /tmp/nixconfig-vf && nixos-rebuild switch --flake .#g14 --impure'
+    ```
+
+    `git archive HEAD` ships the *committed* tree, which matters when the main
+    checkout is dirty with unrelated in-progress work (it usually is). Root over
+    ssh works via Tailscale SSH; `phonkd` on g14 does **not** have passwordless
+    sudo, unlike the servers.
+
+  `--impure` is required either way, for the same absolute path.
 
   Nothing is enabled by the rebuild — the packages just appear on PATH.
+
+  **Done on g14 on 2026-09-16.** All 12 binaries are on PATH,
+  `libcuda.so.1` resolves to `/run/opengl-driver/lib/libcuda.so.1` in both the
+  presenter and the NVENC source (so `autoAddDriverRunpath` did its job), and
+  `viewflow_reverse_decoder_probe` initialises the GPU decode path for real:
+  `renderer=NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2`. That is the
+  presenter half of blac-Windows → g14 working end to end short of a live peer.
+
+  Unrelated pre-existing breakage seen during that rebuild:
+  `home-manager-phonkd.service` fails on g14 with
+  "Existing file '~/.config/gtk-{3,4}.0/gtk.css.hm-backup' would be clobbered".
+  It failed the same way at 21:47 on g14's own earlier rebuild that day, before
+  viewflow was touched, so it is not from this change. Fix is to delete the two
+  stale `.hm-backup` files (or set `home-manager.backupFileExtension`).
 
   blac cannot be rebuilt while it is booted into Windows (its NixOS side has
   been offline since roughly 2026-08-30). That costs nothing: the packages land
