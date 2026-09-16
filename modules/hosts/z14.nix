@@ -246,27 +246,41 @@
         [[output.backlight]]
         name = "eDP-1"
         path = "/sys/class/backlight/amdgpu_bl1"
-        capturer = "wayland"
+        capturer = "none"
 
         [[keyboard]]
         name = "keyboard-asus"
         path = "/sys/class/leds/asus::kbd_backlight"
       '';
 
-      # capturer = "wayland" lets wluma negotiate whichever capture protocol
-      # the compositor offers rather than naming one -- it knows
-      # ext-image-copy-capture-v1, wlr-screencopy and wlr-export-dmabuf, and
-      # Hyprland's support for the three has moved over time. Against this
-      # Hyprland it advertises wlr-screencopy and ext-image-copy-capture and
-      # picks the latter, then hands frames to Vulkan as DRM format XR24.
-      # Naming a protocol explicitly would only make that break on an upgrade.
+      # capturer = "none", and that is not a taste call: screen-contents
+      # dimming segfaults Hyprland 0.55.4. wluma negotiates
+      # ext-image-copy-capture-v1 happily enough, and then every frame it
+      # asks for is a chance to take the compositor down inside Hyprland's
+      # own screencopy path --
       #
-      # Screen-contents dimming is the half most likely to feel wrong at
-      # first, and on an OLED (this panel is a Samsung ATNA40CT06) also the
-      # half most worth having. Setting capturer = "none" above reverts to
-      # ALS-only and changes nothing else.
+      #   Screenshare::CScreenshareFrame::copyDmabuf()
+      #     -> Render::IHyprRenderer::beginRender
+      #     -> Render::GL::CHyprGLRenderer::initRenderBuffer
+      #     -> Render::GL::CGLRenderbuffer::~CGLRenderbuffer()   SIGSEGV
+      #
+      # -- which it did, three identical crash reports inside ninety seconds,
+      # after which Hyprland's watchdog stopped trying and relaunched itself
+      # with --safe-mode: stock config, none of this repo's. The bug is
+      # Hyprland's rather than wluma's, since wluma only requests frames
+      # through a protocol the compositor itself advertises, but the blast
+      # radius is the entire session. Worth retrying on a Hyprland bump --
+      # set this back to "wayland" and watch ~/.cache/hyprland for new
+      # reports.
+      #
+      # "none" avoids the path rather than narrowing it: that capturer never
+      # touches Wayland at all, it feeds a constant luma every 200ms (see
+      # src/frame/capturer/none.rs), so nothing above is ever reached. The
+      # loss is real -- dimming on dark-vs-light content would have been
+      # worth having on an OLED -- but the ambient-light half, which is the
+      # reason wluma is here, is untouched.
       systemd.user.services.wluma = {
-        description = "Adaptive brightness from ambient light and screen contents";
+        description = "Adaptive brightness from ambient light";
         partOf = [ "hyprland-session.target" ];
         after = [ "hyprland-session.target" ];
         wantedBy = [ "hyprland-session.target" ];
