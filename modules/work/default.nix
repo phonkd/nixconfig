@@ -26,8 +26,10 @@
         # gui-darwin already imports it for every darwin desktop, and a second
         # import path to the same function module would duplicate its option
         # definitions (Nix can't dedupe function modules), colliding on
-        # `home.sessionVariables`. The Linux side picks it up in
-        # `nixosModules.work` below, so each platform imports it exactly once.
+        # `home.sessionVariables`. Linux does not import it at all any more:
+        # the proxy is a *system* service there (`nixosModules.proxy`, which
+        # `nixosModules.work` below just enables), so `homeModules.proxy` is
+        # darwin-only and still reached by exactly one path.
       ];
     };
 
