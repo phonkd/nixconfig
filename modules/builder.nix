@@ -48,6 +48,7 @@ let
     gui # gated on host.is.nixosDesktop
     viewflow # gated on hostHasTag "hyprland" AND host.gpu.hasNvidia (blac, g14)
     work # work setup (private repo); gated on hostHasTag "work"
+    proxy # sing-box system proxy; gated on noughty.proxy.enable (set by `work`)
     containers # rootless podman for distrobox; gated on host.is.nixosDesktop
 
     # Server baseline (gated on host.is.server).

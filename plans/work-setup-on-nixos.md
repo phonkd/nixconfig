@@ -33,7 +33,9 @@ Four moves, smallest-useful-slice ordered so each is verifiable alone:
 3. **Split the proxy by platform.** `homeModules.proxy` keeps its single
    definition but branches on `pkgs.stdenv.hostPlatform.isDarwin`:
    `launchd.agents.sing-box` on macOS, `systemd.user.services.sing-box` on
-   Linux. The `sing-box-sel` wrapper is already platform-neutral and is reused
+   Linux. *(The Linux half has since become a **system** unit in its own
+   `nixosModules.proxy` — see **System-wide proxy on z14**.)*
+   The `sing-box-sel` wrapper is already platform-neutral and is reused
    verbatim, except that its `.phonkd.net → 127.0.0.1` DNS split becomes an
    option: that route exists only because macOS scoped resolvers are invisible
    to sing-box, and on Linux 127.0.0.1 is a dead resolver (`darwinModules.dns`
@@ -53,6 +55,8 @@ Four moves, smallest-useful-slice ordered so each is verifiable alone:
 - [x] `lib/registry.nix`: add the `"work"` tag to z14.
 - [x] `modules/proxy.nix`: platform branch (launchd vs systemd user unit) +
       `homelabDnsServer` wrapper option (null on Linux).
+      *(The systemd **user** unit half is superseded — see
+      **System-wide proxy on z14** below. `homelabDnsServer` is unchanged.)*
 - [x] **Deleted `modules/work/tools.nix`.** It duplicated the private repo's own
       tools.nix package list almost exactly, and both were imported — so the
       public copy was redundant *and* an unnecessary disclosure of the work
@@ -79,42 +83,145 @@ delivered on Linux. On the Mac all three arrive through
 `microsoft-teams`) or by hand (Citrix); none of that path exists on NixOS. Top
 three worst apps of all time, and all three are load-bearing.
 
-**Prerequisite: the `"work"` tag is gone from z14.** `lib/registry.nix` dropped
-it on purpose — work moved back to the Mac, and dropping it is what took the
-bedag `Host *` SOCKS catch-all off the laptop. Nothing below lands until that
-tag comes back, and re-adding it re-arms that catch-all — so the `ssh 201-mono`
-check under **Risks / rollout** applies again, unchanged.
+**Prerequisite: the `"work"` tag — done.** `lib/registry.nix` had dropped it on
+purpose (work moved back to the Mac), and dropping it is what took the bedag
+`Host *` SOCKS catch-all off the laptop. It is back on z14, which re-arms that
+catch-all and with it `homeModules.work-ssh-bypass`. Verified in the rendered
+`~/.ssh/config`: the bypass block (tailnet, `*.ts.net`, the host aliases, the
+LAN ranges, `github.com`) renders at line 10 with `ProxyCommand none`, ~250
+lines above the catch-all's `socat` line, so first-match-wins keeps `201-mono`
+off the proxy.
 
 Unfree is *not* the obstacle: `modules/hosts/types/minimal/default.nix` already
-sets `nixpkgs.config.allowUnfree = true` host-wide. The manual downloads are.
+sets `nixpkgs.config.allowUnfree = true` host-wide. The manual downloads are —
+and that is precisely why DisplayLink and Citrix are each behind their own
+`noughty.work.*.enable` flag, defaulting **off**. `requireFile` fails at *build*
+time, so wiring either of them on unconditionally would turn every
+`deploy z14` into a hard failure until the installer is in the store. The
+module wiring is written and evaluated; only the download is outstanding.
 
-- [ ] **DisplayLink** (the dock). `pkgs.displaylink` is `requireFile` — the
-      Synaptics EULA means no non-interactive install. Add the zip to the store
-      first (`nix-prefetch-url --name displaylink-620.zip <url>`, the exact URL
-      is in the package's own `requireFile` message), then set
-      `services.xserver.videoDrivers = [ "displaylink" ]` — membership in that
-      list is the sole gate on `hardware/video/displaylink.nix`, which is what
-      brings the `evdi` kernel module, the udev rules and the `dlm` service.
-      Two Wayland caveats, because that module is written for Xorg: its
-      `displayManager.sessionCommands` `xrandr --setprovideroutputsource` is
-      dead weight under Hyprland, and `systemd.services.dlm` is ordered
-      `after = [ "display-manager.service" ]`, which z14 does not run
-      (greetd/tuigreet, per `modules/desktop.nix`). Expect to override the
-      unit's ordering rather than take the module as-is.
-- [ ] **Citrix Workspace** (the ICA sessions). Now `pkgs.citrix-workspace` —
-      `citrix_workspace` became a rename alias on 2026-06-17 and warns.
-      x86_64-linux, unfree, and also `requireFile`, so the same
-      manual-download dance as DisplayLink. This supersedes the "not installed
-      on Linux" decision below rather than contradicting it: the Linux
-      `ica-proxy` branch already rewrites the .ica and hands it to `xdg-open`,
-      so installing this package is exactly what supplies the handler that
-      branch assumes exists. `remmina` stays for plain RDP.
-- [ ] **Teams**. `pkgs.teams` is darwin-only — its `platforms` lists only
-      x86_64/aarch64-darwin — so the Mac cask has no nixpkgs counterpart here.
-      Pick one: `teams-for-linux` (GPL3+, in nixpkgs, an unofficial Electron
-      wrapper) or the PWA in a browser. Then wire screen sharing, which is the
-      part that actually breaks: it needs `xdg-desktop-portal-hyprland` plus
-      pipewire, not just the app.
+- [x] **Teams** — done, nothing outstanding. `pkgs.teams` is darwin-only (its
+      `platforms` lists only x86_64/aarch64-darwin), so the Mac cask has no
+      nixpkgs counterpart and `teams-for-linux` (GPL3+, unofficial Electron
+      wrapper) is the only packaged route; the PWA was the alternative and is
+      the same Electron shell with fewer knobs. Screen sharing — billed above
+      as "the part that actually breaks" — turned out to need **no** wiring:
+      it wants `xdg-desktop-portal-hyprland` (installed by `programs.hyprland`,
+      see `modules/hyprland/_nixos.nix`), pipewire (`modules/desktop.nix`), and
+      the app started with `--enable-features=WebRTCPipeWireCapturer`. z14
+      already had the first two, and the third is in the nixpkgs wrapper
+      already, guarded on `NIXOS_OZONE_WL` + `WAYLAND_DISPLAY` — and
+      `modules/desktop.nix:407` sets `NIXOS_OZONE_WL = "1"`. An `overrideAttrs`
+      re-adding those flags would have been pure duplication.
+- [~] **DisplayLink** (the dock) — wired, needs one manual download.
+      `noughty.work.displaylink.enable` (default off) sets
+      `services.xserver.videoDrivers = [ "displaylink" ]`; membership in that
+      list is the sole gate on `hardware/video/displaylink.nix`, which brings
+      the `evdi` kernel module, the udev rules and the `dlm` service. To
+      finish, on z14 itself:
+      `nix-prefetch-url --name displaylink-620.zip <url>` (the exact URL is
+      printed by the package's own `requireFile` message — Synaptics puts it
+      behind an EULA click-through, so there is no non-interactive route),
+      then flip the flag and `deploy z14`.
+      **Correction to the earlier note here:** the two Xorg-shaped bits of that
+      module are *inert* under Hyprland, not broken, so no override is needed.
+      The `sessionCommands` `xrandr --setprovideroutputsource` only ever runs
+      in an X session; and `systemd.services.dlm`'s
+      `after = [ "display-manager.service" ]` orders against a unit z14 does
+      not have (greetd/tuigreet), which systemd simply ignores — ordering
+      against an absent unit is a no-op, not a failure. `dlm` has no `wantedBy`
+      on any setup: the displaylink package's own udev rules start it when the
+      dock appears, which is the behaviour we want anyway.
+- [~] **Citrix Workspace** (the ICA sessions) — wired, needs one manual
+      download. `noughty.work.citrix.enable` (default off) adds
+      `pkgs.citrix-workspace` — `citrix_workspace` became a rename alias on
+      2026-06-17 and warns. x86_64-linux, unfree, and also `requireFile`, so
+      the same dance as DisplayLink: `nix build` prints the file it wants and
+      where to get it. This supersedes the "not installed on Linux" decision
+      below rather than contradicting it: the Linux `ica-proxy` branch already
+      rewrites the .ica and hands it to `xdg-open`, so this package is exactly
+      what supplies the handler that branch assumes exists. `remmina` stays for
+      plain RDP.
+
+## System-wide proxy on z14
+
+The original approach (step 3) made sing-box a systemd **user** unit, mirroring
+the Mac's launchd agent. That was the wrong shape for what was actually wanted
+— one proxy the whole machine goes through, with homelab traffic riding the
+tailnet and bedag traffic riding the ssh tunnels. A user unit cannot be that:
+
+- `home.sessionVariables` reaches only what home-manager's session init touches.
+  Units under `systemd --system`, anything greetd starts before the user session
+  exists, and every non-login context never saw the proxy at all.
+- Transparent capture needs `NET_ADMIN`, which an unprivileged user agent has no
+  way to hold.
+
+So the Linux half moved out of `homeModules.proxy` into a new
+`flake.nixosModules.proxy` (same file), gated on `noughty.proxy.enable`, which
+`nixosModules.work` sets. macOS is untouched and keeps the launchd agent — it
+has no second traffic class to route, and a LaunchDaemon there would buy
+nothing but root.
+
+- [x] `modules/proxy.nix`: add `flake.nixosModules.proxy` — `systemd.services.sing-box`
+      (system), `environment.sessionVariables` for the proxy env in **both**
+      cases (`http_proxy` *and* `HTTP_PROXY`; plenty of tooling reads only the
+      upper forms), `sing-box` + `socat` in `environment.systemPackages`.
+- [x] `modules/proxy.nix`: drop the Linux branch from `homeModules.proxy`; it is
+      a darwin-only module now.
+- [x] `modules/work/default.nix`: restructure to `options` + `config` (options
+      may not live inside `mkIf`), set `noughty.proxy.enable = true`, stop
+      importing `homeModules.proxy` into HM.
+- [x] `modules/builder.nix`: add `proxy` to `alwaysImport`.
+
+Deliberately unchanged: the listener is still the mixed inbound on
+`127.0.0.1:2080`, so the work ssh catch-all's `socat` ProxyCommand keeps
+working; and the bedag SOCKS outbounds are still the *user's* own `ssh -fN`
+tunnels on loopback, opened interactively against a yubikey. Loopback is shared
+between system and user and the unit takes no `PrivateNetwork`, so root dialling
+a tunnel phonkd opened is fine.
+
+Two judgement calls worth knowing about:
+
+- **`ConditionPathExists` replaces the restart backoff.** The merged config
+  lives in the private work checkout. Rather than crash-looping with
+  `StartLimitBurst` when that is absent, the unit now simply stays inactive.
+- **System services stay unproxied.** `systemd --system` units do not source
+  `/etc/set-environment`, so `nix-daemon` and friends never see `http_proxy`.
+  That is on purpose: builds must not start failing the moment the bedag
+  tunnels are down.
+
+### Homelab via tailscale — deferred, by request
+
+Today "homelab goes through tailscale" is expressed only as a *bypass*: the
+tailnet CGNAT range and `.phonkd.net` are in `no_proxy`, and (in transparent
+mode) in `route_exclude_address` plus a `direct` route rule — so those packets
+leave sing-box untouched and tailscaled picks them up. That is correct but
+implicit. Making it explicit — a tailscale endpoint outbound, so the homelab is
+reachable *through* sing-box rather than around it — is the outstanding half.
+There is a `TODO(homelab-via-tailscale)` at the route rule in `modules/proxy.nix`.
+
+- [ ] Homelab traffic through an explicit tailscale outbound rather than a bypass.
+- [ ] Decide whether transparent mode (below) becomes the default once that lands.
+
+### Transparent mode — written, off, untested
+
+`noughty.proxy.transparent` adds a `tun` inbound with `auto_route`, turning this
+from an opt-in proxy (things that read `$http_proxy`, plus the ssh catch-all)
+into one that captures every socket on the host. It is **default off and has not
+been run**, because `auto_route` rewrites the default route and z14 already has
+`tailscale0` with opinions about `100.64.0.0/10`. The config it generates is
+schema-valid — `sing-box check` passes on it merged with the real work config —
+which is not the same as saying the routing is right.
+
+`route_exclude_address` carves out the tailnet so tailscale keeps owning its own
+range, and `strict_route` is deliberately **false**: strict mode also hijacks
+other interfaces' traffic, which is exactly the fight not to pick with
+`tailscale0`. The open question is the RFC1918 ranges — several bedag rules match
+on `ip_cidr` in 10/8 and friends, so those must *not* be blanket-excluded the way
+the tailnet is.
+
+- [ ] Turn it on **at a console, not over ssh**, and find out. Rollback is
+      `noughty.proxy.transparent = false` plus a redeploy, or the boot menu.
 
 ## Open decisions
 
@@ -146,8 +253,17 @@ sets `nixpkgs.config.allowUnfree = true` host-wide. The manual downloads are.
   proxied. Mitigated by the `no_proxy` session var plus tailnet match blocks
   added ahead of the catch-all — **verify `ssh 201-mono` still works on z14
   after deploy** before calling this done.
-- sing-box exits immediately if `~/git/bedag-setup/singbox.json` is absent; the
-  systemd unit gets `RestartSec`/`StartLimit` backoff mirroring the launchd
-  `ThrottleInterval = 30`, and is `wantedBy` nothing on a host without the tag.
+- sing-box exits immediately if `~/git/bedag-setup/singbox.json` is absent. The
+  system unit handles this with `ConditionPathExists` — it stays cleanly
+  inactive rather than crash-looping — and is `wantedBy` nothing on a host
+  without the tag. (The `RestartSec`/`StartLimit` backoff the *user* unit used
+  for this is gone with it; `Restart = on-failure` / `RestartSec = 30` remain
+  for real crashes.)
+- The proxy env vars are now system-wide (`/etc/set-environment`), so they are
+  no longer scoped to home-manager's shells. Verified in the built generation:
+  `http_proxy`/`HTTP_PROXY` → `http://localhost:2080` and the matching
+  `no_proxy`/`NO_PROXY` bypass list. Anything that was silently unproxied
+  before because it never sourced hm-session-vars is now proxied — watch for
+  that on first login.
 - Rollout: `deploy z14`. Back out by dropping the `"work"` tag from the registry
   entry and redeploying — every other change is inert without it.

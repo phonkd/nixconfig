@@ -121,21 +121,24 @@
     platform = "x86_64-linux";
     formFactor = "laptop";
     desktop = "hyprland";
-    # NB no "work" tag: work happens on the Mac. It carried one briefly (see
-    # plans/work-setup-on-nixos.md, which built the Linux half of modules/work/
-    # for this host) and the tag is all it took to opt in -- re-add it here if
-    # that ever changes; nothing else was removed.
+    # "work" is back. It was dropped once (work had moved to the Mac) and is
+    # re-added deliberately: see plans/work-setup-on-nixos.md, which built the
+    # Linux half of modules/work/ for this host and now also makes sing-box a
+    # system-wide proxy here. The tag is still the whole opt-in -- everything
+    # it reaches self-gates on it, so removing it again is the rollback.
     #
-    # Dropping it is what took the bedag `Host *` socat SOCKS catch-all off
-    # this laptop. That catch-all is why `ssh ext-mail` here failed as
-    # "Connection closed by UNKNOWN port 65535" rather than as a plain unknown
-    # host -- ext-mail is in no matchBlock, so it fell through to the proxy.
-    # With work gone, no catch-all remains for anything to fall through to, so
-    # homeModules.work-ssh-bypass (which existed only to punch holes in it)
-    # goes with it and is not missed.
+    # Know what it re-arms: the bedag ssh config ends in a `Host *` catch-all
+    # whose ProxyCommand is socat into the SOCKS listener, and it applies to
+    # *every* destination. That is why `ssh ext-mail` used to fail here as
+    # "Connection closed by UNKNOWN port 65535" rather than as an unknown host
+    # -- ext-mail matches no block, so it fell through to the proxy. The tag
+    # brings back homeModules.work-ssh-bypass, which punches the tailnet, the
+    # LAN and github.com back out of it; anything NOT in that list now goes
+    # through the work tunnels again. Verify with `ssh 201-mono` after deploy.
     tags = [
       "gigaplayer-client"
       "hyprland"
+      "work"
     ];
     username = "phonkd";
 
