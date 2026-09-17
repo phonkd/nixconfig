@@ -252,7 +252,10 @@ the tailnet is.
   reaches the homelab over the tailnet by name, and those names must not get
   proxied. Mitigated by the `no_proxy` session var plus tailnet match blocks
   added ahead of the catch-all — **verify `ssh 201-mono` still works on z14
-  after deploy** before calling this done.
+  after deploy** before calling this done. Checked at build time: in the
+  rendered `~/.ssh/config` the bypass block sits at line 10 with
+  `ProxyCommand none`, ~250 lines above the catch-all's `socat` line. Still
+  worth running once on the live system, since that only proves the file.
 - sing-box exits immediately if `~/git/bedag-setup/singbox.json` is absent. The
   system unit handles this with `ConditionPathExists` — it stays cleanly
   inactive rather than crash-looping — and is `wantedBy` nothing on a host
@@ -265,5 +268,16 @@ the tailnet is.
   `no_proxy`/`NO_PROXY` bypass list. Anything that was silently unproxied
   before because it never sourced hm-session-vars is now proxied — watch for
   that on first login.
-- Rollout: `deploy z14`. Back out by dropping the `"work"` tag from the registry
-  entry and redeploying — every other change is inert without it.
+- Rollout: **not `deploy z14`** — that was wrong in this plan from the start.
+  z14 carries no `deploy.hostname` (laptops are deploy *clients*, not targets)
+  and `deploy --list` does not include it. It rebuilds itself:
+
+      sudo nixos-rebuild switch --flake ~/git/nixconfig#z14 --impure
+
+  `--impure` is load-bearing: `lib/registry.nix` reaches for
+  `/etc/nixos/hardware-configuration.nix` and `modules/work/external.nix`
+  probes for the private checkout with `builtins.pathExists`.
+
+  `nixos-rebuild build` (no sudo) has been run and succeeds, so the switch is
+  the only step left. Back out by dropping the `"work"` tag from the registry
+  entry and rebuilding — every other change here is inert without it.
