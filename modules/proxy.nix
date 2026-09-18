@@ -137,9 +137,10 @@
   #
   # sing-box merges THREE config files here, split by who may see them:
   #
-  #   1. the generated one, in the store: inbounds, DNS, routing. Public.
-  #      Passed LAST on the command line so its rules are matched FIRST; see
-  #      the `addFlag` comment for why that inversion is real.
+  #   1. the generated one: inbounds, DNS, routing. Public. Installed to
+  #      /etc/sing-box/config.json rather than used from /nix/store, because
+  #      sing-box orders merged configs by PATH and /etc sorts first -- see
+  #      `environment.etc."sing-box/config.json"` below.
   #   2. ~/git/bedag-setup/singbox.json: the bedag SOCKS outbounds and the
   #      rules picking between them. Private repo, referenced by path.
   #   3. /run/secrets/rendered/singbox-tailscale.json: the tailscale endpoint,
@@ -395,6 +396,33 @@
           pkgs.socat
         ];
 
+        # THE reason the transparent build could not route bedag hosts by name,
+        # and the least guessable thing in this file.
+        #
+        # sing-box merges repeated `--config` files in order of their PATH, not
+        # in the order given on the command line. Measured, by moving one
+        # byte-identical file and changing nothing else:
+        #
+        #   /home/phonkd/.claude/…/x.json  -> its rules land at match[0]
+        #   /home/phonkd/zz-x.json         -> the same rules land at match[18]
+        #
+        # 18 being the number of rules in the work config. So the generated
+        # config, living in /nix/store, always sorted AFTER
+        # /home/phonkd/git/bedag-setup/singbox.json, and its `sniff` rule ran
+        # only once every domain rule had already been evaluated against a bare
+        # IP and skipped. The name was recovered far too late to matter and the
+        # connection fell through to `final: direct`.
+        #
+        # Installing the same file under /etc fixes it by sorting:
+        # /etc < /home < /nix < /run, so this is first, the work config second,
+        # and the sops-rendered tailscale endpoint (/run/secrets/rendered) last
+        # -- which is fine, it contributes an endpoint and no rules.
+        #
+        # This also means the earlier "pass the generated config last" change
+        # was a no-op dressed up as a fix: command-line order never mattered.
+        environment.etc."sing-box/config.json".source =
+          "${sing-box-work}/etc/sing-box/config.json";
+
         # Already declared by modules/tailnet.nix for tailscaled itself; the
         # module system merges the two definitions, and saying it here keeps
         # this module honest about what it depends on rather than relying on
@@ -437,7 +465,27 @@
 
           serviceConfig = {
             # The wrapper already carries `run --config … --config …`.
-            ExecStart = "${sing-box-work}/bin/sing-box";
+            # NOT the wrapper. sing-box orders merged `--config` files by
+            # PATH, not by the order they are given on the command line, and
+            # the wrapper can only ever name its own /nix/store path -- which
+            # sorts after /home/phonkd/git/bedag-setup/singbox.json, putting
+            # every rule this module generates behind all 18 of the work
+            # config's. See `environment.etc."sing-box/config.json"` below for
+            # the measurement. The wrapper stays in systemPackages for
+            # interactive use; only the unit bypasses it, so that it can name
+            # /etc/sing-box/config.json instead.
+            ExecStart = lib.concatStringsSep " " (
+              [
+                "${pkgs.sing-box}/bin/sing-box"
+                "run"
+                "--config"
+                "/etc/sing-box/config.json"
+              ]
+              ++ lib.concatMap (f: [
+                "--config"
+                f
+              ]) ([ cfg.additionalConfigFile ] ++ lib.optional ts.enable tailscaleConfigFile)
+            );
             Restart = "on-failure";
             RestartSec = 30;
             # Root, because the tun inbound needs NET_ADMIN and because the
@@ -521,8 +569,8 @@
             Further sing-box config files, each appended as another `--config`.
             sing-box merges them key by key and keeps arrays in file order, so
             the generated config wins any rule conflict -- but note it is
-            passed LAST for exactly that reason, because sing-box puts a later
-            file's rules BEFORE an earlier one's. See `addFlag`.
+            installed under /etc for exactly that reason: sing-box orders merged
+            configs by file PATH, not by command-line order. See nixosModules.proxy.
 
             A list rather than a single path because the NixOS side now has two
             of them: the private bedag config, and a sops-rendered file holding
@@ -873,9 +921,9 @@
               # Sniffing recovers the name from the TLS ClientHello's SNI (or
               # an HTTP Host header), so the domain rules match again. For that
               # to help it must run BEFORE the work config's rules, which is
-              # why the generated config is passed as the LAST `--config` --
-              # see the comment on `addFlag` below, and do not "fix" that order
-              # back.
+              # why the generated config is installed to /etc rather than used
+              # from /nix/store: sing-box orders merged configs by path, and
+              # /etc sorts before /home. See `nixosModules.proxy`.
               #
               # Only under `transparent`: with the tun absent the name is
               # already known and this would be a no-op, and the Mac's
@@ -894,7 +942,8 @@
               # These are evaluated before any of the work config's own rules,
               # which is what stops a homelab address ever being handed to a
               # bedag tunnel. That precedence comes from the generated config
-              # being the LAST `--config`, not the first -- see `addFlag`.
+              # being installed at /etc/sing-box/config.json, which sorts
+              # before the work config's /home path -- see `nixosModules.proxy`.
               # ORDER IS LOAD-BEARING: these two carve-outs must precede the
               # tailnet rules below, because both describe traffic that falls
               # inside the tailnet by address or by name but must not go to
@@ -941,31 +990,25 @@
           constructFiles.singBoxConfig.relPath = "etc/sing-box/config.json";
 
           package = pkgs."sing-box";
-          # ORDER IS LOAD-BEARING, and it is the opposite of the obvious guess:
-          # the generated config goes LAST.
+          # NB the order of these `--config` flags is cosmetic. sing-box merges
+          # them by file PATH, not by command-line position -- see the long
+          # comment on `environment.etc."sing-box/config.json"` in
+          # `nixosModules.proxy`, which is where that actually has to be dealt
+          # with. An earlier version of this file reordered these flags in the
+          # belief that it controlled rule precedence; it does not, and the
+          # simple order is back.
           #
-          # sing-box merges repeated `--config` by placing a LATER file's
-          # `route.rules` BEFORE an earlier one's. Measured, not assumed: with
-          # the generated config passed first, its `{ action = "sniff"; }` rule
-          # was logged as `router: match[18] => sniff` -- i.e. after the work
-          # config's ~18 rules -- so every domain rule had already been
-          # evaluated and skipped (the tun supplies only an IP) by the time
-          # sniffing recovered the name. The connection then fell through to
-          # `final: direct` and timed out. Passing it last puts it at
-          # `match[0]`, and the very next line becomes
-          # `match[11] domain_suffix=[... .bedag.ch ...] => route(socks-30004)`.
-          #
-          # Nothing else here depends on the order: only this file sets
-          # `route.final`, `dns` and the inbounds, and outbounds are referenced
-          # by tag rather than by position.
+          # It matters on Linux because the generated config sits in /nix/store
+          # and the work config under /home. On darwin the same hazard exists
+          # (/Users sorts before /nix) but is harmless: the Mac's generated
+          # rules are a single `.phonkd.net` route that nothing in the work
+          # config competes with, and it runs no sniffing.
           addFlag = [
             "run"
-          ]
-          ++ lib.concatMap (f: [ "--config" f ]) config.additionalConfigFiles
-          ++ [
             "--config"
             config.constructFiles.singBoxConfig.path
-          ];
+          ]
+          ++ lib.concatMap (f: [ "--config" f ]) config.additionalConfigFiles;
         };
     };
 }
