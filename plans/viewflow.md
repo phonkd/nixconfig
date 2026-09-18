@@ -204,9 +204,63 @@ of breaking a boot.
   helpers, gated to NVIDIA Hyprland hosts (blac, g14). As-built notes below.
 - **Phase 2 — the Windows half on blac.** Hand-work, cannot be done from nix.
   See "The Windows half".
-- **Phase 3 — deferred.** Hyprland metadata/capture plugins + atlas launcher.
-  ABI-locked to the running compositor. Needed only for the g14-as-*source*
-  direction; blac-Windows → g14 does not touch it.
+- **Phase 3 — deferred, and now costed.** Hyprland capture plugin + atlas
+  launcher. ABI-locked to the running compositor. Needed only for the
+  g14-as-*source* direction (g14 → Windows); blac-Windows → g14 does not touch
+  it. See "The reverse direction (g14 → Windows)" below for the exact blocker.
+
+### The reverse direction (g14 → Windows) — what it needs
+
+The direction that works today is Windows → g14. The opposite direction is a
+different program on the Linux side, with a different shape and a hard blocker.
+
+`vf-hyprland-windows --help` states it exactly:
+
+```
+usage: vf-hyprland-windows --window 0xADDRESS --compositor-pid PID [--fps 60]
+       [--performance-mode frame-rate|latency]
+       [--input-native /absolute/viewflow-linux-window-input]
+Shares one selected window using the Viewflow capture plugin and NVENC.
+Omit --input-native for view-only sharing. Launch through vf-window-peer.
+```
+
+Two things follow. First, it shares **one explicitly named window** (by Hyprland
+address) rather than a region — a different and arguably nicer model than the
+Windows source's rectangle. Second, and unlike the direction now running, it
+**supports return input** via `--input-native`, pointed at the
+`viewflow-linux-window-input` helper this repo already installs. So if
+pointer/keyboard crossover is ever wanted, this is the direction that has it.
+
+**The blocker is a compositor version gate, not the plugin build itself:**
+
+```
+# platform/viewflow-capture/CMakeLists.txt:11
+pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland>=0.56)
+```
+
+g14 runs **Hyprland 0.55.4** — `programs.hyprland.enable` with no `package`
+override takes nixpkgs', and nixos-26.05 ships 0.55.4. Upstream's newest release
+is 0.56.2, which is also precisely what the plugin README records as tested
+("Hyprland 0.56.2 Lua"). So the gap is one minor release, and closing it means
+pointing `programs.hyprland.package` at the repo's existing `hyprland` flake
+input (git, submodules) instead of nixpkgs.
+
+That is not a free switch, and the cost is ongoing rather than one-off:
+
+- g14's daily compositor moves from a nixpkgs release to a git build.
+- The plugin "compares the full Hyprland/dependency ABI hash at load time and
+  refuses to load if it was not built against the running compositor", so every
+  Hyprland bump becomes a **paired** compositor+plugin rebuild, forever.
+- The blast radius is the desktop actually in use, not a background service.
+
+Also still outstanding for this direction, but cheap: building
+`platform/windows-window-presenter` → `viewflow-windows-windows.exe` on the
+Windows peer (same CMake pattern as the source, a couple of minutes), plus a
+role-swapped pair of JSON configs.
+
+Recommendation: **leave it deferred** unless input crossover is specifically
+wanted. The working direction cost nothing ongoing; this one puts a permanent
+rebuild tax on the laptop's compositor.
 
 ## Steps
 
