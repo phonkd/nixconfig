@@ -374,6 +374,21 @@ degrade, it refuses each other.
    `tailscale0` is filtered like any other interface. A blocked QUIC handshake
    is silent, so this is worth knowing before debugging one.
 
+   **Already done on g14 (2026-09-18).** `~/viewflow/` (0700) holds the pair CA
+   and both leaf certs (`g14-peer`, `blac-peer`, 7-day, expiring 2026-09-25),
+   plus `presenter.json` below, which
+   `vf-window-peer validate --config ~/viewflow/presenter.json` accepts
+   (`window-peer-config-valid`). Only the Windows half is outstanding; copy
+   `blac-peer.pem`, `blac-peer.key` and `pair-ca.pem` from `g14:~/viewflow/`
+   to `C:\Viewflow\` on blac.
+
+   **Note the presenter's arguments are positional, not flags.**
+   `platform/linux-reverse/main.cpp:742` parses exactly `argv[1..3]` as
+   `origin_x origin_y scale` (or a lone `--validate`); scale must be 1–4. The
+   `--scale`/`--origin-x` spelling in upstream's macOS doc belongs to the
+   *Windows* presenter binary, and passing it here fails. This bit the first
+   draft of this config.
+
    g14 as presenter (the easy direction — no Hyprland plugin needed):
 
    ```json
@@ -385,7 +400,7 @@ degrade, it refuses each other.
      "role": "presenter",
      "backend": {
        "native": "/run/current-system/sw/bin/viewflow_linux_reverse",
-       "args": ["--scale", "1", "--origin-x", "0", "--origin-y", "0"]
+       "args": ["0", "0", "1"]
      }
    }
    ```
@@ -397,8 +412,8 @@ degrade, it refuses each other.
      "bind": "0.0.0.0:0",
      "remote": "192.168.1.181:44220",
      "server_name": "g14-peer",
-     "certificate": "C:/Viewflow/windows-peer.pem",
-     "private_key": "C:/Viewflow/windows-peer.key",
+     "certificate": "C:/Viewflow/blac-peer.pem",
+     "private_key": "C:/Viewflow/blac-peer.key",
      "certificate_authority": "C:/Viewflow/pair-ca.pem",
      "role": "source",
      "backend": {
