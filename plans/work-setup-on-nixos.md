@@ -317,7 +317,54 @@ earlier rules and still goes to the tailscale endpoint.
       `process_name` rule does not match and 502 when it does. Proven on the
       mixed inbound; the tun inbound uses the same process finder.
 
-### Transparent mode — on by default
+### Transparent mode is OFF again — the tun black-holes IPv4
+
+Third failure, and the one that settles it. After the ssh fix, `bedag` still
+could not reach the gateways. The measurements:
+
+| from | to | result |
+|---|---|---|
+| z14, through the tun | gateway :2222 | timeout |
+| z14, `--interface wlp98s0` (tun bypassed) | gateway :2222 | **SSH banner** |
+| 201-mono (no sing-box, same LAN) | gateway :2222 | connects |
+| z14, through the tun | example.com over **IPv6** | 200 |
+| z14, through the tun | example.com over **IPv4** | timeout |
+
+So it was never about the gateways, and never about the routing rules — a
+replay of the same rules through a tun-less sing-box picks `direct` for the
+gateway correctly. **The tun passes IPv6 and black-holes IPv4.** `tun0` has
+only a link-local v6 address, so IPv6 never enters it and leaves via wlp98s0
+as normal; that is exactly why the machine felt online — dual-stack browsing
+worked — while every IPv4-only destination, the bedag gateways included, was
+dead.
+
+`noughty.proxy.transparent` therefore goes back to **false**, and
+`tailscaleOutbound.enable` with it (the endpoint only carries traffic under
+the tun: `no_proxy` keeps the tailnet out of the `$http_proxy` path, so with
+transparent off it would register a second mesh node and then do nothing).
+That restores the design that demonstrably worked — system service, system-wide
+proxy env vars, work tunnels via socat, homelab via tailscaled.
+
+Leads for a next attempt, in order:
+
+- [ ] Give the tun an IPv6 address as well as v4. Its absence is the reason
+      the breakage was invisible, and plausibly part of the cause.
+- [ ] Try `strict_route = true`. It was set false to avoid a fight with
+      `tailscale0`; that may simply have been the wrong trade.
+- [ ] Try `stack = "gvisor"` instead of `"system"`.
+- [ ] Only ever at a console, and **the acceptance test is `curl -4` against an
+      IPv4-only host**. `curl` against a dual-stack host proves nothing — that
+      is precisely what hid this for three rounds.
+
+**Process lesson, recorded because it cost three rounds.** Each time, the
+config was validated (`sing-box check`, generated-config inspection, even a
+live process-matching test) and each time the thing that broke was outside
+what those checks can see. Config validation is not connectivity validation.
+For anything touching the datapath the acceptance test has to be a real
+packet to a real destination, chosen so it cannot succeed by accident — which
+here means IPv4-only.
+
+### Transparent mode — the original write-up
 
 `noughty.proxy.transparent` defaults **true** now, by request: the tun inbound
 with `auto_route` is what makes this a system-wide proxy rather than one that

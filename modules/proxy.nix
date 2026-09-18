@@ -233,26 +233,50 @@
 
         transparent = lib.mkOption {
           type = lib.types.bool;
-          default = true;
+          default = false;
           description = ''
             Capture every socket on the host via a tun inbound, instead of
-            only the things that honour `$http_proxy`. This is what makes the
-            proxy genuinely system-wide, and it is on by request.
+            only the things that honour `$http_proxy`.
 
-            `auto_route` rewrites the default route. If a generation comes up
-            wrong the rollback is the previous one from the boot menu, which
-            is the agreed safety net here rather than a reason to default off.
+            Back to OFF, after two attempts that each broke the machine. It
+            was asked for on, and the honest reason it is off again is that
+            the tun as configured here does not work: it black-holes all IPv4.
+            Measured on z14 with the tun up -- IPv6 to example.com returns
+            200, IPv4 to the same host times out, and so does every
+            IPv4-only destination including the bedag ssh gateways.
+
+            The routing rules were not the problem (a replay of the same rules
+            through a tun-less sing-box picks `direct` correctly); the tun
+            device itself is. The likely culprits, in the order worth trying:
+            `tun0` has no global IPv6 address, which is *why* IPv6 escapes and
+            keeps the box feeling online while IPv4 is dead -- so give
+            `address` both families; try `strict_route = true` (set false here
+            to avoid a fight with tailscale0, which may simply have been the
+            wrong trade); and try `stack = "gvisor"` rather than `"system"`.
+
+            Do not turn this back on except interactively, at a console, with
+            `curl -4` to an IPv4-only host as the acceptance test. `curl`
+            against a dual-stack host proves nothing -- that is exactly what
+            hid this.
           '';
         };
 
         tailscaleOutbound = {
           enable = lib.mkOption {
             type = lib.types.bool;
-            default = true;
+            default = false;
             description = ''
               Give sing-box its own userspace tailscale node and route homelab
               traffic to it, instead of carving the tailnet out of the tun and
               leaving it to tailscaled.
+
+              Off for now, and deliberately coupled to `transparent`: without
+              the tun the only traffic that could reach this endpoint is what
+              comes in via `$http_proxy`, and `no_proxy` excludes the tailnet
+              from that -- so with `transparent = false` the endpoint would
+              register a second node on the mesh and then carry nothing. Turn
+              the two back on together once the tun actually passes IPv4.
+              Whether the endpoint registers at all is still unobserved.
 
               Consequence worth knowing: this is a *second* node on the mesh
               (tsnet is a separate identity from the host's tailscaled), so
