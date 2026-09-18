@@ -138,6 +138,8 @@
   # sing-box merges THREE config files here, split by who may see them:
   #
   #   1. the generated one, in the store: inbounds, DNS, routing. Public.
+  #      Passed LAST on the command line so its rules are matched FIRST; see
+  #      the `addFlag` comment for why that inversion is real.
   #   2. ~/git/bedag-setup/singbox.json: the bedag SOCKS outbounds and the
   #      rules picking between them. Private repo, referenced by path.
   #   3. /run/secrets/rendered/singbox-tailscale.json: the tailscale endpoint,
@@ -292,15 +294,12 @@
             "warn"
             "error"
           ];
-          # TEMPORARY, for one diagnostic round. `action = "sniff"` provably
-          # works in a standalone sing-box with this exact config minus the
-          # tun inbound (socks5 to wiki.bedag.ch returns 302), and provably
-          # does not on the live host with the tun present (same request is
-          # logged as `outbound/direct[direct]` and times out). The tun cannot
-          # be reproduced without root, so the next step is to watch what the
-          # live process actually does rather than guess a fourth time.
-          # Put this back to "warn" once the sniff question is settled.
-          default = "debug";
+          # Back to "warn": the diagnostic round did its job. Raising this to
+          # "debug" is what produced `router: match[18] => sniff`, which is
+          # how the `--config` ordering inversion was found -- worth repeating
+          # if routing ever looks wrong again, since the match indices tell you
+          # immediately which rule won and in what order they were assembled.
+          default = "warn";
           description = ''
             sing-box log level. See the wrapper option of the same name for
             why "warn" is the resting value.
@@ -507,7 +506,9 @@
           description = ''
             Further sing-box config files, each appended as another `--config`.
             sing-box merges them key by key and keeps arrays in file order, so
-            the generated config (always first) wins any rule conflict.
+            the generated config wins any rule conflict -- but note it is
+            passed LAST for exactly that reason, because sing-box puts a later
+            file's rules BEFORE an earlier one's. See `addFlag`.
 
             A list rather than a single path because the NixOS side now has two
             of them: the private bedag config, and a sops-rendered file holding
@@ -856,10 +857,11 @@
               # tunnel.
               #
               # Sniffing recovers the name from the TLS ClientHello's SNI (or
-              # an HTTP Host header) before the rules are evaluated, so the
-              # domain rules match again. It is ordered ahead of everything,
-              # including the work config's own rules, because our config is
-              # the first `--config`.
+              # an HTTP Host header), so the domain rules match again. For that
+              # to help it must run BEFORE the work config's rules, which is
+              # why the generated config is passed as the LAST `--config` --
+              # see the comment on `addFlag` below, and do not "fix" that order
+              # back.
               #
               # Only under `transparent`: with the tun absent the name is
               # already known and this would be a no-op, and the Mac's
@@ -875,10 +877,10 @@
               # suffix rule catches homelab names resolved inside sing-box,
               # before an address exists to match on.
               #
-              # Our config is the first `--config` and sing-box keeps merged
-              # rules in file order, so these are evaluated before any of the
-              # work config's own rules and win. That ordering is what stops a
-              # homelab address ever being handed to a bedag tunnel.
+              # These are evaluated before any of the work config's own rules,
+              # which is what stops a homelab address ever being handed to a
+              # bedag tunnel. That precedence comes from the generated config
+              # being the LAST `--config`, not the first -- see `addFlag`.
               # ORDER IS LOAD-BEARING: these two carve-outs must precede the
               # tailnet rules below, because both describe traffic that falls
               # inside the tailnet by address or by name but must not go to
@@ -925,12 +927,31 @@
           constructFiles.singBoxConfig.relPath = "etc/sing-box/config.json";
 
           package = pkgs."sing-box";
+          # ORDER IS LOAD-BEARING, and it is the opposite of the obvious guess:
+          # the generated config goes LAST.
+          #
+          # sing-box merges repeated `--config` by placing a LATER file's
+          # `route.rules` BEFORE an earlier one's. Measured, not assumed: with
+          # the generated config passed first, its `{ action = "sniff"; }` rule
+          # was logged as `router: match[18] => sniff` -- i.e. after the work
+          # config's ~18 rules -- so every domain rule had already been
+          # evaluated and skipped (the tun supplies only an IP) by the time
+          # sniffing recovered the name. The connection then fell through to
+          # `final: direct` and timed out. Passing it last puts it at
+          # `match[0]`, and the very next line becomes
+          # `match[11] domain_suffix=[... .bedag.ch ...] => route(socks-30004)`.
+          #
+          # Nothing else here depends on the order: only this file sets
+          # `route.final`, `dns` and the inbounds, and outbounds are referenced
+          # by tag rather than by position.
           addFlag = [
             "run"
+          ]
+          ++ lib.concatMap (f: [ "--config" f ]) config.additionalConfigFiles
+          ++ [
             "--config"
             config.constructFiles.singBoxConfig.path
-          ]
-          ++ lib.concatMap (f: [ "--config" f ]) config.additionalConfigFiles;
+          ];
         };
     };
 }
