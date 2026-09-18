@@ -241,6 +241,46 @@ all but makes sing-box depend on tailscaled being up — was not taken, because
 an explicit tailscale outbound was what was asked for. It remains the obvious
 fallback if the duplicate node is annoying.
 
+### Post-mortem: the first transparent build melted the laptop
+
+It was switched, and sing-box went to ~465% CPU (≈4.6 cores) doing nothing.
+Two bugs, compounding, both in the config this plan shipped.
+
+**1. No `route.auto_detect_interface`.** This is the big one and it is
+effectively mandatory with a tun inbound. `auto_route` points the kernel
+default route at the tun; an outbound with no bound interface then *follows
+that default route*. So every `direct` dial left via the tun, was immediately
+picked back up by `tun-in`, routed to `direct` again — a self-feeding loop. The
+signature in the journal is unmistakable once you know it: `inbound packet
+connection from 172.19.0.1:<port>`, i.e. from the tun's **own** address.
+Fixed by setting `auto_detect_interface = true`, unconditionally — it is
+harmless without a tun and catastrophic to omit with one.
+
+**2. MagicDNS lives inside the tailnet CIDR.** tailscaled writes
+`nameserver 100.100.100.100` into `/etc/resolv.conf`, which is what sing-box's
+`local` DNS server talks to — and `100.100.100.100` is inside `100.64.0.0/10`.
+So the rule "tailnet → tailscale endpoint" captured *all system DNS* and sent
+it to an endpoint that cannot answer until it has bootstrapped, which needs
+DNS. Deadlock. Same class of mistake for the control plane: `hs.phonkd.net`
+ends in `.phonkd.net`, so the suffix rule asked the endpoint to resolve the
+address it needs in order to exist. Both are now carve-outs matched *ahead* of
+the tailnet rules (`tailscaleBypassCidrs`, `tailscaleBypassDomains`), and the
+ordering is load-bearing.
+
+Two smaller contributors, both fixed: `log.level` was `"info"`, which logs
+three lines per packet-connection — during a loop the logging is itself a
+large share of the load; it is `"warn"` now. And there was no ceiling on the
+damage, so `CPUQuota = 150%` and journal rate limiting are on the unit. The
+quota does not fix a loop, it just stops one making the machine unusable
+before you can roll back.
+
+**The lesson for this plan.** "`sing-box check` passes" was recorded as
+verification twice, and it was never that: it checks schema and tag references,
+not whether packets can actually leave the box. There is no offline substitute
+— tun behaviour can only be observed on the running host. Treat a transparent
+config as unverified until `journalctl -u sing-box` is quiet and `ssh 201-mono`
+works, and expect to watch it on the first switch rather than walking away.
+
 ### Transparent mode — on by default
 
 `noughty.proxy.transparent` defaults **true** now, by request: the tun inbound
@@ -260,6 +300,14 @@ tag references are right. It says nothing about whether the routes behave.
 
 #### Pre-flight before the first switch
 
+- [ ] **Still unverified: whether the tailscale endpoint registers at all.**
+      The first switch never got far enough to find out — the routing loop
+      swamped it, and the journal shows no endpoint start either way. Trying
+      it offline with the real key was not possible here (decrypting the
+      secret to a scratch file is blocked by the sandbox, correctly), so this
+      is genuinely first observed on the next switch. If it fails to register,
+      100.64.0.0/10 routes to a dead outbound and the homelab goes dark —
+      `noughty.proxy.tailscaleOutbound.enable = false` is the one-line revert.
 - [ ] Confirm the pre-auth key is still valid and reusable —
       `headscale preauthkeys list` on observability, **as root** (the CLI needs
       the socket; plain Tailscale SSH gets permission denied). If it has

@@ -178,6 +178,17 @@
       # never in /nix/store, which is world-readable, nor in this public repo.
       tailscaleConfigFile = config.sops.templates."singbox-tailscale.json".path;
 
+      # Bare host out of `controlUrl` ("https://hs.phonkd.net" ->
+      # "hs.phonkd.net"), so the routing rules can name the control plane. It
+      # has to be excluded from the tailscale endpoint by both name and route;
+      # see `tailscaleBypassDomains`.
+      controlHost =
+        let
+          afterScheme = lib.last (lib.splitString "//" ts.controlUrl);
+          hostPort = lib.head (lib.splitString "/" afterScheme);
+        in
+        lib.head (lib.splitString ":" hostPort);
+
       sing-box-work = self.wrappers.sing-box-sel.wrap {
         inherit pkgs;
         inherit (cfg) listenPort transparent;
@@ -190,6 +201,7 @@
         # it. Setting this is what turns the tailnet from a bypass into a real
         # outbound; see the wrapper option.
         tailscaleEndpointTag = if ts.enable then ts.tag else null;
+        tailscaleBypassDomains = lib.optional ts.enable controlHost;
         # No local dnsmasq on a NixOS laptop -- tailscaled owns resolv.conf
         # here (modules/tailnet.nix) and answers MagicDNS itself, so the plain
         # `local` resolver is already correct. See the option's own docs.
@@ -358,6 +370,17 @@
             # *because* of ProtectSystem = "strict", which would otherwise
             # leave /var/lib read-only; systemd creates and owns it.
             StateDirectory = "sing-box";
+            # Blast radius limiter, added after a routing loop in this very
+            # config pinned ~4.6 cores on a fanless-ish laptop until it was
+            # stopped by hand. A correctly routing sing-box is nearly idle --
+            # it shuffles packets -- so this ceiling is far above anything
+            # legitimate and only ever bites a runaway. It does not fix a
+            # loop; it keeps one from making the machine unusable while you
+            # notice and roll back.
+            CPUQuota = "150%";
+            # Same idea for the log spew a loop produces.
+            LogRateLimitIntervalSec = 10;
+            LogRateLimitBurst = 500;
             # NB deliberately no PrivateNetwork: the SOCKS outbounds are the
             # user's loopback ssh tunnels.
           };
@@ -496,6 +519,37 @@
             Inert unless `tailscaleEndpointTag` is set.
           '';
         };
+        tailscaleBypassCidrs = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "100.100.100.100/32" ];
+          description = ''
+            Addresses that must stay `direct` even though they fall inside
+            `tailnetCidr`, matched ahead of the tailnet rule.
+
+            The default is MagicDNS, and it is not optional: tailscaled writes
+            100.100.100.100 into /etc/resolv.conf, so it is what sing-box's own
+            `local` DNS server talks to — and it sits inside 100.64.0.0/10.
+            Without this carve-out every system DNS query is routed into the
+            tailscale endpoint, which cannot answer until it has bootstrapped,
+            which needs DNS. That deadlock, together with a missing
+            `auto_detect_interface`, is what pinned four cores the first time
+            this shipped.
+          '';
+        };
+        tailscaleBypassDomains = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = ''
+            Exact domains that must resolve and route *outside* the tailscale
+            endpoint, matched ahead of both the DNS and the route rules.
+
+            This is for the control plane. `hs.phonkd.net` ends in
+            `.phonkd.net`, so it would otherwise match `homelabDomainSuffixes`
+            and be sent to the very endpoint that cannot come up until it has
+            reached the control plane. It is also a public address, unlike the
+            homelab names those suffixes are meant for.
+          '';
+        };
       };
 
       config =
@@ -507,7 +561,12 @@
         in
         {
           constructFiles.singBoxConfig.content = builtins.toJSON {
-            log.level = "info";
+            # "info" logs a line per connection AND per packet connection. That
+            # is merely noisy normally, but during the routing loop that this
+            # config first shipped with it was itself a large part of the load:
+            # a feedback loop logging three lines per iteration at millions of
+            # iterations. "warn" still reports the things worth waking up for.
+            log.level = "warn";
 
             # sing-box does its own name resolution, and its `local` server reads
             # /etc/resolv.conf — which on macOS is the legacy file holding the
@@ -548,7 +607,16 @@
                 tag = "ts-dns";
                 endpoint = config.tailscaleEndpointTag;
               };
-              rules = lib.optional useTailscale {
+              # Again, order matters: the control plane resolves via the
+              # system resolver, NOT via the endpoint's own MagicDNS. It ends
+              # in .phonkd.net so it would otherwise match the suffix rule
+              # below and ask the endpoint to resolve the address it needs in
+              # order to exist.
+              rules = lib.optional (useTailscale && config.tailscaleBypassDomains != [ ]) {
+                domain = config.tailscaleBypassDomains;
+                server = "local";
+              }
+              ++ lib.optional useTailscale {
                 domain_suffix = config.homelabDomainSuffixes;
                 server = "ts-dns";
               };
@@ -605,6 +673,23 @@
               # Mandatory once a `dns` block exists (1.12 deprecation, hard error
               # in 1.14). "local" is the implicit behaviour this config had before.
               default_domain_resolver = "local";
+
+              # NOT optional with a tun inbound, and its absence is what made
+              # the first transparent-mode config melt down.
+              #
+              # `auto_route` points the kernel's default route at the tun. An
+              # outbound with no bound interface then follows that default
+              # route -- so every "direct" dial left via the tun, was picked
+              # straight back up by `tun-in` (source 172.19.0.1, the tun's own
+              # address), routed to `direct` again, and round it went. A
+              # self-feeding loop that pinned ~4.6 cores.
+              #
+              # This makes sing-box bind outbounds to the real default
+              # interface (wlp98s0 here) instead, which is what breaks the
+              # cycle. It is harmless without the tun, so it is set
+              # unconditionally rather than guarded on `transparent`: the
+              # failure it prevents is far worse than the nothing it costs.
+              auto_detect_interface = true;
               # The only rule here — the work config brings its own and nothing in
               # it touches phonkd.net. Anything neither set matches goes straight
               # out. With `homelabDnsServer = null` this list is empty and the
@@ -623,6 +708,20 @@
               # rules in file order, so these are evaluated before any of the
               # work config's own rules and win. That ordering is what stops a
               # homelab address ever being handed to a bedag tunnel.
+              # ORDER IS LOAD-BEARING: these two carve-outs must precede the
+              # tailnet rules below, because both describe traffic that falls
+              # inside the tailnet by address or by name but must not go to
+              # the endpoint -- MagicDNS, and the control plane the endpoint
+              # dials to come up at all. Put them after, and the endpoint can
+              # never bootstrap. See the option docs for the deadlock.
+              ++ lib.optional (useTailscale && config.tailscaleBypassCidrs != [ ]) {
+                ip_cidr = config.tailscaleBypassCidrs;
+                outbound = "direct";
+              }
+              ++ lib.optional (useTailscale && config.tailscaleBypassDomains != [ ]) {
+                domain = config.tailscaleBypassDomains;
+                outbound = "direct";
+              }
               ++ lib.optionals useTailscale [
                 {
                   ip_cidr = [ config.tailnetCidr ];
