@@ -418,16 +418,36 @@ degrade, it refuses each other.
      "role": "source",
      "backend": {
        "native": "C:/Viewflow/src/build/window-source/Release/viewflow_windows_reverse.exe",
-       "args": ["source", "--codec", "h264", "--scale", "1"]
+       "args": ["0", "0", "1920", "1080"]
      }
    }
    ```
+
+   **The Windows source's arguments are four integers, not flags** — same trap
+   as the Linux presenter, and both were originally copied from the pattern in
+   upstream's *macOS* doc, which describes neither binary.
+   `platform/windows-reverse/performance_mode.hpp:53-88` accepts only
+   `--performance-status`, `--performance-mode <mode>` and `--mode-file <path>`;
+   every other argument must parse as an integer, and there must be **exactly
+   four** of them, taken as the capture rectangle `left top right bottom`.
+   Anything else throws `invalid reverse coordinate or option`, and an
+   empty/inverted rectangle throws `empty reverse capture rectangle`. Negative
+   values are legal (they are virtual-desktop coordinates, so a monitor left of
+   the primary has a negative left edge — upstream's own test uses
+   `{-6144, -780, 0, 2676}`). So set the rectangle to the region of blac's
+   desktop you want shared, in blac's virtual-desktop coordinates.
 
    `192.168.1.181` is g14's LAN address on wifi — re-check it with
    `ip -brief addr` if the lease moves; pinning a DHCP reservation for g14 on
    the router is the tidier fix if this gets used often. Start the presenter
    first, then the
    source — upstream's own procedure everywhere is receiver-before-sender.
+
+   Both configs can be checked before any of this is live:
+   `vf-window-peer validate --config <file>` prints `window-peer-config-valid`
+   and exits, touching neither the network nor the GPU. Do that on each side
+   first — it catches path, identity and geometry mistakes without needing the
+   peer to exist.
 
 7. **For the other direction** (g14 as source), g14 additionally needs a capture
    plugin loaded in its running Hyprland — that is Phase 3 and is not done. See
