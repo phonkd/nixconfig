@@ -161,7 +161,24 @@ running compositor on the *source* host — `docs/hyprcapture-integration.md`
 inspects HyprCapture's `src/plugin/artifact_capture.cpp` and notes the live
 compositor "lists HyprCapture 0.2.7". So being a *source* is not just a package
 install; it re-opens the deferred Phase 3 plugin tax. Being a *presenter* does
-not — `linux-reverse` is a plain Wayland client (plus CUDA).
+not need the plugin.
+
+**Correction, found while actually running it:** the presenter is *not* "a plain
+Wayland client plus CUDA", as earlier revisions of this plan claimed. It needs
+Hyprland's **IPC environment**, not merely a Wayland socket — started with only
+`XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` set it fails with
+
+```
+reverse presenter: Hyprland IPC environment missing
+reverse native backend exited: exit status: 1
+```
+
+and the peer then loops on `reverse-window-bridge recovering`. It wants
+`HYPRLAND_INSTANCE_SIGNATURE` as well. That signature changes on every
+compositor restart, so `~/viewflow/start-presenter.sh` on g14 derives it from
+the newest entry under `$XDG_RUNTIME_DIR/hypr` rather than hardcoding it. The
+practical consequence is that the *presenter* is Hyprland-bound too: it will not
+run under the Plasma session on the same host, only under Hyprland.
 
 ## Approach
 
@@ -452,6 +469,61 @@ degrade, it refuses each other.
 7. **For the other direction** (g14 as source), g14 additionally needs a capture
    plugin loaded in its running Hyprland — that is Phase 3 and is not done. See
    point 4 of "Hardware reality".
+
+## Bring-up log (2026-09-18) — both halves built, pairing proven
+
+State: **everything is built and configured on both machines, and the QUIC/mTLS
+pair is proven to establish.** The only step not completed from here is starting
+the Windows source, which must be launched from the interactive desktop (below).
+
+What is where:
+
+| | g14 (Linux) | blac (Windows 11, 26200) |
+|---|---|---|
+| orchestrator | `vf-window-peer` (system package) | `C:\Viewflow\src\target\release\vf-window-peer.exe` |
+| native backend | `viewflow_linux_reverse` (system package) | `...\build\window-source\Release\viewflow_windows_reverse.exe` |
+| identities | `~/viewflow/` (0700) | `C:\Viewflow\{blac-peer.pem,blac-peer.key,pair-ca.pem}` |
+| config | `~/viewflow/presenter.json` | `C:\Viewflow\source.json` |
+| launcher | `~/viewflow/start-presenter.sh` | `C:\Viewflow\start-source.bat` |
+
+Both configs pass `vf-window-peer validate --config <file>`
+(`window-peer-config-valid`), and both peers reached
+`reverse-window-bridge ready native_role=... paired_connection=true` — so the
+certs, the CA chain, the LAN addressing (`192.168.1.181:44220`) and the
+udp/44220 firewall opening are all confirmed working end to end.
+
+**The Windows source must run in the interactive console session.**
+`platform/windows-reverse/main.cpp:363` calls `OpenInputDesktop`, and a network
+logon (ssh) has no input desktop, so it fails immediately and the peer loops:
+
+```
+reverse source: reverse capture input desktop unavailable=1
+reverse native backend exited: exit code: 1
+```
+
+A scheduled task with `/it` ("Interactive only") did not work around it either —
+the task ran but returned Last Result 1 and produced no output. So this one step
+is genuinely hands-on: run `C:\Viewflow\start-source.bat` from Explorer on blac.
+The task was deleted again; nothing persistent was left behind.
+
+Toolchain notes for the next rebuild of the Windows side:
+
+- Installed with winget: VS 2022 Build Tools (VCTools workload, MSVC 14.44,
+  Windows SDK 10.0.26100), Rustup (`stable-x86_64-pc-windows-msvc`, cargo
+  1.98.1), CMake 4.4.3, Git 2.55. The Rust build takes ~45 s; the CMake build a
+  couple of minutes. No CUDA anywhere, as expected.
+- **Do not use the scoop-installed git over ssh.** Its shims fail
+  (`Shim: Could not create process`), and addressing the real binary through
+  scoop's `current` junction fails with "The path cannot be traversed because it
+  contains an untrusted mount point" — a network-logon restriction on traversing
+  junctions. Installing Git.Git via winget sidesteps it entirely.
+- blac's display is 2560x1440 on the RTX 5080, which is where `source.json`'s
+  `["0","0","2560","1440"]` capture rectangle comes from. Note an ssh session
+  reports a *virtual* 1024x768 desktop, so do not read geometry from there.
+
+Housekeeping: the leaf certs are 7-day and **expire 2026-09-25**; regenerate
+with the recipe above and re-copy blac's three files when they do. If g14 sleeps,
+the presenter dies with it — restart it with `~/viewflow/start-presenter.sh`.
 
 ## Open decisions
 
