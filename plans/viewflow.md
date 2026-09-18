@@ -1,10 +1,13 @@
 # viewflow — cross-device window sharing
 
 **Repo(s):** nixconfig (this repo only — upstream is consumed as a pinned
-`flake = false` input)   **Status:** Phase 1 done — the Linux half is packaged,
-merged to `main`, and **deployed and verified on g14** (2026-09-16). blac picks
-it up whenever it next boots NixOS. Phase 2 — the Windows half — is hand-work on
-the Windows peer that cannot be done from nix; see "The Windows half" below.
+`flake = false` input)   **Status:** **done and working end to end** — blac's
+windows display on g14 as individual Hyprland windows (2026-09-18). Phase 1 (the
+nix-packaged Linux half) is on `main` and deployed; Phase 2 (the Windows half,
+hand-built on the peer) is built and running. Phase 3 (the atlas/desktop-drag
+launcher, and with it any pointer/keyboard crossover) remains deferred — this
+path is **view-only**. See the bring-up log for what it looks like and the
+hybrid-GPU fix that was required.
 **g14 is the Linux end of every pairing**; the Windows end can be blac *or* z14,
 both of which are dual-boot.
 
@@ -470,11 +473,75 @@ degrade, it refuses each other.
    plugin loaded in its running Hyprland — that is Phase 3 and is not done. See
    point 4 of "Hardware reality".
 
-## Bring-up log (2026-09-18) — both halves built, pairing proven
+## Bring-up log (2026-09-18) — WORKING
 
-State: **everything is built and configured on both machines, and the QUIC/mTLS
-pair is proven to establish.** The only step not completed from here is starting
-the Windows source, which must be launched from the interactive desktop (below).
+State: **it works.** blac's windows appear on g14 as individual Hyprland
+windows, stable, zero recovery events.
+
+### What it actually looks like — individual windows, not a monitor
+
+Worth stating plainly because the mental model matters: this is **not** a second
+display and not a desktop mirror. Each remote window arrives as its own real
+Hyprland toplevel, with the real title, and can be tiled/floated/moved like any
+native window. From `hyprctl clients` on g14 while blac was sharing:
+
+```
+class: ViewflowReverse-3   title: bôa - Duvet
+class: ViewflowReverse-6   title: Release notes - Zen — Zen Browser
+class: ViewflowReverse-7   title: viewflow source  --  blac screen -
+```
+
+The four coordinates in `source.json` are therefore not "the thing that gets
+streamed" — they bound the *region of blac's desktop from which windows are
+picked up*. Windows inside that rectangle get forwarded, one Wayland surface
+each.
+
+The "drag a window across the screen edge onto another monitor" model is the
+*other* upstream path — the desktop-drag atlas launcher, which creates a
+headless Hyprland output and loads plugins into the running compositor. That is
+still deferred (Phase 3) and deliberately unused; it is the thing that can wedge
+the desktop.
+
+**This path is view-only.** `vf-window-peer`'s config struct
+(`crates/viewflowd/src/bin/vf-window-peer.rs:17-25`) has exactly eight fields —
+`bind`, `remote`, `server_name`, `certificate`, `private_key`,
+`certificate_authority`, `role`, `backend` — and no input section at all. So
+pointer/keyboard do not cross over on this path, regardless of
+`viewflow-linux-window-input` being installed. Return input belongs to the
+atlas/`vf-media-peer` route, i.e. Phase 3.
+
+### The fix that made it work: force the presenter onto the dGPU
+
+g14 is a hybrid laptop and Hyprland renders on the **AMD iGPU**. The decoder
+does CUDA/GL interop, so with the GL context on the AMD chip the presenter came
+up and then failed on every frame import:
+
+```
+reverse-presenter ready renderer=AMD Radeon Graphics (radeonsi, renoir, ...)
+reverse presenter: reverse GPU import: invalid OpenGL or DirectX context
+reverse native backend exited: exit status: 1
+reverse-window-bridge recovering: Broken pipe (os error 32); forward desktop retained
+```
+
+That loop is the symptom to recognise: pairing succeeds, the presenter reports
+*ready*, and then it dies per-frame. The cure is to put the client's EGL on the
+NVIDIA GPU — `~/viewflow/start-presenter.sh` now exports:
+
+```sh
+__NV_PRIME_RENDER_OFFLOAD=1
+__GLX_VENDOR_LIBRARY_NAME=nvidia
+__EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json
+```
+
+after which the renderer line reads
+`NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2` and the recovery loop stops
+dead. This is a general consequence of the CUDA-only decode path, so **any**
+hybrid-graphics Linux presenter needs the same treatment; it is not a g14 quirk.
+
+### Build/config state
+
+Everything below was built and configured on both machines, and the QUIC/mTLS
+pair establishes cleanly.
 
 What is where:
 
