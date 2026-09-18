@@ -550,6 +550,42 @@
             homelab names those suffixes are meant for.
           '';
         };
+        bootstrapProcessNames = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "ssh" ];
+          description = ''
+            Processes whose *direct* connections always go `direct`, matched
+            ahead of the work config's own rules.
+
+            This breaks the third and last circular dependency of the
+            transparent build, and it is the same shape as the other two: the
+            thing that builds the path was being routed down the path.
+
+            The bedag SOCKS outbounds (127.0.0.1:30001+) are `ssh -fN`
+            DynamicForward tunnels. Establishing them means first ssh-ing to a
+            gateway, and those gateway blocks say `ProxyCommand None`
+            precisely so they do NOT go through the proxy. That was enough
+            before the tun existed. With `transparent` on, ssh's own packets
+            are captured at the IP layer regardless of what ssh_config says,
+            matched against the work config's bedag rules, and sent into the
+            very tunnels the connection is trying to create. Nothing comes up,
+            and the symptom is the downstream one:
+            `connect to host localhost port 2222: Connection refused`.
+
+            Matching on the process rather than on gateway addresses is
+            deliberate — the addresses are work-internal and this repo is
+            public. It is also the more honest rule: it is not those
+            particular hosts that must stay direct, it is ssh's own dialling,
+            because that is what bootstraps the proxy.
+
+            Safe because it is narrow in practice: the work `Host *` catch-all
+            sends ordinary ssh through `socat` (a different process, over
+            loopback, never captured by the tun), so the only ssh reaching
+            this rule is what already carried `ProxyCommand None` -- gateways,
+            LAN, github. Tailnet ssh is matched by the rules above this one
+            and still goes to the tailscale endpoint.
+          '';
+        };
       };
 
       config =
@@ -732,6 +768,14 @@
                   outbound = config.tailscaleEndpointTag;
                 }
               ]
+              # Deliberately AFTER the tailnet rules and BEFORE the work
+              # config's: `ssh 201-mono` keeps going to the tailscale endpoint,
+              # while ssh to a bedag gateway goes straight out instead of into
+              # the tunnels it is trying to build. See the option docs.
+              ++ lib.optional (config.transparent && config.bootstrapProcessNames != [ ]) {
+                process_name = config.bootstrapProcessNames;
+                outbound = "direct";
+              }
               # Bypass form, for when there is no tailscale endpoint: keep
               # tailnet traffic out of the work tunnels if it arrives at the
               # mixed inbound anyway (an env-proxy client that ignored

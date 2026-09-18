@@ -281,6 +281,42 @@ not whether packets can actually leave the box. There is no offline substitute
 config as unverified until `journalctl -u sing-box` is quiet and `ssh 201-mono`
 works, and expect to watch it on the first switch rather than walking away.
 
+### The third circularity: ssh bootstraps the proxy
+
+Found after the loop fix, when `bedag` still could not bring the tunnels up:
+
+    ssh: connect to host localhost port 2222: Connection refused
+    Connection closed by UNKNOWN port 65535
+
+Same shape as the other two — *the thing that builds the path was being routed
+down the path*. The bedag SOCKS outbounds are `ssh -fN` DynamicForward tunnels,
+and creating them means first ssh-ing to a gateway. Those gateway blocks in the
+work repo say `ProxyCommand None` exactly so they skip the proxy, and that was
+sufficient for as long as the proxy was opt-in. With `transparent` on, ssh's
+packets are captured at the IP layer no matter what ssh_config says, matched
+against the work config's own bedag rules, and sent into the tunnels this very
+connection exists to create. The `localhost:2222` error is downstream: the
+entry gateway carries `LocalForward 2222`, so when it fails, every later hop
+that dials `localhost:2222` fails too.
+
+Fixed with a route rule on `process_name = [ "ssh" ]` → `direct`, placed after
+the tailnet rules and before the work config's. Matching on the process rather
+than on gateway addresses is deliberate: those addresses are work-internal and
+this repo is public, and it is the more honest rule anyway — it is not those
+particular hosts that must stay direct, it is ssh's own dialling, because that
+is what bootstraps the proxy.
+
+Narrow in practice: the `Host *` catch-all sends ordinary ssh through `socat`
+(a different process, over loopback, never captured), so the only ssh reaching
+this rule is what already carried `ProxyCommand None`. Tailnet ssh matches the
+earlier rules and still goes to the tailscale endpoint.
+
+- [x] `bootstrapProcessNames` option + rule.
+- [x] **Mechanism verified on this host**, not just schema-checked: same curl
+      to the same address through a test sing-box returns 200 when the
+      `process_name` rule does not match and 502 when it does. Proven on the
+      mixed inbound; the tun inbound uses the same process finder.
+
 ### Transparent mode — on by default
 
 `noughty.proxy.transparent` defaults **true** now, by request: the tun inbound
