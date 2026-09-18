@@ -191,7 +191,7 @@
 
       sing-box-work = self.wrappers.sing-box-sel.wrap {
         inherit pkgs;
-        inherit (cfg) listenPort transparent;
+        inherit (cfg) listenPort transparent tunStack;
         additionalConfigFiles = [
           cfg.additionalConfigFile
         ]
@@ -233,31 +233,49 @@
 
         transparent = lib.mkOption {
           type = lib.types.bool;
-          default = false;
+          default = true;
           description = ''
             Capture every socket on the host via a tun inbound, instead of
-            only the things that honour `$http_proxy`.
+            only the things that honour `$http_proxy`. This is the difference
+            between a system-wide proxy and an opt-in one, and it is what was
+            actually asked for.
 
-            Back to OFF, after two attempts that each broke the machine. It
-            was asked for on, and the honest reason it is off again is that
-            the tun as configured here does not work: it black-holes all IPv4.
-            Measured on z14 with the tun up -- IPv6 to example.com returns
-            200, IPv4 to the same host times out, and so does every
-            IPv4-only destination including the bedag ssh gateways.
+            ON again as attempt 3, with exactly one thing changed from the
+            attempt that failed: `tunStack` is `"gvisor"` rather than
+            `"system"`.
 
-            The routing rules were not the problem (a replay of the same rules
-            through a tun-less sing-box picks `direct` correctly); the tun
-            device itself is. The likely culprits, in the order worth trying:
-            `tun0` has no global IPv6 address, which is *why* IPv6 escapes and
-            keeps the box feeling online while IPv4 is dead -- so give
-            `address` both families; try `strict_route = true` (set false here
-            to avoid a fight with tailscale0, which may simply have been the
-            wrong trade); and try `stack = "gvisor"` rather than `"system"`.
+            History, because it is why this option carries so much comment.
+            Attempt 1 melted the machine (routing loop, no
+            `auto_detect_interface`). Attempt 2 black-holed all IPv4: with the
+            tun up, IPv6 to example.com returned 200 while IPv4 to the same
+            host timed out, and so did every IPv4-only destination including
+            the bedag ssh gateways. The routing rules were never the problem
+            -- replaying them through a tun-less sing-box picks `direct`
+            correctly -- and the tun was receiving the packets (tun0 RX
+            climbing) without dialling or logging anything. That points at the
+            stack, hence this attempt.
 
-            Do not turn this back on except interactively, at a console, with
-            `curl -4` to an IPv4-only host as the acceptance test. `curl`
-            against a dual-stack host proves nothing -- that is exactly what
-            hid this.
+            Still untried if gvisor is not enough: give the tun a v6 address
+            as well (its absence is why the last breakage was invisible), and
+            `strict_route = true`.
+
+            **The acceptance test is `curl -4` against an IPv4-only host.**
+            Testing against a dual-stack host proves nothing -- that is
+            precisely what hid attempt 2 for three rounds.
+          '';
+        };
+
+        tunStack = lib.mkOption {
+          type = lib.types.enum [
+            "gvisor"
+            "mixed"
+            "system"
+          ];
+          default = "gvisor";
+          description = ''
+            TCP/IP stack for the tun inbound. See the wrapper option of the
+            same name — `"system"` is what swallowed all IPv4 on the first
+            attempt. Inert unless `transparent` is set.
           '';
         };
 
@@ -543,6 +561,29 @@
             Inert unless `tailscaleEndpointTag` is set.
           '';
         };
+        tunStack = lib.mkOption {
+          type = lib.types.enum [
+            "gvisor"
+            "mixed"
+            "system"
+          ];
+          default = "gvisor";
+          description = ''
+            Which TCP/IP stack the tun inbound uses.
+
+            This started as `"system"`, which was the wrong default to reach
+            for: the system stack hands packets to the host stack and is the
+            most environment-sensitive of the three. With it, the tun received
+            IPv4 packets (tun0 RX climbed) and silently swallowed them -- no
+            dial, no error in the log, just a timeout -- while IPv6, which
+            never entered the tun for want of a v6 address on it, kept
+            working and made the box look healthy.
+
+            `"gvisor"` is sing-box's own userspace stack and the one its
+            documentation treats as the safe default. `"mixed"` is gvisor for
+            TCP and system for UDP, worth trying if UDP specifically misbehaves.
+          '';
+        };
         tailscaleBypassCidrs = lib.mkOption {
           type = lib.types.listOf lib.types.str;
           default = [ "100.100.100.100/32" ];
@@ -711,7 +752,7 @@
               # reach sing-box, so excluding them here would defeat the route
               # rule that sends them to the endpoint.
               route_exclude_address = lib.optional (!useTailscale) config.tailnetCidr;
-              stack = "system";
+              stack = config.tunStack;
             };
             outbounds = [
               {
