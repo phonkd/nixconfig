@@ -294,12 +294,26 @@
             "warn"
             "error"
           ];
-          # Back to "warn": the diagnostic round did its job. Raising this to
-          # "debug" is what produced `router: match[18] => sniff`, which is
-          # how the `--config` ordering inversion was found -- worth repeating
-          # if routing ever looks wrong again, since the match indices tell you
-          # immediately which rule won and in what order they were assembled.
-          default = "warn";
+          # "debug" until the sniff-under-tun question is closed, then back to
+          # "warn". Raising it is what produced `router: match[18] => sniff`
+          # and found the `--config` ordering inversion; the match indices say
+          # immediately which rule won and in what order they were assembled,
+          # which is the only way to see this from outside.
+          #
+          # The ordering fix alone did not finish the job. What is established
+          # now, by running the *live generated config file itself* against the
+          # real work config:
+          #
+          #   live config, tun inbound removed, socks5 -> 302 (routes to the
+          #     tunnel correctly)
+          #   live config, unchanged, socks5            -> fails to `direct`
+          #
+          # Same file, same merge order, same work config; the only difference
+          # is the tun inbound's presence, and it breaks domain routing even
+          # for connections arriving on the *mixed* inbound. A tun cannot be
+          # created without root, so this cannot be reproduced in a user-run
+          # instance -- hence debug on the real service.
+          default = "debug";
           description = ''
             sing-box log level. See the wrapper option of the same name for
             why "warn" is the resting value.
