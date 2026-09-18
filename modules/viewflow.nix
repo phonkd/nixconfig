@@ -270,8 +270,25 @@ in
         self.packages.${pkgs.system}.viewflow-linux-native
       ];
 
-      # QUIC is UDP on a port chosen per session (upstream's examples use
-      # 44220). Nothing is opened here on purpose: both machines are on the
-      # tailnet, so pair over 100.64.0.x and keep this off the LAN.
+      # QUIC is UDP on a port chosen per session; 44220 is upstream's example
+      # and what plans/viewflow.md's configs use.
+      #
+      # This has to be opened explicitly, and the reason is worth recording
+      # because the obvious assumption is wrong: `services.tailscale.openFirewall`
+      # (modules/tailnet.nix) opens **only** udp/41641, tailscale's own transport,
+      # and nothing in this repo sets `networking.firewall.trustedInterfaces`.
+      # So the NixOS firewall filters traffic arriving on `tailscale0` exactly as
+      # it does on any other interface -- pairing over 100.64.0.x would have been
+      # blocked too, and a blocked QUIC handshake is silent rather than an error.
+      #
+      # Opened on all interfaces rather than scoped to one: the pair runs over
+      # the home LAN (blac is stationary, g14 is on wifi), and the LAN interface
+      # name differs per host and per link -- wlp2s0 on g14 today, enp9s0 on
+      # blac -- so pinning an interface here would be brittle. The exposure is
+      # one UDP port on a home LAN, behind mTLS: a peer without a certificate
+      # signed by the session's pair CA gets nowhere. Narrow it with
+      # `networking.firewall.interfaces.<name>.allowedUDPPorts` if this ever
+      # leaves the house.
+      networking.firewall.allowedUDPPorts = [ 44220 ];
     };
 }

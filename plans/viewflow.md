@@ -269,9 +269,13 @@ The original step list follows, as the record of what was planned.
    `modules/builder.nix` — the `nvidia-desktop` precedent exactly. That lands it
    on blac and g14 and keeps a CUDA closure off z14, which could not use it.
 
-6. **Firewall.** QUIC is UDP, port chosen per session (upstream examples use
-   44220). Both machines are on the tailnet, so pair over `100.64.0.x` and skip
-   LAN exposure entirely.
+6. **Firewall.** *Corrected — the original plan here was wrong.* It assumed
+   that pairing over the tailnet meant nothing had to be opened. It does not:
+   `services.tailscale.openFirewall` opens only udp/41641, and nothing in this
+   repo sets `networking.firewall.trustedInterfaces`, so `tailscale0` is
+   filtered like any other interface. The module therefore opens udp/44220
+   outright. Since the pair runs on the home LAN anyway (blac is stationary,
+   g14 on wifi), that is also the interface it is actually needed on.
 
 ## The Windows half (Phase 2) — hand-work on the Windows peer
 
@@ -354,8 +358,21 @@ degrade, it refuses each other.
 6. **Write the two JSON configs.** Absolute paths, no relative ones (upstream
    rejects them before it listens). Keep them by hand in `~/viewflow/` on g14
    and `C:\Viewflow\` on blac — they carry per-session cert paths and are not
-   config-as-code. Pair over the tailnet: blac's Windows install is its own
-   tailnet node, so use its `100.64.0.x`, not a LAN address.
+   config-as-code.
+
+   **Pair over the home LAN, not the tailnet.** This only ever runs at home —
+   blac is stationary and g14 is on the house wifi — and blac's *Windows*
+   install is not enrolled in the tailnet (the Windows nodes in
+   `tailscale status` have all been offline for weeks). Using the LAN means
+   there is nothing to install or log into on the Windows side beyond viewflow
+   itself. g14 is `192.168.1.181` on `wlp2s0`.
+
+   Note this needs g14's firewall opened, which `modules/viewflow.nix` now does
+   (`networking.firewall.allowedUDPPorts = [ 44220 ]`). Going over the tailnet
+   instead would **not** have avoided that: `services.tailscale.openFirewall`
+   opens only udp/41641 and nothing here sets `trustedInterfaces`, so
+   `tailscale0` is filtered like any other interface. A blocked QUIC handshake
+   is silent, so this is worth knowing before debugging one.
 
    g14 as presenter (the easy direction — no Hyprland plugin needed):
 
@@ -378,7 +395,7 @@ degrade, it refuses each other.
    ```json
    {
      "bind": "0.0.0.0:0",
-     "remote": "100.64.0.9:44220",
+     "remote": "192.168.1.181:44220",
      "server_name": "g14-peer",
      "certificate": "C:/Viewflow/windows-peer.pem",
      "private_key": "C:/Viewflow/windows-peer.key",
@@ -391,7 +408,10 @@ degrade, it refuses each other.
    }
    ```
 
-   `100.64.0.9` is g14's tailnet address. Start the presenter first, then the
+   `192.168.1.181` is g14's LAN address on wifi — re-check it with
+   `ip -brief addr` if the lease moves; pinning a DHCP reservation for g14 on
+   the router is the tidier fix if this gets used often. Start the presenter
+   first, then the
    source — upstream's own procedure everywhere is receiver-before-sender.
 
 7. **For the other direction** (g14 as source), g14 additionally needs a capture
