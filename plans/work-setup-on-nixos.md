@@ -190,38 +190,90 @@ Two judgement calls worth knowing about:
   That is on purpose: builds must not start failing the moment the bedag
   tunnels are down.
 
-### Homelab via tailscale — deferred, by request
+### Homelab via tailscale — done, as a real outbound
 
-Today "homelab goes through tailscale" is expressed only as a *bypass*: the
-tailnet CGNAT range and `.phonkd.net` are in `no_proxy`, and (in transparent
-mode) in `route_exclude_address` plus a `direct` route rule — so those packets
-leave sing-box untouched and tailscaled picks them up. That is correct but
-implicit. Making it explicit — a tailscale endpoint outbound, so the homelab is
-reachable *through* sing-box rather than around it — is the outstanding half.
-There is a `TODO(homelab-via-tailscale)` at the route rule in `modules/proxy.nix`.
+The bypass is gone. sing-box now runs **its own userspace tailscale node**
+(`endpoints`, `type = "tailscale"` — the pinned sing-box 1.13.19 is built
+`with_tailscale`, confirmed from `sing-box version`), and homelab traffic is
+routed to it:
 
-- [ ] Homelab traffic through an explicit tailscale outbound rather than a bypass.
-- [ ] Decide whether transparent mode (below) becomes the default once that lands.
+    homelab (100.64.0.0/10, *.ts.net, *.phonkd.net) -> tailscale endpoint
+    bedag (the work config's own domain/ip rules)   -> SOCKS ssh tunnels
+    everything else                                 -> direct
 
-### Transparent mode — written, off, untested
+Both rule forms are needed: `ip_cidr` catches what is already resolved into the
+CGNAT range (raw `100.64.x.y`, deploy targets), the suffix rule catches names
+resolved inside sing-box before an address exists to match on. MagicDNS is
+answered by a `type = "tailscale"` DNS server bound to the endpoint, because
+with the tun capturing the tailnet we can no longer assume the host resolver is
+the one that knows those names.
 
-`noughty.proxy.transparent` adds a `tun` inbound with `auto_route`, turning this
-from an opt-in proxy (things that read `$http_proxy`, plus the ssh catch-all)
-into one that captures every socket on the host. It is **default off and has not
-been run**, because `auto_route` rewrites the default route and z14 already has
-`tailscale0` with opinions about `100.64.0.0/10`. The config it generates is
-schema-valid — `sing-box check` passes on it merged with the real work config —
-which is not the same as saying the routing is right.
+`route_exclude_address` for the tailnet is dropped **exactly when** the endpoint
+is in play — keeping both would mean those packets never reach sing-box and the
+new rules could never match. The wrapper enforces that with one flag, so the two
+states cannot drift apart.
 
-`route_exclude_address` carves out the tailnet so tailscale keeps owning its own
-range, and `strict_route` is deliberately **false**: strict mode also hijacks
-other interfaces' traffic, which is exactly the fight not to pick with
-`tailscale0`. The open question is the RFC1918 ranges — several bedag rules match
-on `ip_cidr` in 10/8 and friends, so those must *not* be blanket-excluded the way
-the tailnet is.
+#### The auth key never enters this repo or the store
 
-- [ ] Turn it on **at a console, not over ssh**, and find out. Rollback is
-      `noughty.proxy.transparent = false` plus a redeploy, or the boot menu.
+The endpoint needs a headscale pre-auth key, and this repo is public. Three
+things together make that a non-issue:
+
+1. **No new secret was minted.** It reuses `sops.secrets.headscale_authkey` —
+   the *reusable* key `modules/tailnet.nix` already gives tailscaled. A second
+   node can register with it, so nothing was created, encrypted or committed.
+2. **The key is not in the Nix store.** The generated config (store, public)
+   holds only the endpoint *tag*. The endpoint itself is a `sops.templates`
+   file rendered at activation to `/run/secrets/rendered/singbox-tailscale.json`.
+   Verified: the store copy contains `<SOPS:…:PLACEHOLDER>`, not a key.
+3. **sing-box merges three `--config` files**, split by who may see them —
+   store/public, private work checkout, sops-rendered secret.
+
+- [x] `endpoints` entry via `sops.templates`, reusing the existing authkey.
+- [x] Route + DNS rules pointing the homelab at it.
+- [x] `StateDirectory = sing-box` so the tsnet node keeps its identity across
+      restarts instead of re-registering every boot.
+
+**Consequence to know about: this is a second node on the mesh.** tsnet is a
+separate identity from the host's tailscaled, so headscale gains a
+`z14-singbox` machine next to `z14`. The alternative that avoids it — a plain
+`direct` outbound with `bind_interface = "tailscale0"`, which needs no key at
+all but makes sing-box depend on tailscaled being up — was not taken, because
+an explicit tailscale outbound was what was asked for. It remains the obvious
+fallback if the duplicate node is annoying.
+
+### Transparent mode — on by default
+
+`noughty.proxy.transparent` defaults **true** now, by request: the tun inbound
+with `auto_route` is what makes this a system-wide proxy rather than one that
+only catches things reading `$http_proxy`. `strict_route` stays **false** —
+strict mode also hijacks other interfaces' traffic, which is exactly the fight
+not to pick with `tailscale0`.
+
+Still true, and still the risk: `auto_route` rewrites the default route. The
+agreed safety net is rolling back to the previous generation from the boot menu,
+not a default-off flag.
+
+What has actually been verified is the *config*, not the routing:
+`sing-box check` passes on the real generated config merged with the real bedag
+config and a stand-in for the rendered endpoint file. That says the schema and
+tag references are right. It says nothing about whether the routes behave.
+
+#### Pre-flight before the first switch
+
+- [ ] Confirm the pre-auth key is still valid and reusable —
+      `headscale preauthkeys list` on observability, **as root** (the CLI needs
+      the socket; plain Tailscale SSH gets permission denied). If it has
+      expired, the endpoint will not register and the homelab goes dark while
+      transparent mode is on, because 100.64.0.0/10 is then routed to a dead
+      outbound.
+- [ ] Watch `journalctl -u sing-box -f` on the first start and look for the
+      tsnet node coming up.
+- [ ] Re-check `ssh 201-mono` — it now leaves via the tailscale endpoint rather
+      than via tailscale0, so this exercises genuinely new ground.
+
+Rollback, cheapest first: `noughty.proxy.tailscaleOutbound.enable = false`
+(back to the bypass, tun still on) → `noughty.proxy.transparent = false` (back
+to an `$http_proxy`-only proxy) → previous generation from the boot menu.
 
 ## Open decisions
 
@@ -262,6 +314,14 @@ the tailnet is.
   without the tag. (The `RestartSec`/`StartLimit` backoff the *user* unit used
   for this is gone with it; `Restart = on-failure` / `RestartSec = 30` remain
   for real crashes.)
+- **The homelab now depends on sing-box.** Previously the tailnet was carved
+  out and tailscaled carried it regardless of the proxy's health; now
+  100.64.0.0/10 is routed to sing-box's own tailscale endpoint. If sing-box is
+  down the tun goes with it and tailscaled takes over again (safe), but if
+  sing-box is *up* and the endpoint failed to register, homelab traffic is
+  routed to a dead outbound — `deploy` and homelab ssh included. That is the
+  single most likely way this bites, and the pre-auth key expiring is the most
+  likely cause; see the pre-flight above.
 - The proxy env vars are now system-wide (`/etc/set-environment`), so they are
   no longer scoped to home-manager's shells. Verified in the built generation:
   `http_proxy`/`HTTP_PROXY` → `http://localhost:2080` and the matching

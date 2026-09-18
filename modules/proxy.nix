@@ -50,7 +50,7 @@
       # service, so the unit always points at the generation being activated.
       sing-box-work = self.wrappers.sing-box-sel.wrap {
         inherit pkgs;
-        additionalConfigFile = "${config.home.homeDirectory}/git/bedag-setup/singbox.json";
+        additionalConfigFiles = [ "${config.home.homeDirectory}/git/bedag-setup/singbox.json" ];
         # The `.phonkd.net` split-DNS route exists only to work around macOS
         # scoped resolvers being invisible to sing-box (see the wrapper). On
         # Linux there is no local dnsmasq to point at — `darwinModules.dns` is
@@ -135,10 +135,31 @@
   # between system and user, and this unit gets no PrivateNetwork, so root
   # dialling a tunnel phonkd opened is fine.
   #
-  # The merged config file lives in the user's home and belongs to the private
-  # work repo, not to this one. `ConditionPathExists` is what keeps a host
-  # without that checkout cleanly inactive rather than crash-looping -- it
-  # replaces the backoff the user unit needed for the same case.
+  # sing-box merges THREE config files here, split by who may see them:
+  #
+  #   1. the generated one, in the store: inbounds, DNS, routing. Public.
+  #   2. ~/git/bedag-setup/singbox.json: the bedag SOCKS outbounds and the
+  #      rules picking between them. Private repo, referenced by path.
+  #   3. /run/secrets/rendered/singbox-tailscale.json: the tailscale endpoint,
+  #      rendered by sops at activation because it carries a pre-auth key.
+  #
+  # That split is what keeps this repo publishable. Nothing secret is ever a
+  # store path, and the key itself is the *existing* reusable headscale
+  # authkey `modules/tailnet.nix` already uses -- so enabling the tailscale
+  # outbound minted, encrypted and committed exactly nothing new.
+  #
+  # `ConditionPathExists` on (2) keeps a host without the private checkout
+  # cleanly inactive rather than crash-looping -- it replaces the backoff the
+  # user unit needed for the same case. It is deliberately the *only*
+  # condition: if the sops template were missing the unit should fail and be
+  # restarted, not silently skip, and a host with no work checkout falling
+  # back to plain tailscaled is the safe failure mode.
+  #
+  # Traffic classes, once `transparent` is on and the tun is capturing:
+  #
+  #   homelab (100.64.0.0/10, *.ts.net, *.phonkd.net) -> tailscale endpoint
+  #   bedag (the work config's own domain/ip rules)   -> SOCKS ssh tunnels
+  #   everything else                                 -> direct
   flake.nixosModules.proxy =
     {
       pkgs,
@@ -148,9 +169,27 @@
     }:
     let
       cfg = config.noughty.proxy;
+      ts = cfg.tailscaleOutbound;
+
+      # Rendered at activation, NOT built into the store: it carries the
+      # headscale pre-auth key. `sops.placeholder` is a marker string that
+      # sops-nix substitutes when it writes the file under
+      # /run/secrets/rendered, so the key exists only there (0400 root) and
+      # never in /nix/store, which is world-readable, nor in this public repo.
+      tailscaleConfigFile = config.sops.templates."singbox-tailscale.json".path;
+
       sing-box-work = self.wrappers.sing-box-sel.wrap {
         inherit pkgs;
-        inherit (cfg) additionalConfigFile listenPort transparent;
+        inherit (cfg) listenPort transparent;
+        additionalConfigFiles = [
+          cfg.additionalConfigFile
+        ]
+        ++ lib.optional ts.enable tailscaleConfigFile;
+        # Only a tag here -- the endpoint it names is defined in the
+        # sops-rendered file above, because it is the half with the secret in
+        # it. Setting this is what turns the tailnet from a bypass into a real
+        # outbound; see the wrapper option.
+        tailscaleEndpointTag = if ts.enable then ts.tag else null;
         # No local dnsmasq on a NixOS laptop -- tailscaled owns resolv.conf
         # here (modules/tailnet.nix) and answers MagicDNS itself, so the plain
         # `local` resolver is already correct. See the option's own docs.
@@ -182,15 +221,75 @@
 
         transparent = lib.mkOption {
           type = lib.types.bool;
-          default = false;
+          default = true;
           description = ''
             Capture every socket on the host via a tun inbound, instead of
-            only the things that honour `$http_proxy`.
+            only the things that honour `$http_proxy`. This is what makes the
+            proxy genuinely system-wide, and it is on by request.
 
-            Defaults off and is UNTESTED: `auto_route` rewrites the default
-            route, and z14 already has tailscale0 with opinions about
-            100.64.0.0/10. Turn it on at a console, not over ssh.
+            `auto_route` rewrites the default route. If a generation comes up
+            wrong the rollback is the previous one from the boot menu, which
+            is the agreed safety net here rather than a reason to default off.
           '';
+        };
+
+        tailscaleOutbound = {
+          enable = lib.mkOption {
+            type = lib.types.bool;
+            default = true;
+            description = ''
+              Give sing-box its own userspace tailscale node and route homelab
+              traffic to it, instead of carving the tailnet out of the tun and
+              leaving it to tailscaled.
+
+              Consequence worth knowing: this is a *second* node on the mesh
+              (tsnet is a separate identity from the host's tailscaled), so
+              headscale gains a machine entry alongside `z14`. The alternative
+              that avoids that -- a plain `direct` outbound with
+              `bind_interface = "tailscale0"` -- is noted in
+              plans/work-setup-on-nixos.md; it needs no key but makes sing-box
+              depend on tailscaled being up.
+            '';
+          };
+
+          tag = lib.mkOption {
+            type = lib.types.str;
+            default = "ts-out";
+            description = "Endpoint tag; the route and DNS rules refer to it.";
+          };
+
+          controlUrl = lib.mkOption {
+            type = lib.types.str;
+            default = "https://hs.phonkd.net";
+            description = ''
+              The headscale control plane -- this mesh is self-hosted, so this
+              is emphatically not the Tailscale SaaS default. Same value
+              `modules/tailnet.nix` passes tailscaled as `--login-server`.
+            '';
+          };
+
+          hostname = lib.mkOption {
+            type = lib.types.str;
+            default = "${config.networking.hostName}-singbox";
+            description = ''
+              Name the tsnet node registers under. Deliberately distinct from
+              the host's own tailscaled node, which shares the mesh with it.
+            '';
+          };
+
+          authKeySecret = lib.mkOption {
+            type = lib.types.str;
+            default = "headscale_authkey";
+            description = ''
+              Name of the sops secret holding the headscale pre-auth key.
+
+              Defaults to the key `modules/tailnet.nix` already uses: it is
+              *reusable* (headscale user `phonkd`), so a second node can
+              register with it and no new secret material has to be minted,
+              encrypted or committed. That is the whole reason this feature
+              adds nothing sensitive to this public repo.
+            '';
+          };
         };
       };
 
@@ -201,8 +300,41 @@
           pkgs.socat
         ];
 
+        # Already declared by modules/tailnet.nix for tailscaled itself; the
+        # module system merges the two definitions, and saying it here keeps
+        # this module honest about what it depends on rather than relying on
+        # another module's gate happening to match.
+        sops.secrets.${ts.authKeySecret} = lib.mkIf ts.enable { };
+
+        # The only part of the sing-box config that cannot live in the store.
+        # Everything else -- inbounds, routes, DNS -- is public and generated
+        # by the wrapper; this file holds just the endpoint, because the
+        # endpoint holds the key.
+        sops.templates."singbox-tailscale.json" = lib.mkIf ts.enable {
+          content = builtins.toJSON {
+            endpoints = [
+              {
+                type = "tailscale";
+                tag = ts.tag;
+                auth_key = config.sops.placeholder.${ts.authKeySecret};
+                control_url = ts.controlUrl;
+                hostname = ts.hostname;
+                # Persisted under StateDirectory below, so the node keeps its
+                # identity across restarts instead of re-registering (and
+                # littering headscale with machine entries) every boot.
+                state_directory = "/var/lib/sing-box/tailscale";
+                # Do not pull in subnet routes other nodes advertise: 201
+                # advertises an exit node, and silently inheriting routes here
+                # would change what "direct" means for the whole host.
+                accept_routes = false;
+                ephemeral = false;
+              }
+            ];
+          };
+        };
+
         systemd.services.sing-box = {
-          description = "sing-box (bedag work proxy)";
+          description = "sing-box (system proxy: bedag tunnels + tailnet)";
           after = [ "network.target" ];
           wantedBy = [ "multi-user.target" ];
 
@@ -214,14 +346,18 @@
             Restart = "on-failure";
             RestartSec = 30;
             # Root, because the tun inbound needs NET_ADMIN and because the
-            # config file lives under /home. Hardened where that costs
-            # nothing: this process only ever opens sockets and reads two
-            # config files.
+            # config files live under /home and /run/secrets. Hardened where
+            # that costs nothing: this process only opens sockets and reads
+            # its configs.
             AmbientCapabilities = lib.mkIf cfg.transparent [ "CAP_NET_ADMIN" ];
             ProtectSystem = "strict";
             ProtectHome = "read-only";
             PrivateTmp = true;
             NoNewPrivileges = true;
+            # /var/lib/sing-box, for the tsnet node's identity. Required
+            # *because* of ProtectSystem = "strict", which would otherwise
+            # leave /var/lib read-only; systemd creates and owns it.
+            StateDirectory = "sing-box";
             # NB deliberately no PrivateNetwork: the SOCKS outbounds are the
             # user's loopback ssh tunnels.
           };
@@ -241,10 +377,12 @@
         environment.sessionVariables =
           let
             url = "http://localhost:${toString cfg.listenPort}";
-            # `.phonkd.net` (homelab web) and the tailnet range bypass the
-            # proxy so env-proxy clients reach them direct over the mesh --
-            # the "homelab goes through tailscale" half, as far as it goes
-            # today. Work domains are unaffected (not under phonkd.net).
+            # Keeps homelab traffic out of the *HTTP* proxy path. With
+            # `transparent` on these packets are still captured by the tun and
+            # still routed to the tailscale endpoint, so this is no longer the
+            # thing that makes the homelab work -- it just avoids a pointless
+            # extra hop through the mixed inbound for clients that read the
+            # variable. Work domains are unaffected (not under phonkd.net).
             bypass = "localhost,127.0.0.1,.phonkd.net,100.64.0.0/10";
           in
           {
@@ -270,9 +408,19 @@
       imports = [ wlib.modules.default ];
 
       options = {
-        additionalConfigFile = lib.mkOption {
-          type = lib.types.str;
-          description = "Path to additional sing-box config file, merged as a second --config.";
+        additionalConfigFiles = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = ''
+            Further sing-box config files, each appended as another `--config`.
+            sing-box merges them key by key and keeps arrays in file order, so
+            the generated config (always first) wins any rule conflict.
+
+            A list rather than a single path because the NixOS side now has two
+            of them: the private bedag config, and a sops-rendered file holding
+            the tailscale endpoint. That second one is the whole reason the
+            auth key never reaches the Nix store.
+          '';
         };
         listenPort = lib.mkOption {
           type = lib.types.int;
@@ -301,20 +449,51 @@
             `nixosModules.proxy` ever sets it — the launchd agent is an
             unprivileged user agent and cannot.
 
-            UNTESTED on z14, which is why it defaults false. `auto_route`
-            rewrites the default route, so getting it wrong takes the machine
-            off the network; flip it on at a console, not over ssh. See the
-            rollout note in plans/work-setup-on-nixos.md.
+            `auto_route` rewrites the default route. Rollback is the previous
+            generation from the boot menu.
+          '';
+        };
+        tailscaleEndpointTag = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = ''
+            Tag of a sing-box `tailscale` endpoint (declared in one of
+            `additionalConfigFiles`, because it carries an auth key) to route
+            homelab traffic to.
+
+            Setting this flips the tailnet from a *bypass* into a real
+            outbound. The difference matters: as a bypass the tailnet was
+            carved out of the tun with `route_exclude_address` and left to
+            tailscaled; as an outbound those packets are captured and handed
+            to sing-box's own userspace tailscale node instead. So the
+            exclusion is dropped exactly when this is set — keeping both would
+            mean the rules below could never match.
+
+            null keeps the old bypass behaviour.
           '';
         };
         tailnetCidr = lib.mkOption {
           type = lib.types.str;
           default = "100.64.0.0/10";
           description = ''
-            Carved out of the tun inbound with `route_exclude_address`, so
-            tailscale keeps owning its own CGNAT range and the homelab stays
-            reachable over the mesh while `transparent` is on. Inert unless
-            `transparent` is set.
+            The tailnet's CGNAT range. With `tailscaleEndpointTag` set it is
+            the match for the route rule sending homelab traffic to that
+            endpoint; without it, it is what gets carved out of the tun via
+            `route_exclude_address` so tailscaled keeps owning its own range.
+            Inert unless `transparent` is set.
+          '';
+        };
+        homelabDomainSuffixes = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [
+            ".ts.net"
+            ".phonkd.net"
+          ];
+          description = ''
+            Name-based half of the tailnet route. The `ip_cidr` rule alone
+            catches anything already resolved into the CGNAT range; these
+            catch homelab names whose resolution happens inside sing-box.
+            Inert unless `tailscaleEndpointTag` is set.
           '';
         };
       };
@@ -322,6 +501,9 @@
       config =
         let
           useHomelabDns = config.homelabDnsServer != null;
+          # The tailnet is either an outbound or a bypass, never both -- see
+          # `tailscaleEndpointTag`.
+          useTailscale = config.tailscaleEndpointTag != null;
         in
         {
           constructFiles.singBoxConfig.content = builtins.toJSON {
@@ -356,6 +538,19 @@
                 type = "udp";
                 tag = "homelab";
                 server = config.homelabDnsServer;
+              }
+              # MagicDNS, answered by sing-box's own tailscale node rather than
+              # by tailscaled's resolv.conf. Needed because with the tun
+              # capturing the tailnet we can no longer assume the host resolver
+              # is the one that knows these names.
+              ++ lib.optional useTailscale {
+                type = "tailscale";
+                tag = "ts-dns";
+                endpoint = config.tailscaleEndpointTag;
+              };
+              rules = lib.optional useTailscale {
+                domain_suffix = config.homelabDomainSuffixes;
+                server = "ts-dns";
               };
               final = "local";
             };
@@ -383,7 +578,11 @@
               # `strict_route` also hijacks other interfaces' traffic, which is
               # exactly the fight we do not want with tailscale0.
               strict_route = false;
-              route_exclude_address = [ config.tailnetCidr ];
+              # Only while the tailnet is a *bypass*. Once it is a real
+              # outbound (`tailscaleEndpointTag`) we need those packets to
+              # reach sing-box, so excluding them here would defeat the route
+              # rule that sends them to the endpoint.
+              route_exclude_address = lib.optional (!useTailscale) config.tailnetCidr;
               stack = "system";
             };
             outbounds = [
@@ -414,21 +613,31 @@
                 domain_suffix = [ ".phonkd.net" ];
                 outbound = "direct-homelab";
               }
-              # Belt and braces next to `route_exclude_address` above: that
-              # keeps tailnet packets out of the tun device, this keeps them
-              # out of the *tunnels* if they arrive at the mixed inbound
-              # anyway (an env-proxy client that ignored `no_proxy`, say).
-              # Our config is the first `--config`, and sing-box keeps merged
-              # rules in file order, so this is evaluated before any of the
-              # work config's own rules and wins.
+              # The homelab half of the routing table. Both forms are needed:
+              # `ip_cidr` catches anything already resolved into the CGNAT
+              # range (ssh to a raw 100.64.x.y, deploy targets), while the
+              # suffix rule catches homelab names resolved inside sing-box,
+              # before an address exists to match on.
               #
-              # TODO(homelab-via-tailscale): today "homelab goes through
-              # tailscale" is expressed only as this bypass — the packets
-              # leave sing-box untouched and tailscaled picks them up. Making
-              # it explicit (a tailscale endpoint outbound, so the homelab is
-              # reachable through sing-box rather than around it) is the
-              # deferred half of this work; see plans/work-setup-on-nixos.md.
-              ++ lib.optional config.transparent {
+              # Our config is the first `--config` and sing-box keeps merged
+              # rules in file order, so these are evaluated before any of the
+              # work config's own rules and win. That ordering is what stops a
+              # homelab address ever being handed to a bedag tunnel.
+              ++ lib.optionals useTailscale [
+                {
+                  ip_cidr = [ config.tailnetCidr ];
+                  outbound = config.tailscaleEndpointTag;
+                }
+                {
+                  domain_suffix = config.homelabDomainSuffixes;
+                  outbound = config.tailscaleEndpointTag;
+                }
+              ]
+              # Bypass form, for when there is no tailscale endpoint: keep
+              # tailnet traffic out of the work tunnels if it arrives at the
+              # mixed inbound anyway (an env-proxy client that ignored
+              # `no_proxy`, say) and let tailscaled have it.
+              ++ lib.optional (config.transparent && !useTailscale) {
                 ip_cidr = [ config.tailnetCidr ];
                 outbound = "direct";
               };
@@ -442,9 +651,8 @@
             "run"
             "--config"
             config.constructFiles.singBoxConfig.path
-            "--config"
-            config.additionalConfigFile
-          ];
+          ]
+          ++ lib.concatMap (f: [ "--config" f ]) config.additionalConfigFiles;
         };
     };
 }
