@@ -795,7 +795,29 @@
               # it touches phonkd.net. Anything neither set matches goes straight
               # out. With `homelabDnsServer = null` this list is empty and the
               # work config's own rules are the whole routing table.
-              rules = lib.optional useHomelabDns {
+              # MUST be first, and is what makes the work config's rules work
+              # at all under the tun.
+              #
+              # Those rules are almost entirely `domain_suffix` (".bedag.ch"
+              # and friends). Through the mixed inbound that is fine: an
+              # `$http_proxy` client sends `CONNECT wiki.bedag.ch:443`, so
+              # sing-box is handed the name. The tun gets no such courtesy --
+              # the client resolves the name itself and sing-box sees only
+              # 159.144.24.33, matches no domain rule, falls through to
+              # `direct`, and times out because that host only exists down a
+              # tunnel.
+              #
+              # Sniffing recovers the name from the TLS ClientHello's SNI (or
+              # an HTTP Host header) before the rules are evaluated, so the
+              # domain rules match again. It is ordered ahead of everything,
+              # including the work config's own rules, because our config is
+              # the first `--config`.
+              #
+              # Only under `transparent`: with the tun absent the name is
+              # already known and this would be a no-op, and the Mac's
+              # behaviour should not change.
+              rules = lib.optional config.transparent { action = "sniff"; }
+              ++ lib.optional useHomelabDns {
                 domain_suffix = [ ".phonkd.net" ];
                 outbound = "direct-homelab";
               }
