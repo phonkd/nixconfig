@@ -191,7 +191,12 @@
 
       sing-box-work = self.wrappers.sing-box-sel.wrap {
         inherit pkgs;
-        inherit (cfg) listenPort transparent tunStack;
+        inherit (cfg)
+          listenPort
+          transparent
+          tunStack
+          logLevel
+          ;
         additionalConfigFiles = [
           cfg.additionalConfigFile
         ]
@@ -276,6 +281,29 @@
             TCP/IP stack for the tun inbound. See the wrapper option of the
             same name — `"system"` is what swallowed all IPv4 on the first
             attempt. Inert unless `transparent` is set.
+          '';
+        };
+
+        logLevel = lib.mkOption {
+          type = lib.types.enum [
+            "trace"
+            "debug"
+            "info"
+            "warn"
+            "error"
+          ];
+          # TEMPORARY, for one diagnostic round. `action = "sniff"` provably
+          # works in a standalone sing-box with this exact config minus the
+          # tun inbound (socks5 to wiki.bedag.ch returns 302), and provably
+          # does not on the live host with the tun present (same request is
+          # logged as `outbound/direct[direct]` and times out). The tun cannot
+          # be reproduced without root, so the next step is to watch what the
+          # live process actually does rather than guess a fourth time.
+          # Put this back to "warn" once the sniff question is settled.
+          default = "debug";
+          description = ''
+            sing-box log level. See the wrapper option of the same name for
+            why "warn" is the resting value.
           '';
         };
 
@@ -561,6 +589,26 @@
             Inert unless `tailscaleEndpointTag` is set.
           '';
         };
+        logLevel = lib.mkOption {
+          type = lib.types.enum [
+            "trace"
+            "debug"
+            "info"
+            "warn"
+            "error"
+          ];
+          default = "warn";
+          description = ''
+            sing-box log level.
+
+            "warn" is the resting value: "info" logs a line per connection and
+            per packet-connection, which during the routing loop of the first
+            transparent attempt was itself a large share of the load. Raise it
+            to "debug" only to diagnose, and put it back — the unit's
+            `CPUQuota` and journal rate limiting bound the damage, but they do
+            not make it free.
+          '';
+        };
         tunStack = lib.mkOption {
           type = lib.types.enum [
             "gvisor"
@@ -667,7 +715,7 @@
             # config first shipped with it was itself a large part of the load:
             # a feedback loop logging three lines per iteration at millions of
             # iterations. "warn" still reports the things worth waking up for.
-            log.level = "warn";
+            log.level = config.logLevel;
 
             # sing-box does its own name resolution, and its `local` server reads
             # /etc/resolv.conf — which on macOS is the legacy file holding the
