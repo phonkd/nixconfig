@@ -14,7 +14,7 @@
   # *.w.phonkd.net reaches traefik over the mesh from anywhere (201 opens :443
   # on all interfaces incl. tailscale0). This is what lets homelab web ride the
   # tailnet instead of sing-box — `.w.phonkd.net` is no longer in the sing-box
-  # `domains` list (see modules/proxy.nix). Wired via builder.nix
+  # `domains` list (see modules/proxy/darwin.nix). Wired via builder.nix
   # alwaysImportDarwin.
   flake.darwinModules.dns = { config, pkgs, lib, ... }:
     {

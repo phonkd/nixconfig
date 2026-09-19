@@ -181,7 +181,7 @@
         # flip the switch on `nixosModules.proxy` (which alwaysImport already
         # carries and which self-gates on this option). See the note in
         # `homeModules.work` for why the proxy hangs off the platform modules
-        # rather than off `work` itself, and modules/proxy.nix for why the Linux
+        # rather than off `work` itself, and modules/proxy/nixos.nix for why the Linux
         # half went system-wide.
         noughty.proxy.enable = true;
 

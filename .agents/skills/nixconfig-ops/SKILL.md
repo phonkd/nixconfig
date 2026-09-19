@@ -117,7 +117,7 @@ so `deploy` rides the tailnet too.
   ssh-jump through 203 — `~/.ssh/config` has a `192.168.1.* 192.168.3.*` block
   with `ProxyCommand ssh phonkd@100.64.0.3 nc %h %p`. So they need 203 up.
 - **sing-box still runs, but only for work + Spotify** (the bedag work VPN and
-  the `domains` list in `modules/proxy.nix`). It is irrelevant to homelab ops —
+  the `domains` list in `modules/proxy/darwin.nix`). It is irrelevant to homelab ops —
   if it's down, homelab access is unaffected.
 - **Break-glass when the tailnet is broken**: obs's real sshd is on **:5432**
   at its public IP — `ssh obs-rescue-public` (alias in `mac.nix`; the raw
