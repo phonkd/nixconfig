@@ -113,16 +113,31 @@ module wiring is written and evaluated; only the download is outstanding.
       already, guarded on `NIXOS_OZONE_WL` + `WAYLAND_DISPLAY` — and
       `modules/desktop.nix:407` sets `NIXOS_OZONE_WL = "1"`. An `overrideAttrs`
       re-adding those flags would have been pure duplication.
-- [~] **DisplayLink** (the dock) — wired, needs one manual download.
+- [x] **DisplayLink** (the dock) — done. The download below has been made and
+      `noughty.work.displaylink.enable` is now on in `modules/hosts/z14.nix`
+      (on the host, not the tag: it is a fact about this machine's store, and
+      another work-tagged host would have to fetch its own copy first). The
+      zip's hash matched nixpkgs' expected
+      `sha256-JQO7eEz4pdoPkhcn9tIuy5R4KyfsCniuw6eXw/rLaYE=` exactly, and
+      205-builder needed no separate fetch — the offloaded build copies the
+      `requireFile` path across like any other input, which was verified rather
+      than assumed. Retained below: the wiring, and the URL, since the fetch
+      has to be repeated per release and on any new machine.
       `noughty.work.displaylink.enable` (default off) sets
       `services.xserver.videoDrivers = [ "displaylink" ]`; membership in that
       list is the sole gate on `hardware/video/displaylink.nix`, which brings
       the `evdi` kernel module, the udev rules and the `dlm` service. To
       finish, on z14 itself:
-      `nix-prefetch-url --name displaylink-620.zip <url>` (the exact URL is
-      printed by the package's own `requireFile` message — Synaptics puts it
-      behind an EULA click-through, so there is no non-interactive route),
-      then flip the flag and `deploy z14`.
+      `nix-prefetch-url --name displaylink-620.zip <url>`, then flip the flag
+      and `deploy z14`. The URL is printed by the package's own `requireFile`
+      message; contrary to the note that used to stand here, it is a plain
+      link rather than a click-through, so the fetch *is* scriptable —
+      Synaptics gates it on an EULA it does not technically enforce:
+
+      ```sh
+      nix-prefetch-url --name displaylink-620.zip \
+        'https://www.synaptics.com/sites/default/files/exe_files/2025-09/DisplayLink%20USB%20Graphics%20Software%20for%20Ubuntu6.2-EXE.zip'
+      ```
       **Correction to the earlier note here:** the two Xorg-shaped bits of that
       module are *inert* under Hyprland, not broken, so no override is needed.
       The `sessionCommands` `xrandr --setprovideroutputsource` only ever runs
@@ -133,11 +148,48 @@ module wiring is written and evaluated; only the download is outstanding.
       on any setup: the displaylink package's own udev rules start it when the
       dock appears, which is the behaviour we want anyway.
 - [~] **Citrix Workspace** (the ICA sessions) — wired, needs one manual
-      download. `noughty.work.citrix.enable` (default off) adds
-      `pkgs.citrix-workspace` — `citrix_workspace` became a rename alias on
-      2026-06-17 and warns. x86_64-linux, unfree, and also `requireFile`, so
-      the same dance as DisplayLink: `nix build` prints the file it wants and
-      where to get it. This supersedes the "not installed on Linux" decision
+      download. `noughty.work.citrix.enable` (default off) adds the client;
+      x86_64-linux, unfree, and also `requireFile`, so the same dance as
+      DisplayLink: `nix build` prints the file it wants and where to get it.
+      Unlike DisplayLink's, this download really is behind a click-through and
+      cannot be scripted. Get `linuxx64-26.04.0.105.tar.gz` from
+      <https://www.citrix.com/downloads/workspace-app/betas-and-tech-previews/workspace-app-tp-gcc11-for-linux.html>
+      (falling back to <https://www.citrix.com/downloads/workspace-app/>), then
+      `nix-prefetch-url "file://$PWD/linuxx64-26.04.0.105.tar.gz"` and flip the
+      flag.
+
+      **Correction to what this entry used to say.** It claimed the module adds
+      `pkgs.citrix-workspace`, "`citrix_workspace` having become a rename alias
+      on 2026-06-17". That rename is real but it is *not* on our pin — `pkgs`
+      here still has only the `citrix_workspace*` spellings, so
+      `pkgs.citrix-workspace` did not exist and the first
+      `citrix.enable = true` would have died with `attribute 'citrix-workspace'
+      missing`. `lib.optional` is lazy and the flag defaults off, which is why
+      nothing ever surfaced it.
+
+      Fixed by taking the package from **nixpkgs-unstable** rather than by
+      naming the pin's real attribute. `citrix_workspace_26_01_0` links
+      libsoup 2.4, which nixpkgs marks insecure, so it does not evaluate either
+      without a host-wide `permittedInsecurePackages = [ "libsoup-2.74.3" ]`;
+      it is also already a `throw` in current nixpkgs for that same reason, so
+      it would break at the next flake bump. Unstable's `citrix-workspace` is
+      the GCC 11 line (libsoup 3 + WebKitGTK 4.1), needs no allowance, and
+      carries the `wfica` `GDK_BACKEND`/`EGL_PLATFORM` X11 pin
+      (NixOS/nixpkgs#540102) that the pin lacks — which matters here rather
+      than in general: `wfica` is an X11 client under XWayland, and on a
+      Wayland session Mesa's EGL loader otherwise picks the Wayland platform
+      for its startup GL probe and segfaults in `wl_proxy_create_wrapper`.
+      Hyprland is the only session on z14, so that would be every launch.
+
+      Teams *inside* the VDI needs nothing further: HDX optimisation
+      (`HdxRtcEngine`) ships in the client, and the packaging already puts
+      libpulseaudio on its library path (it `dlopen`s `libpulse.so.0`, which
+      autoPatchelf cannot see) and forces `MultiMedia=On` in `module.ini`,
+      which the upstream installer otherwise disables when it cannot link into
+      FHS gstreamer directories. That is separate from the `teams-for-linux`
+      entry above, which is Teams on the laptop itself.
+
+      This supersedes the "not installed on Linux" decision
       below rather than contradicting it: the Linux `ica-proxy` branch already
       rewrites the .ica and hands it to `xdg-open`, so this package is exactly
       what supplies the handler that branch assumes exists. `remmina` stays for

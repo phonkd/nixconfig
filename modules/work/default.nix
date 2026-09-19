@@ -98,6 +98,45 @@
       noughtyLib,
       ...
     }:
+    let
+      # Citrix Workspace, for the ICA sessions.
+      #
+      # This used to read `citrix-workspace` straight out of `pkgs`, which does
+      # not exist on our pin -- nixpkgs only renamed the attribute away from
+      # `citrix_workspace*` later. `lib.optional` is lazy and the option below
+      # defaults false, so the missing attribute never evaluated and the
+      # mistake stayed invisible: the first `citrix.enable = true` would have
+      # failed eval with `attribute 'citrix-workspace' missing` rather than
+      # installing anything.
+      #
+      # Naming the pin's real attribute instead would mean
+      # `citrix_workspace_26_01_0`, which is a trap of its own: it links
+      # libsoup 2.4, which nixpkgs marks insecure, so that does not evaluate
+      # either without a system-wide
+      # `permittedInsecurePackages = [ "libsoup-2.74.3" ]` on this host. It is
+      # also a dead end -- current nixpkgs has already replaced that attribute
+      # with a `throw` for exactly that reason, so it would break at the next
+      # flake bump. Unstable's `citrix-workspace` is the GCC 11 package line,
+      # links libsoup 3 + WebKitGTK 4.1, and needs no allowance.
+      #
+      # It also carries the `wfica` X11 pin (NixOS/nixpkgs#540102) that the pin
+      # lacks, and that one matters here specifically: wfica is an X11 client
+      # running under XWayland, and on a Wayland session Mesa's EGL loader
+      # otherwise selects the Wayland platform for its startup GL probe and it
+      # segfaults in wl_proxy_create_wrapper. Hyprland is the only session on
+      # the one host carrying this tag, so that would be every launch.
+      #
+      # `import` rather than the `inputs.nixpkgs-unstable.legacyPackages.<sys>`
+      # spelling used in modules/zed-editor.nix and modules/desktop.nix: those
+      # pull *free* packages, and an input's bare legacyPackages carries that
+      # input's own default config, where allowUnfree is false. Ours is set on
+      # the host, not on the input.
+      citrixWorkspace =
+        (import inputs.nixpkgs-unstable {
+          inherit (pkgs.stdenv.hostPlatform) system;
+          config.allowUnfree = true;
+        }).citrix-workspace;
+    in
     {
       # Declared outside the tag gate -- options may not live inside mkIf.
       # Both default false because both packages are `requireFile`: nixpkgs
@@ -159,7 +198,9 @@
             # overrideAttrs re-adding those flags would be pure duplication.
             teams-for-linux
           ]
-          ++ lib.optional config.noughty.work.citrix.enable citrix-workspace;
+          # let-bound above, not a pkgs attribute -- a `let` binding wins over
+          # `with`, which is what makes naming it here work.
+          ++ lib.optional config.noughty.work.citrix.enable citrixWorkspace;
 
         # DisplayLink. Membership in this list is the *sole* gate on
         # nixos/modules/hardware/video/displaylink.nix, which is what brings
