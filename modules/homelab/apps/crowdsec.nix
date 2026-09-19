@@ -107,6 +107,50 @@
             on_success = "break";
           }
         ];
+
+        # Our own devices must never be banned. Without this, browsing an *arr
+        # web UI over the tailnet trips crowdsecurity/http-crawl-non_statics
+        # (those UIs fire dozens of distinct non-static XHRs per page load) and
+        # the firewall bouncer then DROPs the device in 201's INPUT chain for
+        # the 4h profile duration above — silently, and ahead of traefik, so
+        # every home.phonkd.net service simply hangs with no 403 and nothing in
+        # the traefik log to look at. Measured on 2026-09-19: z14 arrived as
+        # 100.64.0.17, earned a ban on 41 events, and sat in the
+        # `crowdsec-blacklists-1` ipset while sabnzbd/sonarr/radarr/jellyfin all
+        # timed out from that host. Port 22 kept working throughout, which is
+        # what made it look like a routing or sing-box fault rather than a ban.
+        #
+        # s02-enrich runs before any scenario sees the event, so a whitelisted
+        # source never fills a bucket in the first place — cheaper than a
+        # postoverflow, and it keeps the alert list readable too.
+        #
+        # THE CIDR LIST IS A MIRROR, not an independent policy: it is the same
+        # set as traefik's `ip-filter` allow-list and authelia's `internal`
+        # network (see traefik.nix and authelia/authelia.nix, both of which
+        # already carry a note about keeping the three in step). A source one of
+        # them trusts and another does not is exactly the asymmetry that
+        # produces a silent, un-debuggable failure. Change all three or none.
+        localConfig.parsers.s02Enrich = [
+          {
+            name = "homelab/trusted-networks";
+            description = "Whitelist the tailnet and the home/homelab LANs";
+            whitelist = {
+              reason = "trusted homelab networks — mirrors traefik ip-filter";
+              cidr = [
+                "192.168.3.0/24"
+                "192.168.1.0/24"
+                "192.168.2.0/24"
+                "10.8.0.0/16"
+                # The headscale tailnet: single-user, headscale-authenticated,
+                # and holds only our own devices. This is the entry that
+                # actually matters — away from the LAN every one of our clients
+                # reaches 201 as 100.64.0.x, so it is the range all of our own
+                # browsing arrives from.
+                "100.64.0.0/10"
+              ];
+            };
+          }
+        ];
       };
 
       # Both of these shell out to `cscli hub update`, which resolves and
