@@ -131,11 +131,56 @@
       # pull *free* packages, and an input's bare legacyPackages carries that
       # input's own default config, where allowUnfree is false. Ours is set on
       # the host, not on the input.
-      citrixWorkspace =
-        (import inputs.nixpkgs-unstable {
-          inherit (pkgs.stdenv.hostPlatform) system;
-          config.allowUnfree = true;
-        }).citrix-workspace;
+      unstable = import inputs.nixpkgs-unstable {
+        inherit (pkgs.stdenv.hostPlatform) system;
+        config.allowUnfree = true;
+      };
+
+      # Re-pinned off nixpkgs' 26.04.0.105, which cannot be obtained any more.
+      #
+      # That version is a *tech preview* build, and Citrix does not keep those
+      # around: by the time this was wired up, 26.04 had been demoted to
+      # "Earlier Versions", where only the `linuxx64-gcc-8-26.04.0.105.tar.gz`
+      # variant is still published. The GCC 8 tarball is not interchangeable
+      # with the GCC 11 one this expression is written against -- different
+      # build line, different checksum, and the expression strips a
+      # WebKitGTK 4.0 bundle and links libsoup 3 on the assumption of GCC 11 --
+      # so feeding it the file that *is* still downloadable would not have
+      # worked either.
+      #
+      # 26.08.0.153 is the current tech preview and the same GCC 11 line, so
+      # only the version and the file it asks for change. Nothing else in the
+      # expression reads `version` (it appears in `src.name` and in the
+      # requireFile message, nothing more), which is what makes this a clean
+      # two-field override rather than a fork of the package.
+      #
+      # Expect to redo this. Citrix rotates tech previews out of the download
+      # portal, so the version here goes stale the same way 26.04 did; when the
+      # build starts asking for a tarball the portal no longer lists, bump both
+      # fields to whatever the tech preview page currently offers.
+      citrixWorkspace = unstable.citrix-workspace.overrideAttrs (prev: {
+        version = "26.08.0.153";
+        src = unstable.requireFile {
+          name = "linuxx64-26.08.0.153.tar.gz";
+          sha256 = "17f0nlg18bz2b6qq86i04igm551b54nym41zi13m81906fzgi4h7";
+          message = ''
+            Citrix Workspace is `requireFile`: it cannot be fetched
+            automatically, and the download is behind a click-through.
+
+            Get the x86_64 *tarball* for version 26.08.0.153 from the tech
+            preview listing -- NOT the "Earlier Versions" section, whose
+            remaining 26.x tarballs are the GCC 8 build and will not satisfy
+            this hash:
+
+              https://www.citrix.com/downloads/workspace-app/
+
+            The file must be named linuxx64-26.08.0.153.tar.gz (no `gcc-8` in
+            the name). Then:
+
+              nix-prefetch-url "file://$PWD/linuxx64-26.08.0.153.tar.gz"
+          '';
+        };
+      });
     in
     {
       # Declared outside the tag gate -- options may not live inside mkIf.

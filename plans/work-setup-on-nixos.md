@@ -147,16 +147,36 @@ module wiring is written and evaluated; only the download is outstanding.
       against an absent unit is a no-op, not a failure. `dlm` has no `wantedBy`
       on any setup: the displaylink package's own udev rules start it when the
       dock appears, which is the behaviour we want anyway.
-- [~] **Citrix Workspace** (the ICA sessions) — wired, needs one manual
-      download. `noughty.work.citrix.enable` (default off) adds the client;
-      x86_64-linux, unfree, and also `requireFile`, so the same dance as
-      DisplayLink: `nix build` prints the file it wants and where to get it.
-      Unlike DisplayLink's, this download really is behind a click-through and
-      cannot be scripted. Get `linuxx64-26.04.0.105.tar.gz` from
-      <https://www.citrix.com/downloads/workspace-app/betas-and-tech-previews/workspace-app-tp-gcc11-for-linux.html>
-      (falling back to <https://www.citrix.com/downloads/workspace-app/>), then
-      `nix-prefetch-url "file://$PWD/linuxx64-26.04.0.105.tar.gz"` and flip the
-      flag.
+- [x] **Citrix Workspace** (the ICA sessions) — done, at version
+      **26.08.0.153**, with `noughty.work.citrix.enable = true` on z14.
+      x86_64-linux, unfree, and `requireFile`, so the same dance as
+      DisplayLink — except this download really is behind a click-through and
+      cannot be scripted:
+
+      ```sh
+      # x86_64 tarball, from the *tech preview* listing
+      nix-prefetch-url "file://$PWD/linuxx64-26.08.0.153.tar.gz"
+      ```
+
+      **Why not nixpkgs' own 26.04.0.105 — and expect to redo this.** That
+      version is a tech preview, and Citrix does not keep tech previews around.
+      By the time this was wired up 26.04 had been demoted to "Earlier
+      Versions", where the only surviving 26.04 tarball is
+      `linuxx64-gcc-8-26.04.0.105.tar.gz`. That one is *not* interchangeable:
+      the GCC 8 and GCC 11 builds are different files with different checksums,
+      and the expression strips a WebKitGTK 4.0 bundle and links libsoup 3 on
+      the assumption of GCC 11. Three distinct SHA-256s were involved before
+      this was understood — nixpkgs' expected hash, the GA page's x86_64
+      tarball, and the GCC 8 file that actually downloaded — and none matched.
+      The tell is the filename: the GCC 11 build carries no `gcc-8` infix.
+
+      So `modules/work/default.nix` overrides `version` + `src` on unstable's
+      `citrix-workspace` rather than taking it as-is. Nothing else in that
+      expression reads `version` (it appears only in `src.name` and the
+      requireFile message), which is what keeps this a two-field override
+      instead of a fork. The same rotation will stale *this* pin too: when the
+      build starts demanding a tarball the portal no longer lists, bump both
+      fields to whatever the tech preview page currently offers and re-fetch.
 
       **Correction to what this entry used to say.** It claimed the module adds
       `pkgs.citrix-workspace`, "`citrix_workspace` having become a rename alias
