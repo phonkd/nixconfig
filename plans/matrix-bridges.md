@@ -321,13 +321,17 @@ serving the two well-known JSON files from the apex deliberately.
    version string is deliberate: a nixpkgs bump past 3.2.16 breaks the build
    rather than silently doing nothing.
 8. **The bridges' secret defaults are `""`, not `"generate"`** — the modules'
-   own comments are stale on this point. Either way the config file is rebuilt
-   on every start, so anything left at the default rotates on each restart and
-   invalidates every encrypted session. The mechanism that fixes it is
+   own comments are stale on this point, and so was the first draft of this
+   plan, which inherited the comments' conclusion. Because `""` is not
+   `"generate"`, nothing is generated and **nothing rotates on restart**; the
+   real defect is narrower and duller — an empty key, identical on every
+   install. Only `pickle_key` is worth fixing (it encrypts the bridge's crypto
+   store and must be stable *and* secret). The mechanism for fixing it is
    **envsubst**: each bridge's `preStart` runs the settings file through it, so
    a literal `"$MAUTRIX_…"` in `settings` is replaced at start time by the value
-   from `environmentFile`. That is why the secrets are env vars rather than
-   `sops.secrets.*.path` references.
+   from `environmentFile`. That indirection exists to keep the value out of
+   `/nix/store`, where a plain `settings` entry would be world-readable — it is
+   not about rotation. See *Why this is five keys and not fourteen*.
 9. **`ensureDatabases` cannot set a locale, and Synapse demands C collation.**
    It issues a bare `CREATE DATABASE`, so the *cluster* has to be initialised
    that way: `initdbArgs = [ "--locale=C" "--encoding=UTF8" ]`. This applies at
@@ -415,7 +419,7 @@ Ordered; each verifiable on its own.
      `/.well-known/matrix/*` JSON files here too.
    - `networking.firewall.allowedTCPPorts = [ 80 443 ]`.
 7. **Secrets** — the file and the wiring already exist; the values are
-   placeholders. See the **Secrets** section below for the fourteen keys and the
+   placeholders. See the **Secrets** section below for the five keys and the
    exact commands. This must happen *before* the first `deploy`, or Synapse and
    all three bridges start with a known-bad shared secret.
 8. **Verify, then open federation.** `deploy matrix`; create the first account with
@@ -509,7 +513,7 @@ type-checked before the VM exists.
 ### What is *not* here
 
 No account credentials, and nothing you have to fetch from a third party. All
-fourteen values are random strings this repo generates. The actual logins are
+five values are random strings this repo generates. The actual logins are
 runtime operations over a bot DM, after the server is up:
 
 - **WhatsApp** — `!wa login`, scan the QR from the phone's linked-devices screen.
@@ -530,23 +534,11 @@ for k in \
   synapse-macaroon-secret-key \
   synapse-form-secret \
   whatsapp-pickle-key \
-  whatsapp-provisioning-secret \
-  whatsapp-public-media-key \
-  whatsapp-direct-media-key \
-  signal-pickle-key \
-  signal-provisioning-secret \
-  signal-public-media-key \
-  signal-direct-media-key \
-  discord-provisioning-secret \
-  discord-avatar-proxy-key \
-  discord-direct-media-key
+  signal-pickle-key
 do
   sops-secret "chat.$k" --generate
 done
 ```
-
-Run it as one block — a partially-filled file is the dangerous state, because a
-leftover placeholder is a *working* shared secret that happens to be public.
 
 **Verify none survived** before deploying:
 
@@ -557,7 +549,7 @@ sops decrypt modules/homelab/secrets/chat.yaml | grep -c REPLACE-ME   # must pri
 Then commit the re-encrypted file. Only ciphertext changes; the plaintext never
 touches the working tree.
 
-### The fourteen keys, and where each lands
+### The five keys, and where each lands
 
 | sops key (`chat_…`) | consumed as | by |
 |---|---|---|
@@ -565,24 +557,48 @@ touches the working tree.
 | `synapse_macaroon_secret_key` | `macaroon_secret_key` | ” |
 | `synapse_form_secret` | `form_secret` | ” |
 | `whatsapp_pickle_key` | `$MAUTRIX_WHATSAPP_ENCRYPTION_PICKLE_KEY` | mautrix-whatsapp, via `environmentFile` |
-| `whatsapp_provisioning_secret` | `$MAUTRIX_WHATSAPP_PROVISIONING_SHARED_SECRET` | ” |
-| `whatsapp_public_media_key` | `$MAUTRIX_WHATSAPP_PUBLIC_MEDIA_SIGNING_KEY` | ” |
-| `whatsapp_direct_media_key` | `$MAUTRIX_WHATSAPP_DIRECT_MEDIA_SERVER_KEY` | ” |
 | `signal_pickle_key` | `$MAUTRIX_SIGNAL_ENCRYPTION_PICKLE_KEY` | mautrix-signal, via `environmentFile` |
-| `signal_provisioning_secret` | `$MAUTRIX_SIGNAL_PROVISIONING_SHARED_SECRET` | ” |
-| `signal_public_media_key` | `$MAUTRIX_SIGNAL_PUBLIC_MEDIA_SIGNING_KEY` | ” |
-| `signal_direct_media_key` | `$MAUTRIX_SIGNAL_DIRECT_MEDIA_SERVER_KEY` | ” |
-| `discord_provisioning_secret` | `$MAUTRIX_DISCORD_PROVISIONING_SHARED_SECRET` | mautrix-discord, via `environmentFile` |
-| `discord_avatar_proxy_key` | `$MAUTRIX_DISCORD_AVATAR_PROXY_KEY` | ” |
-| `discord_direct_media_key` | `$MAUTRIX_DISCORD_DIRECT_MEDIA_SERVER_KEY` | ” |
 
 Synapse's three go through a `sops.templates` YAML fragment because the module
-refuses them as in-store values (landmine 6). The bridges' eleven go through
-`sops.templates` **env** files because the substitution happens in `preStart`
-via envsubst (landmine 8) — not because of a store-path concern.
+refuses them as in-store values (landmine 6) — not because of env vars; they are
+a file. Of the three, `macaroon_secret_key` is the one that genuinely must never
+leak: it signs access tokens, so a known value is account takeover.
 
-Rotating any of the `pickle_key` values invalidates that bridge's existing
-encrypted sessions; the others are safe to re-`--generate` at will.
+The two `pickle_key`s go through `sops.templates` **env** files, because the
+substitution happens in `preStart` via envsubst (landmine 8) — a value put
+straight into `settings` would be world-readable in `/nix/store`.
+
+Rotating a `pickle_key` invalidates that bridge's existing encrypted sessions.
+
+### Why this is five keys and not fourteen
+
+The first cut of this plan protected four secrets per bridge. Checking the
+bridges' own `example-config.yaml` (via the vendored mautrix-go bridgev2 config
+for WhatsApp/Signal, and the in-tree one for Discord) showed most of them guard
+nothing:
+
+- **`public_media.signing_key`** — `public_media.enabled: false`, and enabling it
+  also requires an `appservice.public_address`. Dead config until then.
+- **`direct_media.server_key`** — `direct_media.enabled: false`, and enabling it
+  needs a `server_name` plus `.well-known` delegation to it. Likewise dead.
+- **`provisioning.shared_secret`** — accepts the documented literal
+  `"disable"`, which switches the provisioning HTTP API off outright. The
+  bridges are driven by `!wa` / `!signal` / `!discord` bot DMs, so turning the
+  endpoint off is strictly better than guarding an unused one with a managed
+  secret. (nixpkgs' `""` default would fail upstream's own "must be at least 16
+  characters" rule anyway.)
+- **Discord needs no secrets at all.** Its config has no pickle key (zero
+  occurrences of `pickle`), and `avatar_proxy_key` only signs avatar URLs when
+  `public_address` is set — "if not set, avatars will not be bridged". So it
+  gets no `environmentFile`.
+
+Also worth correcting the original premise: nixpkgs defaults these to `""`, not
+`"generate"`, so they do **not** silently rotate on every restart the way the
+modules' own stale comments suggest. The real problem with the default
+`pickle_key` is narrower — it is empty, and identical on every install.
+
+If `public_media` or `direct_media` is ever switched on, add that key back as an
+env var at the same time; that is the moment it starts mattering.
 
 ## Open decisions
 

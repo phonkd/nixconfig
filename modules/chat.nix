@@ -46,12 +46,18 @@
       # postgres must not bind TCP at all.
       pgUri = db: "postgresql:///${db}?host=/run/postgresql";
 
-      # All three bridges regenerate their config file on every start, so a
-      # secret left at the module default ("" or "generate") changes on each
-      # restart -- which invalidates every encrypted session. The modules'
-      # answer is envsubst: each preStart runs the settings file through it,
-      # so a "$VAR" below is replaced at start time by the value supplied
-      # through environmentFile. The names must match the sops.templates.
+      # Why the pickle keys are env vars rather than plain settings: each
+      # bridge rewrites its config file from the nix store on every start, so
+      # a value here would be world-readable in /nix/store. The modules' way
+      # round that is envsubst -- each preStart runs the settings file through
+      # it, so a "$VAR" below is replaced at start time by the value from
+      # environmentFile. Names must match the sops.templates.
+      #
+      # Only two vars survive. The pickle key encrypts the bridge's crypto
+      # store, so it has to be both stable and secret; nixpkgs defaults it to
+      # "", which is stable but empty and identical on every install. Every
+      # other secret the survey listed turned out to guard a feature that
+      # ships disabled, or an API we switch off -- see the settings below.
 
       # The two well-known documents. Both are served from matrix.phonkd.net
       # rather than the apex: the apex A record points at the *home* IP and
@@ -77,16 +83,7 @@
               "chat_synapse_macaroon_secret_key"
               "chat_synapse_form_secret"
               "chat_whatsapp_pickle_key"
-              "chat_whatsapp_provisioning_secret"
-              "chat_whatsapp_public_media_key"
-              "chat_whatsapp_direct_media_key"
               "chat_signal_pickle_key"
-              "chat_signal_provisioning_secret"
-              "chat_signal_public_media_key"
-              "chat_signal_direct_media_key"
-              "chat_discord_provisioning_secret"
-              "chat_discord_avatar_proxy_key"
-              "chat_discord_direct_media_key"
             ]
             (_: {
               sopsFile = chatSecrets;
@@ -104,16 +101,15 @@
           owner = "matrix-synapse";
         };
 
+        # Only the pickle key needs this treatment, and only for the two
+        # bridgev2 bridges. Everything else the survey wanted to protect is
+        # either a feature that ships off (see the settings below) or an API
+        # we turn off outright, so mautrix-discord needs no environmentFile
+        # at all -- it has no pickle key in its config (checked against its
+        # example-config.yaml, which has zero occurrences of "pickle").
         sops.templates."mautrix-whatsapp.env" = {
           content = ''
             MAUTRIX_WHATSAPP_ENCRYPTION_PICKLE_KEY=${config.sops.placeholder."chat_whatsapp_pickle_key"}
-            MAUTRIX_WHATSAPP_PROVISIONING_SHARED_SECRET=${
-              config.sops.placeholder."chat_whatsapp_provisioning_secret"
-            }
-            MAUTRIX_WHATSAPP_PUBLIC_MEDIA_SIGNING_KEY=${
-              config.sops.placeholder."chat_whatsapp_public_media_key"
-            }
-            MAUTRIX_WHATSAPP_DIRECT_MEDIA_SERVER_KEY=${config.sops.placeholder."chat_whatsapp_direct_media_key"}
           '';
           owner = "mautrix-whatsapp";
         };
@@ -121,24 +117,8 @@
         sops.templates."mautrix-signal.env" = {
           content = ''
             MAUTRIX_SIGNAL_ENCRYPTION_PICKLE_KEY=${config.sops.placeholder."chat_signal_pickle_key"}
-            MAUTRIX_SIGNAL_PROVISIONING_SHARED_SECRET=${
-              config.sops.placeholder."chat_signal_provisioning_secret"
-            }
-            MAUTRIX_SIGNAL_PUBLIC_MEDIA_SIGNING_KEY=${config.sops.placeholder."chat_signal_public_media_key"}
-            MAUTRIX_SIGNAL_DIRECT_MEDIA_SERVER_KEY=${config.sops.placeholder."chat_signal_direct_media_key"}
           '';
           owner = "mautrix-signal";
-        };
-
-        sops.templates."mautrix-discord.env" = {
-          content = ''
-            MAUTRIX_DISCORD_PROVISIONING_SHARED_SECRET=${
-              config.sops.placeholder."chat_discord_provisioning_secret"
-            }
-            MAUTRIX_DISCORD_AVATAR_PROXY_KEY=${config.sops.placeholder."chat_discord_avatar_proxy_key"}
-            MAUTRIX_DISCORD_DIRECT_MEDIA_SERVER_KEY=${config.sops.placeholder."chat_discord_direct_media_key"}
-          '';
-          owner = "mautrix-discord";
         };
 
         # ── libolm ────────────────────────────────────────────────────────
@@ -267,9 +247,18 @@
               default = true;
               pickle_key = "$MAUTRIX_WHATSAPP_ENCRYPTION_PICKLE_KEY";
             };
-            provisioning.shared_secret = "$MAUTRIX_WHATSAPP_PROVISIONING_SHARED_SECRET";
-            public_media.signing_key = "$MAUTRIX_WHATSAPP_PUBLIC_MEDIA_SIGNING_KEY";
-            direct_media.server_key = "$MAUTRIX_WHATSAPP_DIRECT_MEDIA_SERVER_KEY";
+            # We drive the bridges with !wa / !signal bot DMs, never the
+            # provisioning HTTP API, and "disable" is a documented value that
+            # switches it off entirely -- strictly better than guarding an
+            # endpoint we do not use with a secret we have to manage.
+            # (nixpkgs defaults it to "", which upstream would reject anyway:
+            # the shared secret "must be at least 16 characters".)
+            provisioning.shared_secret = "disable";
+            # public_media and direct_media are NOT configured here on
+            # purpose: both ship `enabled: false` and each needs more than a
+            # key to switch on (a public_address, or a server_name plus DNS
+            # delegation). Their signing_key / server_key are dead config
+            # until then, so they get no secret.
             bridge.permissions = {
               "*" = "relay";
               ${serverName} = "admin";
@@ -294,9 +283,7 @@
               default = true;
               pickle_key = "$MAUTRIX_SIGNAL_ENCRYPTION_PICKLE_KEY";
             };
-            provisioning.shared_secret = "$MAUTRIX_SIGNAL_PROVISIONING_SHARED_SECRET";
-            public_media.signing_key = "$MAUTRIX_SIGNAL_PUBLIC_MEDIA_SIGNING_KEY";
-            direct_media.server_key = "$MAUTRIX_SIGNAL_DIRECT_MEDIA_SERVER_KEY";
+            provisioning.shared_secret = "disable"; # as above
             bridge.permissions = {
               "*" = "relay";
               ${serverName} = "admin";
@@ -304,12 +291,16 @@
           };
         };
 
-        # mautrix-discord is the odd one out: it still uses the pre-bridgev2
-        # config layout, so the database block hangs off `appservice` and the
-        # secrets live under `bridge`, not at the top level.
+        # mautrix-discord is the odd one out twice over: it still uses the
+        # pre-bridgev2 config layout (the database block hangs off
+        # `appservice`, the rest under `bridge`), and it needs **no secrets at
+        # all** -- hence no environmentFile. Its config has no pickle key;
+        # `avatar_proxy_key` only signs avatar URLs when `public_address` is
+        # set, and upstream says "if not set, avatars will not be bridged";
+        # `direct_media` ships disabled. All checked against its
+        # example-config.yaml.
         services.mautrix-discord = {
           enable = true;
-          environmentFile = config.sops.templates."mautrix-discord.env".path;
           settings = {
             homeserver = {
               address = "http://127.0.0.1:8008";
@@ -324,9 +315,7 @@
                 allow = true;
                 default = true;
               };
-              provisioning.shared_secret = "$MAUTRIX_DISCORD_PROVISIONING_SHARED_SECRET";
-              avatar_proxy_key = "$MAUTRIX_DISCORD_AVATAR_PROXY_KEY";
-              direct_media.server_key = "$MAUTRIX_DISCORD_DIRECT_MEDIA_SERVER_KEY";
+              provisioning.shared_secret = "disable"; # as on the other two
               permissions = {
                 "*" = "relay";
                 ${serverName} = "admin";
