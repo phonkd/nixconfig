@@ -158,26 +158,62 @@ No secrets, no traefik, no ports — nothing to register in the app registry.
 ### Phase 2 — the always-on box, if Phase 1 has no host to live on
 
 Only needed if the amp is fed by something that isn't a NixOS machine (TV over
-Bluetooth, an external DAC over RCA, a phone). Two candidates:
+Bluetooth, an external DAC over RCA, a phone).
+
+#### Powering the fixer — the thing that bites first
+
+The amp's USB-C is a **device** port. It sources no VBUS, so nothing plugged into it
+gets powered from it, and the fixer has to be the USB **host**. That kills the naive
+"single-USB-C ESP32 plugged straight into the amp": that board's only connector is
+also its only power inlet, and you can't have both.
+
+The saving grace is that **the amp does not need the host to supply VBUS either.**
+The reference firmware targets `esp32-s3-devkitc-1`, whose OTG port physically
+*cannot* source VBUS — both USB connectors feed the 5 V rail through Schottky
+diodes, a documented DevKitC-1 limitation — and the firmware contains no
+VBUS-enable GPIO code at all. It works regardless, which means the MC331, being
+self-powered from its own PSU, asserts its D+ pull-up without seeing host VBUS. The
+two data lines are enough.
+
+So the constraint is only "the fixer needs power from somewhere other than the amp",
+and every option below satisfies it:
+
+| Fixer | Powered by | Link to the amp |
+|---|---|---|
+| Pi 4 / 5 | its own USB-C PSU | USB-**A** → USB-C. Nothing to think about. |
+| Pi Zero 2 W | the `PWR IN` micro-USB | the second (`USB`/OTG) micro-USB → OTG adapter → USB-C |
+| ESP32-S3, two USB-C (DevKitC-1 & clones) | the UART/programming port | the OTG port → USB-C |
+| ESP32-S3, one USB-C (S3 Zero, Super Mini) | **5 V + GND on the pin header**, from any charger | the single USB-C → amp, data only |
+
+The single-port S3 is therefore still viable — just never power it through the
+connector you need for the amp. Two caveats if you go that way: with
+`ARDUINO_USB_MODE=0` the native port is in host mode, so there's no CDC serial and
+reflashing means the BOOT-button download mode; and *if* this particular unit turns
+out to want VBUS after all, the fix is a wire (or a shorted Schottky) from the
+board's 5 V rail to the connector's VBUS pad.
+
+#### The candidates
 
 * **Raspberry Pi** (Zero 2 W is plenty; a 4 is nicer). Best fit *if* it can earn its
   keep by also becoming a `gigaplayer-client` snapclient — then one USB-A → USB-C
   cable carries both the audio and the fix, the amp stays in USB mode (PID `0x1717`),
-  and we delete a separate DAC. Honest cost: this flake is entirely `x86_64-linux`
-  (+ one `aarch64-darwin`), so a Pi means a **new platform** — an SD/UEFI image to
-  build, and `205-builder` can't build for it without binfmt emulation. Wire the Pi's
-  **USB-A** port to the amp: on a Pi 4/5 the USB-C port is power/gadget only, and on a
-  Zero it needs an OTG adapter.
+  and we delete a separate DAC. It also has the least to go wrong electrically:
+  separate power inlet, a real host port that does supply VBUS, no board mods. Honest
+  cost: this flake is entirely `x86_64-linux` (+ one `aarch64-darwin`), so a Pi means
+  a **new platform** — an SD image to build, and `205-builder` can't build for it
+  without binfmt emulation. Note the Pi's *own* USB-C is power/gadget only; the amp
+  hangs off a USB-A port.
 * **ESP32-S3** flashed with the community firmware
   (`github.com/CaseresMaxi/fosi-fix-mc331-sp32`, ~$8, has a web UI, re-applies on
-  reconnect and every 30 s). Five minutes, zero flake churn — but it's a
-  hand-configured box outside the config, which is exactly the kind of thing this
-  repo exists to avoid.
+  reconnect and every 30 s). Cheapest and quickest, and a two-USB-C DevKitC-1 needs
+  no thought at all since that is the board the firmware was written for. Downsides:
+  a single-port board needs the header-power trick above, and either way it's a
+  hand-flashed box outside the config — the kind of thing this repo exists to avoid.
 
-Recommendation: **Phase 1 on an existing host if the amp is cabled to one; a Pi
-only if it also becomes the streamer.** A single-purpose Pi is worse than the ESP32
-at the same job, and a single-purpose ESP32 is worse than either at being
-declarative.
+Recommendation: **Phase 1 on an existing host if the amp is cabled to one; a Pi only
+if it also becomes the streamer; otherwise a two-port ESP32-S3.** A single-purpose Pi
+is worse than the ESP32 at the same job, and a single-purpose ESP32 is worse than
+either at being declarative.
 
 ## Steps
 
@@ -224,4 +260,11 @@ declarative.
   (doxygenthief's ACPWorkbench find, Lozioandry's HID-injection script, sorbet8876's
   Linux udev rules, Maximiliano6969's Android app and ESP32 firmware).
 * `github.com/CaseresMaxi/fosi-fix-mc331-sp32` — `src/config/Config.h` is where the
-  known-good −90 dB packet and the VID/PIDs come from.
+  known-good −90 dB packet and the VID/PIDs come from; `platformio.ini`
+  (`board = esp32-s3-devkitc-1`) and the absence of any VBUS GPIO handling are what
+  establish that the amp enumerates without host VBUS.
+* `docs.espressif.com/projects/esp-dev-kits/.../esp32-s3-usb-otg/user_guide.html` and
+  the ESP32 forum thread "USB Host example on ESP32-S3-DevKitC-1" — the DevKitC-1
+  cannot drive VBUS out of its USB port; the ESP32-S3-USB-OTG kit is the board that
+  can (GPIO12 `DEV_VBUS_EN` / GPIO13 `BOOST_EN` / GPIO18 `USB_SEL`, 500 mA limited),
+  if a future use ever does need to power a bus-powered peripheral.
