@@ -1,6 +1,6 @@
 # matrix + signal/whatsapp/discord bridges
 
-**Repo(s):** nixconfig   **Status:** draft
+**Repo(s):** nixconfig   **Status:** in progress — module + secrets landed (inert); VM not provisioned
 
 ## Goal
 
@@ -59,7 +59,7 @@ in `modules/observability.nix`** — its `obsHost` special-case is keyed on
 
 ### File layout: one `modules/chat.nix` for both halves
 
-`modules/chat.nix` — already stubbed on the main checkout, still untracked —
+`modules/chat.nix` — now written and committed —
 holds **both** sides of this feature: the homeserver's NixOS module and the
 desktop clients' Home Manager module. That is the established shape here, not a
 novelty: `modules/kde.nix`, `modules/hyprland.nix` and `modules/desktop.nix` each
@@ -74,10 +74,11 @@ imports it by path. Two consequences worth stating plainly:
 
 - **Every `.nix` under `modules/` is evaluated**, so a mistake in this one file
   breaks the whole flake — every host, not just the chat host.
-- **Untracked files are invisible to the flake.** `chat.nix` is not `git add`ed
-  yet, and that is the only reason the defects below are not already firing.
+- **It is tracked now**, which is what makes the above load-bearing: an
+  untracked file is invisible to the flake, and that invisibility was the only
+  reason the defects below were not already firing.
 
-Target skeleton:
+Skeleton — the committed file fills each of these blocks in:
 
 ```nix
 { self, inputs, ... }:
@@ -106,7 +107,7 @@ Target skeleton:
 }
 ```
 
-Wiring, once the file is correct:
+Wiring (both described below; only the server half is actually hooked up):
 
 - Server: add `chat-server` to `alwaysImport` in `modules/builder.nix`. It
   self-gates on the tag, exactly like `mailserver` and `observability-server`
@@ -118,9 +119,14 @@ Wiring, once the file is correct:
   store symlinks that Spotlight will not index, so a nix-installed GUI app is
   unlaunchable on Tahoe.
 
-### Defects in the current stub (verified, not read off)
+### Defects in the original stub — **fixed, kept as the record of why**
 
-The stub as it stands does not merely need filling in — it breaks the flake the
+All three were repaired when `modules/chat.nix` was written for real; the
+committed file has none of them. Kept here because each is a trap the next
+module in this repo can fall into, and defect 1 in particular is a rule about
+`flake.homeModules`, not a one-off typo.
+
+The stub as it stood did not merely need filling in — it broke the flake the
 moment it is tracked. All three were confirmed by copying the file into a
 worktree and evaluating, not by inspection.
 
@@ -303,6 +309,43 @@ serving the two well-known JSON files from the apex deliberately.
    `macaroon_secret_key` and `form_secret` are explicitly flagged
    "Pass this value via extraConfigFiles instead" (synapse.nix ~L418) — so the
    sops route in step 7 is mandatory, not a nicety.
+7. **All three bridges link libolm, which nixpkgs marks insecure.** Building the
+   host fails outright with `Package 'olm-3.2.16' ... known vulnerabilities`
+   until it is permitted — found by actually evaluating the host, not by
+   reading. `olm` is a `buildInputs` dependency of all three packages, so
+   turning bridge encryption *off* would not drop it. `mautrix-whatsapp` and
+   `mautrix-signal` take a `withGoolm` flag that swaps in a pure-Go Olm, but
+   `mautrix-discord` has no such flag, and upstream calls goolm experimental and
+   "not recommended". **Fix:** `nixpkgs.config.permittedInsecurePackages =
+   [ "olm-3.2.16" ]`, inside the tag gate so it touches nothing else. The pinned
+   version string is deliberate: a nixpkgs bump past 3.2.16 breaks the build
+   rather than silently doing nothing.
+8. **The bridges' secret defaults are `""`, not `"generate"`** — the modules'
+   own comments are stale on this point. Either way the config file is rebuilt
+   on every start, so anything left at the default rotates on each restart and
+   invalidates every encrypted session. The mechanism that fixes it is
+   **envsubst**: each bridge's `preStart` runs the settings file through it, so
+   a literal `"$MAUTRIX_…"` in `settings` is replaced at start time by the value
+   from `environmentFile`. That is why the secrets are env vars rather than
+   `sops.secrets.*.path` references.
+9. **`ensureDatabases` cannot set a locale, and Synapse demands C collation.**
+   It issues a bare `CREATE DATABASE`, so the *cluster* has to be initialised
+   that way: `initdbArgs = [ "--locale=C" "--encoding=UTF8" ]`. This applies at
+   initdb time only — i.e. the very first start of a fresh host. Retrofitting an
+   existing cluster means dump, re-initdb, restore. Getting this wrong on the
+   new VM is cheap; getting it wrong on `ext-mail` later would not be.
+10. **`ensureDBOwnership` requires role name == database name, and the bridges
+    break that.** Their system users are `mautrix-whatsapp` etc., but a database
+    name with a hyphen would need quoting throughout the connection URIs, so the
+    databases are `mautrix_whatsapp`. The assertion fires if you set
+    `ensureDBOwnership = true`. **Fix:** leave it off and hand ownership over
+    once in `systemd.services.postgresql.postStart`.
+11. **sops-nix reads the secrets file at *evaluation* time.** A
+    `sops.secrets.<name>` pointing at a file that is not committed fails the
+    build with `Path 'modules/homelab/secrets/chat.yaml' does not exist in Git
+    repository` — not at deploy time, at eval. So the encrypted file has to
+    exist and be `git add`ed before the host will evaluate at all, which is why
+    it is committed with placeholders rather than created during rollout.
 
 ## Steps
 
@@ -310,15 +353,25 @@ Ordered; each verifiable on its own.
 
 ### Phase 1 — homeserver up
 
-0. **Make the stub safe first.** `modules/chat.nix` exists untracked on the main
-   checkout and, as written, fails flake evaluation the moment it is `git add`ed
-   (see *Defects in the current stub* above). Before anything else: rename
-   `flake.homeModules.desktop` → `flake.homeModules.chat`, drop
-   `imports = [ self.nixosModules.desktop ]`, add `noughtyLib` to the
-   `chat-server` argument list and wrap its `config` in the tag gate. Verify with
-   `nix eval .#homeModules.chat --apply 'x: "ok"'` and the same for
-   `.#nixosModules.chat-server` — both must evaluate before the file is committed.
-   This step is independent of the host decision and can land today.
+0. ~~**Make the stub safe first.**~~ **Done.** `modules/chat.nix` is written,
+   committed and wired into `alwaysImport`, with the three stub defects fixed
+   and the full server half in place (postgres, Synapse, all three bridges,
+   nginx, and every sops template). The secrets file
+   `modules/homelab/secrets/chat.yaml` is committed with placeholders.
+
+   **It is inert.** No host carries the `chat-server` tag, so the whole module
+   is behind `mkIf false`. Verified rather than asserted: evaluating
+   `observability` with and without `chat-server` in `alwaysImport` yields the
+   *same* system derivation. Tagging a host is the single switch that turns all
+   of this on — which is what makes steps 1–5 the real remaining work, and why
+   the new-VM-vs-`ext-mail` decision stayed cheap to defer.
+
+   Verified so far: `nix eval` of both module attributes; a full
+   `config.system.build.toplevel` evaluation of a `hetzner-vm` host temporarily
+   wearing the tag (this is what surfaced landmines 7–11); and spot-checks that
+   the `$MAUTRIX_…` literals survive into `settings` for envsubst and the
+   postgres URIs render as unix-socket DSNs. **Not** verified: nothing has been
+   *built* or run. Whether Synapse and the bridges actually come up is step 8.
 1. **Provision the VM.** Hetzner CX22, x86_64, same project and private network as
    `ext-mail`/`observability`. Install NixOS the way those two were done. Open
    80/443 in the Hetzner cloud firewall. Record the public IP and the `/` + `/efi`
@@ -338,14 +391,19 @@ Ordered; each verifiable on its own.
    `tailnet.nix` gates on `is.server`, so it enrols itself with the sops
    `headscale_authkey`. Read the assigned `100.64.0.x` out of `tailscale status`,
    put it in `deploy.hostname`, and confirm `deploy matrix` works end to end.
-6. **`modules/chat.nix`, server half** — `flake.nixosModules.chat-server`, gated on
+6. ~~**`modules/chat.nix`, server half**~~ — **Done in step 0**; this is now the
+   description of what the committed file contains, not work left to do.
+   `flake.nixosModules.chat-server`, gated on
    `noughtyLib.hostHasTag "chat-server"` and added to `alwaysImport` in
    `modules/builder.nix`, following the shape of
    `modules/hetzner/mail/mail.nix`:
    - `services.postgresql` — enable, `settings.listen_addresses = lib.mkForce ""`
      (landmine 1), `ensureDatabases` + `ensureUsers` for `matrix-synapse`,
-     `mautrix_whatsapp`, `mautrix_signal`, `mautrix_discord`, each created with
-     `LC_COLLATE=C LC_CTYPE=C` (Synapse refuses anything else).
+     `mautrix_whatsapp`, `mautrix_signal`, `mautrix_discord`. **Correction to
+     the original plan:** the C collation Synapse demands cannot be set per
+     database — `ensureDatabases` issues a bare `CREATE DATABASE` — so it comes
+     from the cluster's `initdbArgs` instead, and ownership for the three
+     bridge DBs is handed over in `postStart` (landmines 9 and 10).
    - `services.matrix-synapse` — `server_name = "phonkd.net"`,
      `public_baseurl = "https://matrix.phonkd.net/"`, one listener on
      `127.0.0.1:8008` carrying `client` + `federation`,
@@ -356,12 +414,10 @@ Ordered; each verifiable on its own.
      `client_max_body_size` raised for media. Serve the two
      `/.well-known/matrix/*` JSON files here too.
    - `networking.firewall.allowedTCPPorts = [ 80 443 ]`.
-7. **Secrets** into the global `modules/homelab/global-secrets/secret.yaml` (the
-   defaultSopsFile — the new host decrypts it with the same shared age key, so no
-   per-host sops file is needed, unlike `ext-mail`'s local one):
-   `sops set modules/homelab/global-secrets/secret.yaml '["matrix-synapse-conf"]' '"..."'`
-   holding `registration_shared_secret`, `macaroon_secret_key` and `form_secret`
-   as a YAML fragment, wired in via `settings.extraConfigFiles`.
+7. **Secrets** — the file and the wiring already exist; the values are
+   placeholders. See the **Secrets** section below for the fourteen keys and the
+   exact commands. This must happen *before* the first `deploy`, or Synapse and
+   all three bridges start with a known-bad shared secret.
 8. **Verify, then open federation.** `deploy matrix`; create the first account with
    `register_new_matrix_user`; log in from Element against
    `https://matrix.phonkd.net`. Then add the
@@ -394,12 +450,15 @@ Discord.
     differently from the other two: `settings.appservice` carries the database
     block, rather than a top-level `settings.database`.
 
-11b. **`modules/chat.nix`, client half** — `flake.homeModules.chat`, and the only
-    step that touches the desktops rather than the server. Put the Matrix client
-    in `home.packages` and import the module from `flake.homeModules.gui-nixos`
-    (`modules/hosts/types/gui/default.nix`), which is what `blac`, `g14` and `z14`
-    already pull. The Mac takes an `element` cask in `gui-darwin` instead, for the
-    Spotlight reason documented on `affine` and `discord` there.
+11b. **`modules/chat.nix`, client half** — `flake.homeModules.chat` is **written
+    but deliberately not imported yet**, so no desktop closure has changed. It
+    is the only step that touches the desktops rather than the server, and
+    wiring it early would install Element on `blac`, `g14` and `z14` months
+    before there is a homeserver to point it at. To turn it on: import it from
+    `flake.homeModules.gui-nixos` (`modules/hosts/types/gui/default.nix`), which
+    is the list those three already pull. The Mac takes an `element` cask in
+    `gui-darwin` instead, for the Spotlight reason documented on `affine` and
+    `discord` there.
     Client choice (all three are in the pinned nixpkgs, versions checked):
     `element-desktop` 1.12.26 — the reference client, the one to default to;
     `nheko` 0.12.1 — native Qt, much lighter, weaker on spaces/threads;
@@ -432,6 +491,98 @@ Discord.
 16. **Double puppeting** (`double_puppet.secrets`, so messages you send from the
     WhatsApp/Signal app show as *you* in Matrix rather than as the bridge bot),
     and a Grafana dashboard off Synapse's Prometheus metrics.
+
+## Secrets
+
+Everything lives in one per-app sops file, **`modules/homelab/secrets/chat.yaml`**,
+created by the `.sops.yaml` rule for `modules/homelab/secrets/.*\.yaml$` — the
+same single age recipient as the rest of the repo, so no per-host re-encryption
+and nothing to do on the new box beyond the shared key already being at
+`/home/phonkd/.config/sops/age/keys.txt`.
+
+**The file is committed with obvious placeholders** (`REPLACE-ME-…`). That is
+deliberate, not an oversight: landmine 11 — sops-nix resolves the file at
+evaluation time, so the host will not evaluate at all until it exists and is
+tracked. Committing it empty-but-valid is what lets the module be reviewed and
+type-checked before the VM exists.
+
+### What is *not* here
+
+No account credentials, and nothing you have to fetch from a third party. All
+fourteen values are random strings this repo generates. The actual logins are
+runtime operations over a bot DM, after the server is up:
+
+- **WhatsApp** — `!wa login`, scan the QR from the phone's linked-devices screen.
+- **Signal** — `!signal login`, likewise a linked device.
+- **Discord** — `!discord login-token <token>`, pasted into the bot DM. The token
+  itself never enters this repo. (Landmine 4 — user-token mode is ToS-gray; the
+  bot-token alternative cannot see DMs. Still an open decision.)
+
+### Filling them in
+
+From the repo root, in the devshell (`nix develop`), using this repo's own
+helper — `sops-secret <app>.<key> --generate` mints 48 random bytes, stores it
+as `chat_<key>`, and re-encrypts the file in place:
+
+```sh
+for k in \
+  synapse-registration-shared-secret \
+  synapse-macaroon-secret-key \
+  synapse-form-secret \
+  whatsapp-pickle-key \
+  whatsapp-provisioning-secret \
+  whatsapp-public-media-key \
+  whatsapp-direct-media-key \
+  signal-pickle-key \
+  signal-provisioning-secret \
+  signal-public-media-key \
+  signal-direct-media-key \
+  discord-provisioning-secret \
+  discord-avatar-proxy-key \
+  discord-direct-media-key
+do
+  sops-secret "chat.$k" --generate
+done
+```
+
+Run it as one block — a partially-filled file is the dangerous state, because a
+leftover placeholder is a *working* shared secret that happens to be public.
+
+**Verify none survived** before deploying:
+
+```sh
+sops decrypt modules/homelab/secrets/chat.yaml | grep -c REPLACE-ME   # must print 0
+```
+
+Then commit the re-encrypted file. Only ciphertext changes; the plaintext never
+touches the working tree.
+
+### The fourteen keys, and where each lands
+
+| sops key (`chat_…`) | consumed as | by |
+|---|---|---|
+| `synapse_registration_shared_secret` | `registration_shared_secret` | Synapse, via `extraConfigFiles` |
+| `synapse_macaroon_secret_key` | `macaroon_secret_key` | ” |
+| `synapse_form_secret` | `form_secret` | ” |
+| `whatsapp_pickle_key` | `$MAUTRIX_WHATSAPP_ENCRYPTION_PICKLE_KEY` | mautrix-whatsapp, via `environmentFile` |
+| `whatsapp_provisioning_secret` | `$MAUTRIX_WHATSAPP_PROVISIONING_SHARED_SECRET` | ” |
+| `whatsapp_public_media_key` | `$MAUTRIX_WHATSAPP_PUBLIC_MEDIA_SIGNING_KEY` | ” |
+| `whatsapp_direct_media_key` | `$MAUTRIX_WHATSAPP_DIRECT_MEDIA_SERVER_KEY` | ” |
+| `signal_pickle_key` | `$MAUTRIX_SIGNAL_ENCRYPTION_PICKLE_KEY` | mautrix-signal, via `environmentFile` |
+| `signal_provisioning_secret` | `$MAUTRIX_SIGNAL_PROVISIONING_SHARED_SECRET` | ” |
+| `signal_public_media_key` | `$MAUTRIX_SIGNAL_PUBLIC_MEDIA_SIGNING_KEY` | ” |
+| `signal_direct_media_key` | `$MAUTRIX_SIGNAL_DIRECT_MEDIA_SERVER_KEY` | ” |
+| `discord_provisioning_secret` | `$MAUTRIX_DISCORD_PROVISIONING_SHARED_SECRET` | mautrix-discord, via `environmentFile` |
+| `discord_avatar_proxy_key` | `$MAUTRIX_DISCORD_AVATAR_PROXY_KEY` | ” |
+| `discord_direct_media_key` | `$MAUTRIX_DISCORD_DIRECT_MEDIA_SERVER_KEY` | ” |
+
+Synapse's three go through a `sops.templates` YAML fragment because the module
+refuses them as in-store values (landmine 6). The bridges' eleven go through
+`sops.templates` **env** files because the substitution happens in `preStart`
+via envsubst (landmine 8) — not because of a store-path concern.
+
+Rotating any of the `pickle_key` values invalidates that bridge's existing
+encrypted sessions; the others are safe to re-`--generate` at will.
 
 ## Open decisions
 
