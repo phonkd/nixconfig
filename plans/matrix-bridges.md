@@ -351,6 +351,34 @@ serving the two well-known JSON files from the apex deliberately.
     exist and be `git add`ed before the host will evaluate at all, which is why
     it is committed with placeholders rather than created during rollout.
 
+12. **Defining a `types.attrs` block REPLACES the module's default — it does not
+    merge into it.** This bites mautrix-discord specifically, and it is silent.
+    Its `settings.homeserver` / `appservice` / `bridge` are each a plain
+    `types.attrs` option with a default attrset, and a NixOS *default* is not a
+    *definition*, so the merge function never sees it. Setting just
+    `appservice.database` therefore deleted the appservice `port` (29334), `id`,
+    `bot` and both tokens; setting `bridge` deleted every username/displayname
+    template, `command_prefix` and the rest — 34 keys down to 3. Nothing warns
+    you, and it evaluates and builds perfectly happily.
+
+    mautrix-whatsapp and mautrix-signal do **not** have this problem: their
+    single `settings` option carries `apply = lib.recursiveUpdate defaultConfig`,
+    which folds the defaults back in.
+
+    **Fix:** merge explicitly against the module's own defaults, read back out
+    of the option type so they track nixpkgs rather than being copied and going
+    stale:
+
+    ```nix
+    discordOpts = options.services.mautrix-discord.settings.type.getSubOptions [ ];
+    discordBlock = name: overrides:
+      lib.recursiveUpdate (discordOpts.${name}.default or { }) overrides;
+    ```
+
+    Worth checking for on any module whose `settings` is `types.attrs` without
+    an `apply`. Verified by evaluating `builtins.attrNames` on each block before
+    and after — a diff of rendered config keys is the only way this shows up.
+
 ## Steps
 
 Ordered; each verifiable on its own.
@@ -599,6 +627,28 @@ modules' own stale comments suggest. The real problem with the default
 
 If `public_media` or `direct_media` is ever switched on, add that key back as an
 env var at the same time; that is the moment it starts mattering.
+
+### So are the dropped ones generated, and thrown away?
+
+Worth being precise, because the two bridge families behave differently:
+
+- **WhatsApp and Signal** — nixpkgs pins the dropped keys to `""`, which is not
+  `"generate"`, so **nothing is generated**. The config simply carries an empty
+  value for a feature that is switched off. Nothing rotates.
+- **Discord** — its nixpkgs defaults really do say `"generate"` for
+  `avatar_proxy_key` and `direct_media.server_key`. Those *are* generated at
+  each start, written into the config in the state directory, and then thrown
+  away when the next start rebuilds that file from the nix store. So yes: for
+  those two, generated-and-not-persisted, i.e. a new value every restart.
+
+  That is harmless **only because both features are off** — `public_address` is
+  `null` ("if not set, avatars will not be bridged") and `direct_media.enabled`
+  is `false`. If either is ever enabled, that rotation stops being cosmetic and
+  the key has to move to an `environmentFile` like the pickle keys.
+
+Nothing else is orphaned in the other direction either: all five keys in
+`chat.yaml` are referenced by the module, and no referenced key is missing from
+the file.
 
 ## Open decisions
 

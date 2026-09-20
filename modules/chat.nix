@@ -25,6 +25,7 @@
   flake.nixosModules.chat-server =
     {
       config,
+      options,
       pkgs,
       lib,
       noughtyLib,
@@ -58,6 +59,22 @@
       # "", which is stable but empty and identical on every install. Every
       # other secret the survey listed turned out to guard a feature that
       # ships disabled, or an API we switch off -- see the settings below.
+
+      # mautrix-discord's settings sub-blocks are plain `types.attrs` with
+      # defaults, and a NixOS *default* is not a definition -- so defining
+      # `settings.appservice` REPLACES the module's default wholesale rather
+      # than merging into it. Setting just `appservice.database` therefore
+      # silently drops the appservice port, id, bot and tokens, and setting
+      # `bridge` drops every username/displayname template. mautrix-whatsapp
+      # and mautrix-signal do not have this problem: their `settings` option
+      # carries `apply = lib.recursiveUpdate defaultConfig`, which folds the
+      # defaults back in for you.
+      #
+      # So merge explicitly, reading the defaults back out of the option type
+      # so they track nixpkgs instead of being copied here and going stale.
+      discordOpts = options.services.mautrix-discord.settings.type.getSubOptions [ ];
+      discordDefault = name: discordOpts.${name}.default or { };
+      discordBlock = name: overrides: lib.recursiveUpdate (discordDefault name) overrides;
 
       # The two well-known documents. Both are served from matrix.phonkd.net
       # rather than the apex: the apex A record points at the *home* IP and
@@ -301,16 +318,21 @@
         # example-config.yaml.
         services.mautrix-discord = {
           enable = true;
+          # Each block is merged onto the module's own default (see
+          # discordBlock above) -- writing these as plain attrsets would
+          # delete every default key the override does not mention.
           settings = {
-            homeserver = {
+            homeserver = discordBlock "homeserver" {
               address = "http://127.0.0.1:8008";
               domain = serverName;
             };
-            appservice.database = {
-              type = "postgres";
-              uri = pgUri "mautrix_discord";
+            appservice = discordBlock "appservice" {
+              database = {
+                type = "postgres";
+                uri = pgUri "mautrix_discord";
+              };
             };
-            bridge = {
+            bridge = discordBlock "bridge" {
               encryption = {
                 allow = true;
                 default = true;
