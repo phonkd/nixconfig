@@ -1,108 +1,69 @@
+# Neovim, plus the language servers the editors here share.
+#
+# The Lua is not in this file. It lives in modules/code-editors/nvim/ as real
+# .lua files -- init.lua and a lua/phonkd/ module per concern -- because Lua
+# inside a Nix string is Lua that no tool can see: no syntax highlighting, no
+# lua_ls, no `gf`, and an indentation mistake surfaces as a runtime error at
+# nvim startup rather than at build time.
+#
+# Nix keeps the job it is good at: installing the plugins and the servers, and
+# placing the config. The split is
+#
+#   extraLuaConfig             <- nvim/init.lua, read verbatim into the
+#                                 init.lua home-manager generates
+#   xdg.configFile."nvim/lua"  <- nvim/lua/, linked whole
+#
+# so adding a module means a file under nvim/lua/phonkd/ and a `require` line
+# in nvim/init.lua, and nothing in this file changes.
+#
+# modules/code-editors/ needs no leading underscore the way modules/hyprland/'s
+# helpers do: import-tree only claims paths ending in .nix, and there are none
+# in there.
 { config, pkgs, ... }:
 
 {
-  flake.homeModules.code-editors = {pkgs,...}: {
-    home.packages = with pkgs; [
-      nil
-      nixd
-      yaml-language-server
-      sox
-    ];
-    programs.neovim = {
-      enable = true;
-      vimAlias = true;
-      extraPackages = with pkgs; [
-        ripgrep
-        fd
+  flake.homeModules.code-editors =
+    { pkgs, ... }:
+    {
+      home.packages = with pkgs; [
         nil
         nixd
+        yaml-language-server
+        sox
       ];
-      defaultEditor = true;
-      plugins = with pkgs.vimPlugins; [
-        {
-          plugin = catppuccin-nvim;
-          type = "lua";
-          config = ''
-            require("catppuccin").setup({
-              flavour = "mocha"
-            })
-            vim.cmd([[colorscheme catppuccin]])
-          '';
-        }
-        {
-          plugin = telescope-nvim;
-          type = "lua";
-          config = ''
-            local builtin = require('telescope.builtin')
-            vim.keymap.set('n', 'ff', builtin.find_files, {})
-            vim.keymap.set('n', 'fg', builtin.live_grep, {})
-            vim.keymap.set('n', 'fb', builtin.buffers, {})
-            vim.keymap.set('n', 'fh', builtin.help_tags, {})
-          '';
-        }
-        plenary-nvim # telescope dependency
-        vim-nix
-        luasnip
-        cmp_luasnip
-        cmp-nvim-lsp
-        {
-          plugin = nvim-cmp;
-          type = "lua";
-          config = ''
-            local cmp = require('cmp')
-            cmp.setup({
-              snippet = {
-                expand = function(args)
-                  require('luasnip').lsp_expand(args.body)
-                end,
-              },
-              mapping = cmp.mapping.preset.insert({
-                ['<C-Space>'] = cmp.mapping.complete(),
-                ['<C-e>'] = cmp.mapping.abort(),
-                ['<CR>'] = cmp.mapping.confirm({ select = true }),
-                ['<Tab>'] = cmp.mapping.select_next_item(),
-                ['<S-Tab>'] = cmp.mapping.select_prev_item(),
-              }),
-              sources = cmp.config.sources({
-                { name = 'nvim_lsp' },
-                { name = 'luasnip' },
-              }),
-            })
-          '';
-        }
-        {
-          plugin = nvim-lspconfig;
-          type = "lua";
-          config = ''
-            local capabilities = require('cmp_nvim_lsp').default_capabilities()
 
-            vim.lsp.config('nixd', {
-              capabilities = capabilities,
-              cmd = { 'nixd' },
-              filetypes = { 'nix' },
-            })
-            vim.lsp.enable('nixd')
-          '';
-        }
-        {
-          plugin = neoscroll-nvim;
-          type = "lua";
-          config = ''
-            require('neoscroll').setup()
-          '';
-        }
-        vim-markdown
-        bullets-vim
-        vim-table-mode
-        {
-          plugin = render-markdown-nvim;
-          type = "lua";
-          config = ''
-            require('render-markdown').setup({})
-          '';
-        }
-      ];
+      xdg.configFile."nvim/lua".source = ./code-editors/nvim/lua;
+
+      programs.neovim = {
+        enable = true;
+        vimAlias = true;
+        defaultEditor = true;
+        extraPackages = with pkgs; [
+          ripgrep
+          fd
+          nil
+          nixd
+        ];
+        extraLuaConfig = builtins.readFile ./code-editors/nvim/init.lua;
+        # Order is no longer load-bearing -- configuration order is decided by
+        # the `require`s in init.lua now -- but it is kept as it was so the
+        # diff against the previous, config-carrying list stays readable.
+        plugins = with pkgs.vimPlugins; [
+          catppuccin-nvim
+          telescope-nvim
+          plenary-nvim # telescope dependency
+          vim-nix
+          luasnip
+          cmp_luasnip
+          cmp-nvim-lsp
+          nvim-cmp
+          nvim-lspconfig
+          neoscroll-nvim
+          vim-markdown
+          bullets-vim
+          vim-table-mode
+          render-markdown-nvim
+        ];
+      };
     };
-  };
-
 }
