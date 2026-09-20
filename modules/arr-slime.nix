@@ -458,6 +458,29 @@
             serviceConfig = {
               Restart = lib.mkOverride 90 "on-failure";
               RestartSec = lib.mkOverride 90 "10s";
+              # ...and wait for seerr to actually answer before running.
+              # `After=seerr.service` only means the node process launched;
+              # Jellyseerr needs several more seconds before its HTTP API
+              # accepts connections. The upstream start script curls
+              # 127.0.0.1:5055 under `set -e`, so it exits 7 ("couldn't
+              # connect") and fails the unit -- which fails
+              # switch-to-configuration, which makes deploy-rs roll the whole
+              # generation back. That has bitten every deploy that restarts
+              # seerr: Aug 23, Sep 7, Sep 9 and Sep 20. The Restart= above
+              # does recover it ~10s later, but only after the deploy is
+              # already lost, so retrying is not enough on its own.
+              # /api/v1/status is unauthenticated, so it needs no api key.
+              ExecStartPre = "${pkgs.writeShellScript "wait-for-seerr" ''
+                for _ in $(seq 1 60); do
+                  if ${pkgs.curl}/bin/curl -sfo /dev/null --max-time 5 \
+                    http://127.0.0.1:5055/api/v1/status; then
+                    exit 0
+                  fi
+                  sleep 2
+                done
+                echo "seerr API still not answering after 120s" >&2
+                exit 1
+              ''}";
             };
           };
 
@@ -465,41 +488,44 @@
           # StartLimitBurst, so rapid restarts hit the systemd default rate
           # limit (5 failures / 10s) and the unit is permanently stopped.
           # Set sane restart throttling for all *arr services + seerr.
+          #
+          # The start-limit pair are the *unit*-level NixOS options on purpose:
+          # systemd only reads StartLimitIntervalSec from [Unit]. Written
+          # inside serviceConfig they land in [Service], where systemd rejects
+          # the key outright -- "Unknown key 'StartLimitIntervalSec' in section
+          # [Service], ignoring", logged for all five units on every
+          # activation -- so the window silently stayed at the 10s default and
+          # only StartLimitBurst took effect, through systemd's legacy
+          # [Service] alias for it.
+          # (An attrset literal, not lib.genAttrs: Nix merges the
+          # `systemd.services.seerr-sonarr` definition above with this one only
+          # because both are literals -- a function call here is an
+          # "attribute 'systemd.services' already defined" error.)
           systemd.services = {
             sonarr = {
-              serviceConfig = {
-                RestartSec = lib.mkOverride 90 "10s";
-                StartLimitIntervalSec = lib.mkOverride 90 "30s";
-                StartLimitBurst = lib.mkOverride 90 10;
-              };
+              startLimitIntervalSec = 30;
+              startLimitBurst = 10;
+              serviceConfig.RestartSec = lib.mkOverride 90 "10s";
             };
             radarr = {
-              serviceConfig = {
-                RestartSec = lib.mkOverride 90 "10s";
-                StartLimitIntervalSec = lib.mkOverride 90 "30s";
-                StartLimitBurst = lib.mkOverride 90 10;
-              };
+              startLimitIntervalSec = 30;
+              startLimitBurst = 10;
+              serviceConfig.RestartSec = lib.mkOverride 90 "10s";
             };
             lidarr = {
-              serviceConfig = {
-                RestartSec = lib.mkOverride 90 "10s";
-                StartLimitIntervalSec = lib.mkOverride 90 "30s";
-                StartLimitBurst = lib.mkOverride 90 10;
-              };
+              startLimitIntervalSec = 30;
+              startLimitBurst = 10;
+              serviceConfig.RestartSec = lib.mkOverride 90 "10s";
             };
             prowlarr = {
-              serviceConfig = {
-                RestartSec = lib.mkOverride 90 "10s";
-                StartLimitIntervalSec = lib.mkOverride 90 "30s";
-                StartLimitBurst = lib.mkOverride 90 10;
-              };
+              startLimitIntervalSec = 30;
+              startLimitBurst = 10;
+              serviceConfig.RestartSec = lib.mkOverride 90 "10s";
             };
             seerr = {
-              serviceConfig = {
-                RestartSec = lib.mkOverride 90 "10s";
-                StartLimitIntervalSec = lib.mkOverride 90 "30s";
-                StartLimitBurst = lib.mkOverride 90 10;
-              };
+              startLimitIntervalSec = 30;
+              startLimitBurst = 10;
+              serviceConfig.RestartSec = lib.mkOverride 90 "10s";
             };
           };
 

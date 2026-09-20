@@ -39,7 +39,7 @@
             copyApps.enable = false;
             linkApps.enable = true;
           };
-          # sing-box now carries ONLY the bedag work setup — see modules/proxy.nix.
+          # sing-box now carries ONLY the bedag work setup — see modules/proxy/darwin.nix.
           # Everything HOMELAB rides the headscale tailnet: hosts for ssh/deploy
           # (Tailscale SSH by identity), observability, SMB, AND homelab web
           # (`.w.phonkd.net` resolves to 201's tailnet IP 100.64.0.5 via the Mac's

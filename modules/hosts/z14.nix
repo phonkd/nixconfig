@@ -182,6 +182,41 @@
       # that makes that sink's volume reach the chain at all.
       noughty.hyprland.loudnessKnob = true;
 
+      # The DisplayLink dock. The option (modules/work/default.nix) is off by
+      # default because pkgs.displaylink is `requireFile` and flipping it on a
+      # machine whose store lacks the installer turns every `deploy z14` into a
+      # hard failure. That prerequisite is now met here -- the zip was fetched
+      # with the `nix-prefetch-url` in the option's own description, and its
+      # hash matches nixpkgs, so this host can build it.
+      #
+      # 205-builder needs no separate fetch: the offloaded build copies the
+      # requireFile path across like any other input, which was verified rather
+      # than assumed.
+      #
+      # It lives on the host rather than following the "work" tag because it is
+      # a fact about this machine's store, not about bedag -- another
+      # work-tagged host would have to do its own download first.
+      noughty.work.displaylink.enable = true;
+
+      # Citrix Workspace. Same shape as displaylink above, and on the host for
+      # the same reason: what the flag asserts is that *this* machine's store
+      # holds the installer.
+      #
+      # Unlike displaylink's, that is not yet true at the point this is being
+      # switched on, and the effect is deliberate rather than an oversight.
+      # citrix-workspace is `requireFile`, so the next rebuild stops with the
+      # package's own message naming the exact tarball and the page to get it
+      # from. That message is the authoritative source for the URL -- it moves
+      # with the version -- and Citrix puts the download behind a click-through
+      # that cannot be scripted, so there is no way to satisfy this from here
+      # ahead of time. Fetch it once and rebuild:
+      #
+      #     nix-prefetch-url "file://$PWD/linuxx64-<version>.tar.gz"
+      #
+      # Dropping this one line is the way back to a building configuration if
+      # that download has to wait.
+      noughty.work.citrix.enable = true;
+
       # See acpMixerPaths above for what this is fixing and what was measured.
       # asDropin because both units come from their own packages via
       # systemd.packages: a plain definition here would replace the packaged

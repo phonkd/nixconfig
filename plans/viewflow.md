@@ -1,10 +1,13 @@
 # viewflow — cross-device window sharing
 
 **Repo(s):** nixconfig (this repo only — upstream is consumed as a pinned
-`flake = false` input)   **Status:** Phase 1 done — the Linux half is packaged,
-merged to `main`, and **deployed and verified on g14** (2026-09-16). blac picks
-it up whenever it next boots NixOS. Phase 2 — the Windows half — is hand-work on
-the Windows peer that cannot be done from nix; see "The Windows half" below.
+`flake = false` input)   **Status:** **done and working end to end** — blac's
+windows display on g14 as individual Hyprland windows (2026-09-18). Phase 1 (the
+nix-packaged Linux half) is on `main` and deployed; Phase 2 (the Windows half,
+hand-built on the peer) is built and running. Phase 3 (the atlas/desktop-drag
+launcher, and with it any pointer/keyboard crossover) remains deferred — this
+path is **view-only**. See the bring-up log for what it looks like and the
+hybrid-GPU fix that was required.
 **g14 is the Linux end of every pairing**; the Windows end can be blac *or* z14,
 both of which are dual-boot.
 
@@ -161,7 +164,24 @@ running compositor on the *source* host — `docs/hyprcapture-integration.md`
 inspects HyprCapture's `src/plugin/artifact_capture.cpp` and notes the live
 compositor "lists HyprCapture 0.2.7". So being a *source* is not just a package
 install; it re-opens the deferred Phase 3 plugin tax. Being a *presenter* does
-not — `linux-reverse` is a plain Wayland client (plus CUDA).
+not need the plugin.
+
+**Correction, found while actually running it:** the presenter is *not* "a plain
+Wayland client plus CUDA", as earlier revisions of this plan claimed. It needs
+Hyprland's **IPC environment**, not merely a Wayland socket — started with only
+`XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` set it fails with
+
+```
+reverse presenter: Hyprland IPC environment missing
+reverse native backend exited: exit status: 1
+```
+
+and the peer then loops on `reverse-window-bridge recovering`. It wants
+`HYPRLAND_INSTANCE_SIGNATURE` as well. That signature changes on every
+compositor restart, so `~/viewflow/start-presenter.sh` on g14 derives it from
+the newest entry under `$XDG_RUNTIME_DIR/hypr` rather than hardcoding it. The
+practical consequence is that the *presenter* is Hyprland-bound too: it will not
+run under the Plasma session on the same host, only under Hyprland.
 
 ## Approach
 
@@ -184,9 +204,63 @@ of breaking a boot.
   helpers, gated to NVIDIA Hyprland hosts (blac, g14). As-built notes below.
 - **Phase 2 — the Windows half on blac.** Hand-work, cannot be done from nix.
   See "The Windows half".
-- **Phase 3 — deferred.** Hyprland metadata/capture plugins + atlas launcher.
-  ABI-locked to the running compositor. Needed only for the g14-as-*source*
-  direction; blac-Windows → g14 does not touch it.
+- **Phase 3 — deferred, and now costed.** Hyprland capture plugin + atlas
+  launcher. ABI-locked to the running compositor. Needed only for the
+  g14-as-*source* direction (g14 → Windows); blac-Windows → g14 does not touch
+  it. See "The reverse direction (g14 → Windows)" below for the exact blocker.
+
+### The reverse direction (g14 → Windows) — what it needs
+
+The direction that works today is Windows → g14. The opposite direction is a
+different program on the Linux side, with a different shape and a hard blocker.
+
+`vf-hyprland-windows --help` states it exactly:
+
+```
+usage: vf-hyprland-windows --window 0xADDRESS --compositor-pid PID [--fps 60]
+       [--performance-mode frame-rate|latency]
+       [--input-native /absolute/viewflow-linux-window-input]
+Shares one selected window using the Viewflow capture plugin and NVENC.
+Omit --input-native for view-only sharing. Launch through vf-window-peer.
+```
+
+Two things follow. First, it shares **one explicitly named window** (by Hyprland
+address) rather than a region — a different and arguably nicer model than the
+Windows source's rectangle. Second, and unlike the direction now running, it
+**supports return input** via `--input-native`, pointed at the
+`viewflow-linux-window-input` helper this repo already installs. So if
+pointer/keyboard crossover is ever wanted, this is the direction that has it.
+
+**The blocker is a compositor version gate, not the plugin build itself:**
+
+```
+# platform/viewflow-capture/CMakeLists.txt:11
+pkg_check_modules(HYPRLAND REQUIRED IMPORTED_TARGET hyprland>=0.56)
+```
+
+g14 runs **Hyprland 0.55.4** — `programs.hyprland.enable` with no `package`
+override takes nixpkgs', and nixos-26.05 ships 0.55.4. Upstream's newest release
+is 0.56.2, which is also precisely what the plugin README records as tested
+("Hyprland 0.56.2 Lua"). So the gap is one minor release, and closing it means
+pointing `programs.hyprland.package` at the repo's existing `hyprland` flake
+input (git, submodules) instead of nixpkgs.
+
+That is not a free switch, and the cost is ongoing rather than one-off:
+
+- g14's daily compositor moves from a nixpkgs release to a git build.
+- The plugin "compares the full Hyprland/dependency ABI hash at load time and
+  refuses to load if it was not built against the running compositor", so every
+  Hyprland bump becomes a **paired** compositor+plugin rebuild, forever.
+- The blast radius is the desktop actually in use, not a background service.
+
+Also still outstanding for this direction, but cheap: building
+`platform/windows-window-presenter` → `viewflow-windows-windows.exe` on the
+Windows peer (same CMake pattern as the source, a couple of minutes), plus a
+role-swapped pair of JSON configs.
+
+Recommendation: **leave it deferred** unless input crossover is specifically
+wanted. The working direction cost nothing ongoing; this one puts a permanent
+rebuild tax on the laptop's compositor.
 
 ## Steps
 
@@ -374,6 +448,21 @@ degrade, it refuses each other.
    `tailscale0` is filtered like any other interface. A blocked QUIC handshake
    is silent, so this is worth knowing before debugging one.
 
+   **Already done on g14 (2026-09-18).** `~/viewflow/` (0700) holds the pair CA
+   and both leaf certs (`g14-peer`, `blac-peer`, 7-day, expiring 2026-09-25),
+   plus `presenter.json` below, which
+   `vf-window-peer validate --config ~/viewflow/presenter.json` accepts
+   (`window-peer-config-valid`). Only the Windows half is outstanding; copy
+   `blac-peer.pem`, `blac-peer.key` and `pair-ca.pem` from `g14:~/viewflow/`
+   to `C:\Viewflow\` on blac.
+
+   **Note the presenter's arguments are positional, not flags.**
+   `platform/linux-reverse/main.cpp:742` parses exactly `argv[1..3]` as
+   `origin_x origin_y scale` (or a lone `--validate`); scale must be 1–4. The
+   `--scale`/`--origin-x` spelling in upstream's macOS doc belongs to the
+   *Windows* presenter binary, and passing it here fails. This bit the first
+   draft of this config.
+
    g14 as presenter (the easy direction — no Hyprland plugin needed):
 
    ```json
@@ -385,7 +474,7 @@ degrade, it refuses each other.
      "role": "presenter",
      "backend": {
        "native": "/run/current-system/sw/bin/viewflow_linux_reverse",
-       "args": ["--scale", "1", "--origin-x", "0", "--origin-y", "0"]
+       "args": ["0", "0", "1"]
      }
    }
    ```
@@ -397,16 +486,30 @@ degrade, it refuses each other.
      "bind": "0.0.0.0:0",
      "remote": "192.168.1.181:44220",
      "server_name": "g14-peer",
-     "certificate": "C:/Viewflow/windows-peer.pem",
-     "private_key": "C:/Viewflow/windows-peer.key",
+     "certificate": "C:/Viewflow/blac-peer.pem",
+     "private_key": "C:/Viewflow/blac-peer.key",
      "certificate_authority": "C:/Viewflow/pair-ca.pem",
      "role": "source",
      "backend": {
        "native": "C:/Viewflow/src/build/window-source/Release/viewflow_windows_reverse.exe",
-       "args": ["source", "--codec", "h264", "--scale", "1"]
+       "args": ["0", "0", "1920", "1080"]
      }
    }
    ```
+
+   **The Windows source's arguments are four integers, not flags** — same trap
+   as the Linux presenter, and both were originally copied from the pattern in
+   upstream's *macOS* doc, which describes neither binary.
+   `platform/windows-reverse/performance_mode.hpp:53-88` accepts only
+   `--performance-status`, `--performance-mode <mode>` and `--mode-file <path>`;
+   every other argument must parse as an integer, and there must be **exactly
+   four** of them, taken as the capture rectangle `left top right bottom`.
+   Anything else throws `invalid reverse coordinate or option`, and an
+   empty/inverted rectangle throws `empty reverse capture rectangle`. Negative
+   values are legal (they are virtual-desktop coordinates, so a monitor left of
+   the primary has a negative left edge — upstream's own test uses
+   `{-6144, -780, 0, 2676}`). So set the rectangle to the region of blac's
+   desktop you want shared, in blac's virtual-desktop coordinates.
 
    `192.168.1.181` is g14's LAN address on wifi — re-check it with
    `ip -brief addr` if the lease moves; pinning a DHCP reservation for g14 on
@@ -414,9 +517,134 @@ degrade, it refuses each other.
    first, then the
    source — upstream's own procedure everywhere is receiver-before-sender.
 
+   Both configs can be checked before any of this is live:
+   `vf-window-peer validate --config <file>` prints `window-peer-config-valid`
+   and exits, touching neither the network nor the GPU. Do that on each side
+   first — it catches path, identity and geometry mistakes without needing the
+   peer to exist.
+
 7. **For the other direction** (g14 as source), g14 additionally needs a capture
    plugin loaded in its running Hyprland — that is Phase 3 and is not done. See
    point 4 of "Hardware reality".
+
+## Bring-up log (2026-09-18) — WORKING
+
+State: **it works.** blac's windows appear on g14 as individual Hyprland
+windows, stable, zero recovery events.
+
+### What it actually looks like — individual windows, not a monitor
+
+Worth stating plainly because the mental model matters: this is **not** a second
+display and not a desktop mirror. Each remote window arrives as its own real
+Hyprland toplevel, with the real title, and can be tiled/floated/moved like any
+native window. From `hyprctl clients` on g14 while blac was sharing:
+
+```
+class: ViewflowReverse-3   title: bôa - Duvet
+class: ViewflowReverse-6   title: Release notes - Zen — Zen Browser
+class: ViewflowReverse-7   title: viewflow source  --  blac screen -
+```
+
+The four coordinates in `source.json` are therefore not "the thing that gets
+streamed" — they bound the *region of blac's desktop from which windows are
+picked up*. Windows inside that rectangle get forwarded, one Wayland surface
+each.
+
+The "drag a window across the screen edge onto another monitor" model is the
+*other* upstream path — the desktop-drag atlas launcher, which creates a
+headless Hyprland output and loads plugins into the running compositor. That is
+still deferred (Phase 3) and deliberately unused; it is the thing that can wedge
+the desktop.
+
+**This path is view-only.** `vf-window-peer`'s config struct
+(`crates/viewflowd/src/bin/vf-window-peer.rs:17-25`) has exactly eight fields —
+`bind`, `remote`, `server_name`, `certificate`, `private_key`,
+`certificate_authority`, `role`, `backend` — and no input section at all. So
+pointer/keyboard do not cross over on this path, regardless of
+`viewflow-linux-window-input` being installed. Return input belongs to the
+atlas/`vf-media-peer` route, i.e. Phase 3.
+
+### The fix that made it work: force the presenter onto the dGPU
+
+g14 is a hybrid laptop and Hyprland renders on the **AMD iGPU**. The decoder
+does CUDA/GL interop, so with the GL context on the AMD chip the presenter came
+up and then failed on every frame import:
+
+```
+reverse-presenter ready renderer=AMD Radeon Graphics (radeonsi, renoir, ...)
+reverse presenter: reverse GPU import: invalid OpenGL or DirectX context
+reverse native backend exited: exit status: 1
+reverse-window-bridge recovering: Broken pipe (os error 32); forward desktop retained
+```
+
+That loop is the symptom to recognise: pairing succeeds, the presenter reports
+*ready*, and then it dies per-frame. The cure is to put the client's EGL on the
+NVIDIA GPU — `~/viewflow/start-presenter.sh` now exports:
+
+```sh
+__NV_PRIME_RENDER_OFFLOAD=1
+__GLX_VENDOR_LIBRARY_NAME=nvidia
+__EGL_VENDOR_LIBRARY_FILENAMES=/run/opengl-driver/share/glvnd/egl_vendor.d/10_nvidia.json
+```
+
+after which the renderer line reads
+`NVIDIA GeForce RTX 3050 Ti Laptop GPU/PCIe/SSE2` and the recovery loop stops
+dead. This is a general consequence of the CUDA-only decode path, so **any**
+hybrid-graphics Linux presenter needs the same treatment; it is not a g14 quirk.
+
+### Build/config state
+
+Everything below was built and configured on both machines, and the QUIC/mTLS
+pair establishes cleanly.
+
+What is where:
+
+| | g14 (Linux) | blac (Windows 11, 26200) |
+|---|---|---|
+| orchestrator | `vf-window-peer` (system package) | `C:\Viewflow\src\target\release\vf-window-peer.exe` |
+| native backend | `viewflow_linux_reverse` (system package) | `...\build\window-source\Release\viewflow_windows_reverse.exe` |
+| identities | `~/viewflow/` (0700) | `C:\Viewflow\{blac-peer.pem,blac-peer.key,pair-ca.pem}` |
+| config | `~/viewflow/presenter.json` | `C:\Viewflow\source.json` |
+| launcher | `~/viewflow/start-presenter.sh` | `C:\Viewflow\start-source.bat` |
+
+Both configs pass `vf-window-peer validate --config <file>`
+(`window-peer-config-valid`), and both peers reached
+`reverse-window-bridge ready native_role=... paired_connection=true` — so the
+certs, the CA chain, the LAN addressing (`192.168.1.181:44220`) and the
+udp/44220 firewall opening are all confirmed working end to end.
+
+**The Windows source must run in the interactive console session.**
+`platform/windows-reverse/main.cpp:363` calls `OpenInputDesktop`, and a network
+logon (ssh) has no input desktop, so it fails immediately and the peer loops:
+
+```
+reverse source: reverse capture input desktop unavailable=1
+reverse native backend exited: exit code: 1
+```
+
+A scheduled task with `/it` ("Interactive only") did not work around it either —
+the task ran but returned Last Result 1 and produced no output. So this one step
+is genuinely hands-on: run `C:\Viewflow\start-source.bat` from Explorer on blac.
+The task was deleted again; nothing persistent was left behind.
+
+Toolchain notes for the next rebuild of the Windows side:
+
+- Installed with winget: VS 2022 Build Tools (VCTools workload, MSVC 14.44,
+  Windows SDK 10.0.26100), Rustup (`stable-x86_64-pc-windows-msvc`, cargo
+  1.98.1), CMake 4.4.3, Git 2.55. The Rust build takes ~45 s; the CMake build a
+  couple of minutes. No CUDA anywhere, as expected.
+- **Do not use the scoop-installed git over ssh.** Its shims fail
+  (`Shim: Could not create process`), and addressing the real binary through
+  scoop's `current` junction fails with "The path cannot be traversed because it
+  contains an untrusted mount point" — a network-logon restriction on traversing
+  junctions. Installing Git.Git via winget sidesteps it entirely.
+- blac's display is 2560x1440 on the RTX 5080, which is where `source.json`'s
+  `["0","0","2560","1440"]` capture rectangle comes from. Note an ssh session
+  reports a *virtual* 1024x768 desktop, so do not read geometry from there.
+
+Housekeeping: the leaf certs are 7-day and **expire 2026-09-25**; regenerate
+with the recipe above and re-copy blac's three files when they do. If g14 sleeps,
+the presenter dies with it — restart it with `~/viewflow/start-presenter.sh`.
 
 ## Open decisions
 
