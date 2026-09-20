@@ -303,6 +303,7 @@
       "vm"
       "hetzner-vm"
       "mailserver"
+      "chat-server"
       # Ships telemetry over the Hetzner private network (10.0.0.3), not the
       # home-router tunnel — see obsHost in the observability-sender module.
       "observability-sender"

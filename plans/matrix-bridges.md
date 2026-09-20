@@ -1,6 +1,6 @@
 # matrix + signal/whatsapp/discord bridges
 
-**Repo(s):** nixconfig   **Status:** in progress — module + secrets landed (inert); VM not provisioned
+**Repo(s):** nixconfig   **Status:** in progress — hosted on `ext-mail`, tag wired; secrets and DNS outstanding
 
 ## Goal
 
@@ -13,8 +13,9 @@ path depends on 201-mono or the home connection being up.
 
 ## Approach
 
-New Hetzner VM `ext-matrix`, alongside the two that already exist (`ext-mail`,
-`observability`), running **Synapse + Postgres + nginx** with the three
+**Hosted on the existing `ext-mail` VM** — decided 2026-09-20; the separate-VM
+option this plan originally recommended, and what choosing against it costs, is
+recorded under Open decisions. It runs **Synapse + Postgres + nginx** with the three
 **mautrix** bridges as local appservices. All four are in the pinned nixpkgs
 (`nixos-26.05`) with real NixOS modules — verified against the module source,
 not from memory:
@@ -404,25 +405,29 @@ Ordered; each verifiable on its own.
    the `$MAUTRIX_…` literals survive into `settings` for envsubst and the
    postgres URIs render as unix-socket DSNs. **Not** verified: nothing has been
    *built* or run. Whether Synapse and the bridges actually come up is step 8.
-1. **Provision the VM.** Hetzner CX22, x86_64, same project and private network as
-   `ext-mail`/`observability`. Install NixOS the way those two were done. Open
-   80/443 in the Hetzner cloud firewall. Record the public IP and the `/` + `/efi`
-   disk UUIDs.
-2. **DNS:** create `matrix.phonkd.net A <ip>` in Cloudflare. (SRV comes in step 8,
-   once the server answers.)
-3. **`lib/registry.nix`:** add an `ext-matrix` stanza — `kind = "server"`,
-   `tags = [ "vm" "hetzner-vm" "chat-server" "observability-sender" ]`,
-   `extraModules = [ self.nixosModules."ext-matrix" self.nixosModules."hetzner-vm" ]`.
-   Leave `deploy.hostname` out until the box is on the tailnet (step 5).
-4. **`modules/hosts/matrix.nix`:** host identity module, mirroring
-   `modules/hosts/mail.nix` — sets `networking.hostName`, plus the `lib.mkForce`
-   fileSystems UUID overrides from step 1.
-5. **Bootstrap + enrol.** Place the shared age key at
-   `/home/phonkd/.config/sops/age/keys.txt` (the sops `keyFile`, per
-   `modules/homelab/sops.nix`), then first `nixos-rebuild` on the box by hand.
-   `tailnet.nix` gates on `is.server`, so it enrols itself with the sops
-   `headscale_authkey`. Read the assigned `100.64.0.x` out of `tailscale status`,
-   put it in `deploy.hostname`, and confirm `deploy matrix` works end to end.
+1. ~~**Provision the VM.**~~ **Dropped** — reusing `ext-mail` (see Open
+   decisions). No Hetzner cloud-firewall change either: 80/443 are already open
+   there for `mail.` and `cal.`, which is one of the small dividends of this
+   choice. Nothing to bootstrap, no disk UUIDs to read off.
+2. **DNS:** create `matrix.phonkd.net A 157.180.27.152` (ext-mail's public IP)
+   in Cloudflare. **This is the one prerequisite that must land before the first
+   deploy** — ACME issues the cert over HTTP-01 on that name, so nginx will fail
+   to obtain it until the record resolves. (The SRV record comes in step 8, once
+   the server answers.)
+3. ~~**`lib/registry.nix`: add an `ext-matrix` stanza.**~~ **Done, differently.**
+   `chat-server` was added to the existing `ext-mail` tag list instead — a
+   one-line edit. `deploy.hostname` is already `157.180.27.152` there, so
+   `deploy mail` is the deploy command for this work too.
+4. ~~**`modules/hosts/matrix.nix`.**~~ **Dropped** — no new host, so no host
+   identity module and no `fileSystems` UUID overrides.
+5. ~~**Bootstrap + enrol.**~~ **Dropped** — `ext-mail` is already a deploy node
+   with the age key in place and the tailnet enrolment done.
+
+   Verified on `ext-mail` with the tag applied: nginx serves all three vhosts
+   (`mail.`, `cal.`, `matrix.`), sshd keeps :5432, postgres binds nothing
+   (`listen_addresses = ""`), the firewall is unchanged at
+   `[25 80 443 465 993 5432]`, and the two `security.acme` definitions agree
+   rather than conflict. Docker flips to `false` — see the Open decisions note.
 6. ~~**`modules/chat.nix`, server half**~~ — **Done in step 0**; this is now the
    description of what the committed file contains, not work left to do.
    `flake.nixosModules.chat-server`, gated on
@@ -652,18 +657,27 @@ the file.
 
 ## Open decisions
 
-- **New VM vs. the mailserver VM — reopened.** Still recommending a new
-  `ext-matrix`, but less strongly than before: the "ext-mail is hand-managed"
-  argument is gone now that it is a deploy node, so the case rests only on
-  blast-radius isolation (mail reputation, bridge OOM, one nginx serving two
-  release cycles). If box-count or the €4/month wins, the delta is smaller than
-  this plan originally implied — add the `chat-server` tag to the existing
-  `ext-mail` stanza, add the matrix vhosts to its nginx, and accept that a bridge
-  OOM can take mail with it. Note the `worktree-mail-tailnet` branch has to reach
-  `main` either way before `deploy mail` is reproducible from a clean checkout.
-  **Nothing about `modules/chat.nix` changes with this decision** — it is gated on
-  a tag, so which host wears the tag is a one-line registry edit. That is the
-  reason to fix and land the module (step 0) without waiting for this call.
+- **New VM vs. the mailserver VM — RESOLVED 2026-09-20: reuse `ext-mail`.**
+  This plan had recommended a separate `ext-matrix` on blast-radius grounds; the
+  call went the other way, for box count and the €4/month. Recorded honestly so
+  that reversing it later is cheap and so the accepted risk is not forgotten:
+
+  - **What we accepted.** One nginx and one reload path now serve both mail and
+    a Synapse that changes far more often, so a broken matrix vhost can take the
+    webmail/CalDAV vhosts down with it. A bridge OOM or a Synapse schema
+    migration can now hurt mail — whose deliverability and DKIM reputation are
+    the one thing in this fleet that is genuinely hard to rebuild.
+  - **What was never actually a risk.** 80/443 was not contention:
+    `matrix.phonkd.net` is simply a third vhost beside `mail.` and `cal.`
+    (verified — all three render on the host). Postgres vs sshd on :5432 is real
+    but identical on any `hetzner-vm` host, and `listen_addresses = mkForce ""`
+    handles it either way.
+  - **Side effect of tagging `ext-mail`.** Docker is now forced **off** there.
+    Nothing on that host used it, and it reclaims ~1 GB of closure — but it is a
+    change to a live box, not a no-op.
+  - **Reversing costs one registry line** plus a VM bootstrap: move the
+    `chat-server` tag onto a new `ext-matrix` stanza. **Nothing in
+    `modules/chat.nix` changes** — gating on a tag is exactly what buys that.
 - **Where the client half lives.** `modules/chat.nix` holding both halves is the
   recommendation and matches `kde.nix` / `hyprland.nix` / `desktop.nix`. The
   alternative — server module here, client packages appended to the existing
