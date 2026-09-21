@@ -11,6 +11,10 @@
     programs.neovim = {
       enable = true;
       vimAlias = true;
+      # `vimdiff` otherwise falls through to Apple's stock vim, which has no
+      # colorscheme (pastel LightCyan/LightMagenta diff backgrounds under a
+      # light terminal fg) and an external differ without linematch.
+      vimdiffAlias = true;
       extraPackages = with pkgs; [
         ripgrep
         fd
