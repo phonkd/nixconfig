@@ -57,10 +57,25 @@
     # copying, symlinking and macOS aliases all fail here; the trampoline is
     # the thing that works.
     #
-    # Deliberately NOT following our nixpkgs: it is a Common Lisp program and
-    # its pinned nixpkgs gives a cached sbcl + ASDF closure (~20s to build).
-    # Repointing it at nixos-26.05 rebuilds that whole stack for no gain.
-    mac-app-util.url = "github:hraban/mac-app-util";
+    # Pointed at nixpkgs-unstable, NOT our nixos-26.05 and NOT its own pin,
+    # because both of those give sbcl 2.6.4 and sbcl < 2.6.6 cannot start at
+    # all under macOS 27. The kernel now reserves a ~52 GB "GPU Carveout"
+    # region that runs from just past the dyld shared cache up to
+    # 0xfc0000000, and sbcl's fixed low spaces sit inside it, so its first
+    # MAP_FIXED lands on EACCES:
+    #
+    #   failed to allocate 1048576 bytes at 0x300100000
+    #   (hint: Try "ulimit -a"; maybe you should increase memory limits.)
+    #
+    # That aborts `mac-app-util sync-trampolines`, which aborts the whole
+    # home-manager activation at trampolineApps. sbcl 2.6.6 moved the static
+    # addresses; 2.6.7 (unstable) is verified working here. Revert to plain
+    # `.url` once nixos-26.xx ships sbcl >= 2.6.6. The ~20s ASDF rebuild the
+    # old pin was avoiding is the price of a working activation.
+    mac-app-util = {
+      url = "github:hraban/mac-app-util";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     # Caelestia -- the Quickshell desktop shell used by the Hyprland session
     # (modules/hyprland.nix). Sole consumer: that module.
     #
