@@ -174,8 +174,10 @@ Phased so each phase is useful standing alone. Phase 0 ships before the homelab
 is touched at all.
 
 **Phase −1 — today, before anything:**
-- [ ] **Request the Spotify extended streaming history export.** Up to 30 days.
-      Nothing here can be validated on real data until it lands.
+- [x] **Request the Spotify extended streaming history export.** Requested
+      2026-09-22 (along with the other providers'); Spotify quotes up to 30
+      days, so expect it by ~2026-10-22. Nothing here can be validated on real
+      data until it lands — build against a fixture meanwhile.
 - [ ] Meanwhile: pick the repo name; create a Last.fm API key.
 
 **Phase 0 — offline taste report (no service, no deploy).**
