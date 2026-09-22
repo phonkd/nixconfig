@@ -34,18 +34,20 @@
 
       users.users.phonkd.extraGroups = [ "hermes" ];
 
-      # ALIBABA_CODING_PLAN_API_KEY — the Alibaba Cloud Model Studio "Coding
-      # Plan" subscription key, and the main model path since it replaced the
-      # metered OpenRouter one. Hermes ships the provider profile built in as
-      # `alibaba-coding-plan`: OpenAI-compatible endpoint
-      # https://coding-intl.dashscope.aliyuncs.com/v1, key read from
-      # ALIBABA_CODING_PLAN_API_KEY (or DASHSCOPE_API_KEY), base URL
-      # overridable with ALIBABA_CODING_PLAN_BASE_URL. Mint the key in the
-      # Model Studio console under the coding plan — a classic pay-as-you-go
-      # DashScope key belongs to dashscope-intl.aliyuncs.com and 401s here.
-      sops.secrets."hermes-alibaba" = {
-        owner = "hermes";
-      };
+      # NOTE: the main model path is no longer an env-var secret at all. It is
+      # the `openai-codex` subscription provider, whose OAuth credentials live
+      # in the *writable* state dir at
+      # /var/lib/hermes/.hermes/auth.json — see settings.model below. There is
+      # deliberately no sops secret, no `authFile`, and no env var for it:
+      # Hermes refreshes the access token itself and rewrites auth.json in
+      # place, so anything nix-managed would either be stale or clobber a
+      # refreshed token on the next activation.
+      #
+      # The former ALIBABA_CODING_PLAN_API_KEY secret ("hermes-alibaba") is
+      # gone from here: the Alibaba coding plan subscription expired, and the
+      # key is being removed from global-secrets/secret.yaml. sops-nix fails
+      # activation on a declared-but-missing key, so the declaration has to go
+      # at the same time as the value.
       # OPENROUTER_API_KEY — no longer the model path (see settings.model
       # below), kept only because the vision/image tools fall back to
       # OpenRouter when the main provider can't serve them. Safe to drop this
@@ -116,17 +118,42 @@
           pkgs.curl
           pkgs.git
         ];
-        # Main model: glm-5 on the Alibaba coding plan (hermes-alibaba).
-        # Replaced deepseek-v4-flash on OpenRouter, which billed per token; the
-        # coding plan is a flat subscription. GLM is one of the third-party
-        # models the plan resells alongside Alibaba's own — same key, same
-        # endpoint. Others it serves: qwen3.7-plus / qwen3.6-plus,
-        # qwen3-coder-plus / qwen3-coder-next, kimi-k2.5, glm-4.7,
-        # MiniMax-M2.5 — swap `default` below, nothing else changes.
-        # Quirk to expect: Hermes carries a workaround for this API reporting
-        # "glm-4.7" as the model name whatever you asked for, but it only fires
-        # for provider `alibaba`, not `alibaba-coding-plan` — so if the agent
-        # ever misnames itself in chat, that's cosmetic, not a misrouted call.
+        # Main model: gpt-5.6-sol over the ChatGPT Plus subscription, via
+        # Hermes' built-in `openai-codex` provider. Replaced glm-5 on the
+        # Alibaba coding plan, whose subscription expired.
+        #
+        # How this provider authenticates (hermes_cli/providers.py):
+        #   transport  codex_responses
+        #   auth_type  oauth_external   ← no API key, no env var
+        #   base_url   https://chatgpt.com/backend-api/codex
+        # Credentials come from the credential pool in $HERMES_HOME/auth.json
+        # and nowhere else. `hermes auth add openai-codex` runs a pure
+        # device-code flow (hermes_cli/auth.py::_codex_device_code_login):
+        # it prints https://auth.openai.com/codex/device plus a user code and
+        # polls for 15 min. No loopback listener, so no `ssh -L` tunnel — the
+        # upstream guide (website/docs/guides/oauth-over-ssh.md) lists
+        # openai-codex under "tunnel needed? No — device code flow". Hermes
+        # refreshes the token itself and rewrites auth.json in place.
+        #
+        # Model choice. The pinned Hermes carries a curated offline catalog
+        # (hermes_cli/codex_models.py::DEFAULT_CODEX_MODELS) and, once a token
+        # exists, replaces it with the live per-account catalog from
+        # chatgpt.com/backend-api/codex/models. gpt-5.6-sol is the top-priority
+        # slug in the curated list and one of the three bases upstream marks
+        # live-verified on the Codex OAuth backend (model_metadata.py's
+        # _CODEX_900K_SNAPSHOT_BASES: sol / terra / luna). Alternatives, same
+        # one-line swap: gpt-5.6-terra, gpt-5.6-luna, gpt-5.5, gpt-5.4,
+        # gpt-5.4-mini.
+        # Do NOT use: gpt-5.3-codex-spark (ChatGPT *Pro* entitlement only),
+        # gpt-6-astra (account-gated), any `-pro` variant, or gpt-5.3-codex /
+        # gpt-5.2-codex / gpt-5.1-codex-* (the Codex backend 400s them with
+        # "not supported when using Codex with a ChatGPT account").
+        # Upstream does NOT document which ChatGPT tiers get which slugs, so
+        # confirm against the live picker after login — `hermes model` lists
+        # exactly what this account may actually route to.
+        # The `-900k` suffix Hermes offers in that picker is a Hermes-side
+        # context opt-in that it strips before the wire; leaving it off keeps
+        # the advertised 272K window.
         # A Copilot/gpt-5.4 attempt is parked: the API path itself works — the
         # hermes-copilot OAuth token gets live gpt-5.4 completions from
         # api.githubcopilot.com — but Hermes' credential pool in
@@ -138,8 +165,8 @@
         # what pins the provider, so the model name stays unprefixed (the
         # `vendor/model` form is OpenRouter routing syntax and would 404 here).
         settings.model = {
-          default = "glm-5";
-          provider = "alibaba-coding-plan";
+          default = "gpt-5.6-sol";
+          provider = "openai-codex";
         };
         settings.discord.require_mention = false;
         settings.approvals.mode = "auto";
@@ -161,7 +188,6 @@
           tools.include = [ "search_personal_data" ];
         };
         environmentFiles = [
-          config.sops.secrets."hermes-alibaba".path
           config.sops.secrets."hermes-openrouter-key".path
           config.sops.secrets."hermes-discord".path
           config.sops.secrets."hermes-discord-users".path
