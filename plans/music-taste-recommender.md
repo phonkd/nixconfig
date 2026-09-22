@@ -1,8 +1,9 @@
 # Music taste engine: Spotify GDPR export → recommendations → (later) a player
 
-**Repo(s):** new sibling repo (name TBD, `crate` proposed) for the code +
-NixOS module; `nixconfig` for host wiring, secrets, traefik, dashboard.
-**Status:** draft
+**Repo(s):** `earworm` (new sibling repo — code + NixOS module); `nixconfig`
+for host wiring, secrets, traefik, dashboard.
+**Status:** draft — approved in shape, **not started**. No code until the
+Spotify export lands (requested 2026-09-22, ETA ~2026-10-22).
 
 ## Goal
 
@@ -173,16 +174,18 @@ this tool manages itself.
 Phased so each phase is useful standing alone. Phase 0 ships before the homelab
 is touched at all.
 
-**Phase −1 — today, before anything:**
+**Phase −1 — done, waiting on delivery:**
 - [x] **Request the Spotify extended streaming history export.** Requested
       2026-09-22 (along with the other providers'); Spotify quotes up to 30
       days, so expect it by ~2026-10-22. Nothing here can be validated on real
       data until it lands — build against a fixture meanwhile.
-- [ ] Meanwhile: pick the repo name; create a Last.fm API key.
+- [x] Repo/service name decided: **`earworm`** (`~/git/earworm`, service
+      `earworm`, traefik `music.home.phonkd.net`).
+- [ ] Create a Last.fm API key.
 
 **Phase 0 — offline taste report (no service, no deploy).**
-- [ ] New repo, Python, `slop-trove`'s shape (`src/<pkg>/`, `pyproject.toml`,
-      `package.nix`, `flake.nix`, `nixos-module.nix`).
+- [ ] New repo `earworm`, Python, `slop-trove`'s shape (`src/earworm/`,
+      `pyproject.toml`, `package.nix`, `flake.nix`, `nixos-module.nix`).
 - [ ] `parse` — export zip → Postgres `listens` + `library` + `playlists`.
 - [ ] `report` — a printed/HTML taste report: top artists by affinity vs by raw
       plays (the gap is the interesting bit), skip-rate rankings, era profile,
@@ -250,8 +253,7 @@ without hand-copying. Once Phase 5 scrobbles exist, re-exports become optional.
   thing is the radar, not the transport controls.
 - **Acquisition via lidarr (recommended) vs direct slskd.** lidarr for anything
   with a MusicBrainz release; slskd direct as the escape hatch.
-- **Repo/service name.** `crate` (crate-digging) proposed; `earworm`,
-  `tastemaker`, `digger` are the alternatives. Your call — it's yours to type.
+- ~~**Repo/service name.**~~ **Decided 2026-09-22: `earworm`.**
 - **LLM in the loop?** 203's ollama is right there. Recommendation: **not for
   ranking** (a small local model is worse than the arithmetic above and can't be
   debugged), but yes for *prose* — turning a provenance tuple into the one-line
