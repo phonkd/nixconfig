@@ -355,6 +355,22 @@
           deps = [ ];
         };
 
+      # Retire old Hermes-local nixconfig workflow skills. Repo-local `.claude/`
+      # and AGENTS.md/CLAUDE.md are the source of truth for nixconfig work.
+      system.activationScripts.removeLegacyHermesNixconfigSkills = {
+        text = ''
+          rm -rf -- \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/cc-sync \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/hermes-autofix \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/hermes-autofix-cron-tirith \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/nixconfig-workflow \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/devops/cc-sync-cron-tips \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/cc-sync-pitfalls \
+            ${config.services.hermes-agent.stateDir}/.hermes/skills/homelab-alert-autofix
+        '';
+        deps = [ ];
+      };
+
       # Personal-data embedding + semantic search (the "thing"); Hermes queries
       # it via the MCP entry above. Postgres + pgvector are created locally.
       services.slop-trove = {
