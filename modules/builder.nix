@@ -46,6 +46,7 @@ let
     gigaplayer-server # gated on hostHasTag "gigaplayer-server"
     gigaplayer-server-proxy # gated on hostHasTag "reverse-proxy"
     gui # gated on host.is.nixosDesktop
+    fosi-mc331 # gated on hostHasTag "fosi-mc331"
     viewflow # gated on hostHasTag "hyprland" AND host.gpu.hasNvidia (blac, g14)
     work # work setup (private repo); gated on hostHasTag "work"
     proxy # sing-box system proxy; gated on noughty.proxy.enable (set by `work`)
