@@ -1,8 +1,90 @@
 # Fosi MC331 — kill the low-volume noise gate
 
-**Repo(s):** nixconfig (a new tag-gated module) + possibly a new `aarch64-linux`
-host   **Status:** draft — needs the "which box is cabled to the amp" answer
-before Phase 1 lands.
+**Repo(s):** nixconfig   **Status:** in-progress — the delivery mechanism is
+built, deployed on z14 and provably works at the USB level, but the amp has so
+far ignored every frame sent to it. The payload is decoded and settled; the
+*framing* is not, and is the live suspect. Read "What the hardware actually did"
+before acting on anything below it — parts of the original design were wrong and
+are corrected there.
+
+## What the hardware actually did (z14, 2026-09-23)
+
+The module is live on z14 and the amp accepts frames. It just doesn't act on
+them. Measured, not inferred:
+
+* **The HID interface has no endpoints**, so `usbhid` never binds it and no
+  `/dev/hidraw*` node exists for it. Everything must go over control transfers
+  (SET_REPORT on ep0) via libusb — the plan's original hidapi/hidraw design
+  cannot work here, and `modules/fosi-mc331-fix.py` uses pyusb instead.
+* **The tuning interface number moves with the input selector.** On OPT/AUX/BT
+  (PID `171E`) the amp exposes that one interface, number 0. On USB (PID `1717`)
+  it is also a USB-Audio device: 0 and 1 are audio interfaces held by
+  `snd-usb-audio`, 2 is Consumer Control (the remote's volume/play keys), and
+  the tuning interface is 3. Addressing 0 in USB mode collides with
+  `snd-usb-audio` and fails `EBUSY`. Select it by signature instead: HID class,
+  zero endpoints.
+* **Interface 3 declares a 256-byte Output report** — `06 00 FF` (Usage Page
+  0xFF00), `0A AA 55` (Usage 0x55AA), `75 08` × `96 00 01` — plus a 256-byte
+  Input report and an 8-byte Feature report, with no Report IDs. A 64-byte
+  transfer is ACKed and dropped. hidapi pads to the declared length for free,
+  which is why no community tool had to know this.
+* **With a correctly sized 256-byte report, the amp ACKs everything and applies
+  nothing.** `-1`, `-10`, `-90`, `-100`, `-1000`, a nonsense `-10001230123`, and
+  the suppressor-off variant (flags byte `0x00`) are all audibly identical. A
+  `-10 dB` threshold sits above nearly all programme material and should gate
+  almost continuously; it does nothing. `GET_REPORT` on Input returns zeros and
+  on Feature returns what looks like uninitialised SRAM (ARM pointers such as
+  `0x20016cc8`).
+
+So the amp ACKs a well-formed SET_REPORT regardless of content, and there is no
+evidence the DSP ever sees these frames. Either this unit is a later firmware
+revision than the one the forum reverse-engineered (Fosi did say a revision was
+coming), or — more likely, since it is untested — the frames are going to the
+wrong interface. See below.
+
+The decoded frame format below still stands on its own terms — the CRC-8
+derivation reproduces both independent captures exactly — it simply isn't what
+this amp listens to.
+
+### What is still untested — the framing, not the payload
+
+The forum hands over the payload, and that part is settled. What it does *not*
+hand over is the framing, because every community implementation goes through
+hidapi and hidapi made those choices invisibly:
+
+* **Which interface.** `hid.Device(vid, pid)` opens the *first* HID interface
+  hidapi enumerates for that VID/PID. In USB mode that is almost certainly
+  interface **2** (Consumer Control), not the vendor interface 3 this repo
+  reasoned its way to. If the firmware accepts commands on 2, everything we have
+  sent has gone to the wrong place.
+* **What length.** The forum's `usbhidtool` line passes **17 bytes**. hidapi's
+  Windows backend pads to the declared report length; its hidraw backend does
+  not. So "17" and "256" are both defensible readings and neither is confirmed.
+* **Which request.** Interrupt OUT where an endpoint exists, control SET_REPORT
+  otherwise — hidapi picks per backend.
+
+That is a small matrix (interface × length × report type) and it is cheap to
+sweep with a `-10 dB` threshold, which should gate audibly the instant a
+combination lands. Do that before concluding anything.
+
+The other unfetched artifact is **Lozioandry's `fosi_watcher.zip`**, attached to
+the forum thread — the original field-proven implementation. It would pin down
+all three variables at once. Worth getting hold of.
+
+### Where to go next, cheapest first
+
+0. **Sweep the framing matrix** (above), and get `fosi_watcher.zip`.
+1. **Run the community Android APK against the amp**
+   (`github.com/CaseresMaxi/fosi_MC331_fix`). This is the decisive experiment and
+   needs no VM: if the app fixes the cut-off, our frame or framing is wrong and
+   is worth chasing; if it does nothing either, this unit simply isn't the one
+   the community fixed, and no host-side work will help.
+2. **Capture what ACPWorkbench really sends** — Windows VM with the amp passed
+   through, plus USBPcap. The only reliable way to learn the real protocol, and a
+   much bigger job than anything done so far.
+3. **Accept it.** If (1) fails, the honest answer is that this is a hardware/
+   firmware defect with no host-side remedy, and the lever is Fosi's promised
+   revision or a return.
 
 ## Goal
 
