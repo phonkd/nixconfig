@@ -89,30 +89,34 @@
       sops.secrets."hermes-copilot" = {
         owner = "hermes";
       };
-      # CLAUDE_CODE_OAUTH_TOKEN for the delegated Claude Code CLI (the bundled
-      # autonomous-ai-agents/claude-code skill shells out to `claude`). Uses the
-      # Claude Pro/Max subscription — generate once with `claude setup-token`
-      # on a logged-in machine, no per-token API billing. REQUIRED before deploy:
-      # sops-nix fails activation if this key is missing from secret.yaml.
-      sops.secrets."hermes-claude" = {
-        owner = "hermes";
-      };
+      # NOTE: there is deliberately no Anthropic / Claude Code path here any
+      # more. The "hermes-claude" secret (CLAUDE_CODE_OAUTH_TOKEN, feeding the
+      # bundled autonomous-ai-agents/claude-code skill and the `anthropic`
+      # provider) was removed 2026-09-23: it was never stable in practice.
+      # It also never fully worked — its variable was in environmentFiles but
+      # never appeared in the generated $HERMES_HOME/.env, while
+      # `hermes auth list` still advertised an `anthropic` credential from
+      # env:ANTHROPIC_TOKEN. Don't re-add it without understanding that gap.
+      # The key can stay in secret.yaml harmlessly (nothing declares it now);
+      # prune it there whenever convenient.
 
       services.hermes-agent = {
         enable = true;
         addToSystemPackages = true;
         extraDependencyGroups = [ "messaging" ];
-        # gh: GitHub toolset. claude-code + tmux + jq: the bundled
-        # autonomous-ai-agents/claude-code skill delegates to the `claude` CLI
-        # (print mode + interactive PTY via tmux; jq parses its stream-json).
-        # The skill auto-seeds into ~/.hermes/skills on startup; terminal +
-        # skills toolsets are already in the hermes-discord preset.
-        # curl: used by skills that hit HTTP APIs directly (e.g.
+        # gh: GitHub toolset. tmux + jq: general terminal-toolset tooling —
+        # these arrived for the Claude Code delegation skill (PTY via tmux, jq
+        # for its stream-json), which is gone now, but both stay because the
+        # terminal/skills toolsets in the hermes-discord preset use them
+        # broadly. curl: used by skills that hit HTTP APIs directly (e.g.
         # mimir-alerting) — NOT on the service PATH otherwise, only the
         # system profile has it.
+        # pkgs.claude-code was removed here 2026-09-23 with the rest of the
+        # Anthropic path. Note it is still in environment.systemPackages above,
+        # which is a separate thing: that is the `claude` CLI for logging into
+        # this box interactively, not something Hermes shells out to.
         extraPackages = [
           pkgs.gh
-          pkgs.claude-code
           pkgs.tmux
           pkgs.jq
           pkgs.curl
@@ -194,7 +198,6 @@
           config.sops.secrets."hermes-discord-home".path
           config.sops.secrets."hermes-github".path
           config.sops.secrets."hermes-copilot".path
-          config.sops.secrets."hermes-claude".path
         ];
       };
 
