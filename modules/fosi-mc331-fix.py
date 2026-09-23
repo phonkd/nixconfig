@@ -91,7 +91,18 @@ def tuning_interface(dev):
 
 
 def main():
-    db = float(sys.argv[1]) if len(sys.argv) > 1 else -90.0
+    # `--off` clears the flags byte instead of just lowering the threshold, i.e.
+    # switches the suppressor off rather than moving its trigger point. Several
+    # people on the vendor forum report that only the full disable cures the
+    # cut-off for them. The byte's meaning is inferred, not documented -- but it
+    # is the one byte that differs, the frame still carries a valid CRC, and the
+    # amp reloads factory defaults on its next power-on regardless.
+    args = sys.argv[1:]
+    enable = 0xFF
+    if "--off" in args:
+        enable = 0x00
+        args.remove("--off")
+    db = float(args[0]) if args else -90.0
 
     dev = None
     for pid in PIDS:
@@ -107,9 +118,10 @@ def main():
         sys.exit("no endpoint-less HID interface on %04x:%04x -- cannot tune"
                  % (dev.idVendor, dev.idProduct))
 
-    frame = packet(db)
-    print("device %04x:%04x  interface %d  threshold %.2f dB  frame %s"
-          % (dev.idVendor, dev.idProduct, interface, db, frame.hex()))
+    frame = packet(db, enable)
+    print("device %04x:%04x  interface %d  suppressor %s  threshold %.2f dB  frame %s"
+          % (dev.idVendor, dev.idProduct, interface,
+             "off" if enable == 0x00 else "on", db, frame.hex()))
 
     data = frame.ljust(64, b"\0")
     for name, rtype in REPORT_TYPES:

@@ -29,8 +29,12 @@
 
         python = pkgs.python3.withPackages (ps: [ ps.pyusb ]);
 
+        # No args -> the configured threshold. Anything passed wins, so
+        # `fosi-mc331-fix -80` or `fosi-mc331-fix --off` (disable the
+        # suppressor outright) can be tried by hand without a rebuild.
         fosi-mc331-fix = pkgs.writeShellScriptBin "fosi-mc331-fix" ''
-          exec ${python}/bin/python3 ${./fosi-mc331-fix.py} "''${1:-${threshold}}"
+          if [ $# -eq 0 ]; then set -- ${threshold}; fi
+          exec ${python}/bin/python3 ${./fosi-mc331-fix.py} "$@"
         '';
       in
       {
