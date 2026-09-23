@@ -343,6 +343,12 @@ rec {
   eeVolume = "${self.packages.${pkgs.system}.hypr-ee-volume}/bin/hypr-ee-volume";
   sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
 
+  # Pins workspaces 1-3/4-6/7-9 to the panel / left external / right external,
+  # live, across hotplug. Same perSystem-package arrangement as the two above,
+  # but started as a user unit rather than from a bind -- see _session.nix, and
+  # modules/hyprland/workspace-monitors.nix for why it is a daemon at all.
+  workspaceMonitors = "${self.packages.${pkgs.system}.hypr-workspace-monitors}/bin/hypr-workspace-monitors";
+
   # -- Screenshots: capture, then annotate -------------------------------
   #
   # grimblast keeps doing the capturing -- the targets, the freeze, the
