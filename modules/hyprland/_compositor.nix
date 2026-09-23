@@ -28,6 +28,7 @@ let
     layoutSettings
     monitorsConf
     scale
+    workspaceScreens
     workspacesConf
     ;
 in
@@ -101,6 +102,29 @@ in
       # ",preferred,auto,<scale>" -- every output, its preferred mode,
       # auto-placed, at noughty.hyprland.scale (1 = 100%).
       monitor = ",preferred,auto,${scale}";
+
+      # Which screen each workspace opens on, from
+      # noughty.hyprland.workspaceScreens -- `{ "eDP-1" = [ 1 2 3 ]; }`
+      # becomes `workspace = 1, monitor:eDP-1` and so on. Empty on every
+      # host that does not set it, which emits nothing at all.
+      #
+      # This is stock Hyprland doing the work, including the part that
+      # looks like it would need a helper: an unplugged monitor is not an
+      # error, its workspaces go to a monitor that exists, and they come
+      # back when it does. The option's own comment in _nixos.nix has the
+      # rest, and the one limit worth repeating here is that a rule names
+      # a monitor -- there is no "the second screen from the left".
+      #
+      # nwg-displays' workspaces.conf can set the same rules from the GUI
+      # and is sourced from `extraConfig` above, i.e. *after* this. That
+      # ordering is deliberate and is the same bargain the `monitor=`
+      # fallback strikes: what is declared here is the default, and the
+      # dialog is allowed to overrule it for as long as its file says so.
+      workspace = lib.concatLists (
+        lib.mapAttrsToList (
+          screen: workspaces: map (ws: "${toString ws}, monitor:${screen}") workspaces
+        ) workspaceScreens
+      );
 
       # The cursor half of `env` names the theme this module installs
       # itself (`home.pointerCursor` in _session.nix). It is spelled

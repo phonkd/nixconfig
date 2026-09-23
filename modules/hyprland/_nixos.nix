@@ -72,6 +72,52 @@ in
       '';
     };
 
+    workspaceScreens = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.listOf lib.types.ints.positive);
+      # Per host, not per session, because the whole content of this option is
+      # connector names and those are a property of one machine's ports.
+      #
+      # Empty default = Hyprland's own behaviour, which is that a workspace
+      # belongs to whichever monitor was focused when it was first opened.
+      # That is the thing this option exists to stop being true: with nine
+      # workspaces split across a laptop panel and two externals, "where did 6
+      # go" otherwise depends on where the pointer was.
+      #
+      # What Hyprland gives for free, and the reason nothing here watches for
+      # hotplug: a rule naming a monitor that is not connected is not an error
+      # and is not a no-op either. The workspace opens on the focused monitor
+      # instead, the compositor parks the workspaces of a monitor that vanishes
+      # on a surviving one, and it moves them back when it returns. So the
+      # undocked laptop puts all nine on the panel with no second rule saying
+      # so, and docking restores the split.
+      #
+      # What it does NOT give, and the one thing to know before editing: a
+      # workspace rule names a monitor, by connector or `desc:`. There is no
+      # positional selector -- no "the second screen from the left". If an
+      # external moves to a different port, this option is what has to change.
+      # `hyprctl monitors` prints the names.
+      default = { };
+      example = {
+        "eDP-1" = [
+          1
+          2
+          3
+        ];
+        "HDMI-A-1" = [
+          4
+          5
+          6
+        ];
+      };
+      description = ''
+        Which screen each workspace opens on, keyed by monitor name
+        (`hyprctl monitors`) with the workspaces that belong to it. Emitted as
+        Hyprland `workspace = <n>, monitor:<name>` rules. A workspace named
+        nowhere here, or named on a monitor that is not connected, falls back
+        to whichever monitor has focus.
+      '';
+    };
+
     scale = lib.mkOption {
       type = lib.types.str;
       # 1 = 100%. Deliberately not "auto": Hyprland's auto-scaling picks a

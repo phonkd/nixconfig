@@ -16,36 +16,9 @@ let
     cursorName
     cursorSize
     generated
-    workspaceMonitors
     ;
 in
 {
-  # ---------------------------------------------------------------
-  # Workspaces -> screens
-  # ---------------------------------------------------------------
-  # 1-3 on the built-in panel, 4-6 on the leftmost external, 7-9 on
-  # the rightmost, and whatever is missing folds back onto the panel.
-  # The whole argument for why this is a daemon and not a `workspace
-  # = ...` rule is in modules/hyprland/workspace-monitors.nix.
-  #
-  # `Restart = "always"`, not "on-failure": the process is a reader on
-  # Hyprland's event socket, and losing that socket is a *clean* exit
-  # for it. PartOf the session target is what stops it for good when
-  # the session itself ends, so "always" cannot turn into a respawn
-  # loop against a compositor that is gone.
-  systemd.user.services.hypr-workspace-monitors = {
-    Unit = {
-      Description = "Pin Hyprland workspace groups to screens by arrangement";
-      PartOf = [ "hyprland-session.target" ];
-      After = [ "hyprland-session.target" ];
-    };
-    Service = {
-      ExecStart = workspaceMonitors;
-      Restart = "always";
-      RestartSec = 2;
-    };
-    Install.WantedBy = [ "hyprland-session.target" ];
-  };
 
   # ---------------------------------------------------------------
   # Notifications, launcher, lock screen, idle
