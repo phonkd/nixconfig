@@ -60,6 +60,36 @@ def packet(db, enable=0xFF):
     return bytes([0xA5, 0x5A, 0x88, 0x0B] + payload + [crc8(payload)])
 
 
+def tuning_interface(dev):
+    """Find the DSP tuning interface: HID class, and no endpoints.
+
+    Its interface number moves with the amp's input selector, so it has to be
+    discovered rather than hardcoded:
+
+      OPT/AUX/BT (PID 171E)  the amp exposes this one interface only -> number 0
+      USB        (PID 1717)  it is a USB-Audio device as well, so the layout is
+                             0 audio control + 1 audio streaming (both held by
+                             snd-usb-audio), 2 a real HID interface held by
+                             usbhid, and 3 this one -> number 3
+
+    Hardcoding 0 therefore worked over Bluetooth but hit snd-usb-audio's claim
+    on the audio control interface over USB, failing with EBUSY. Zero endpoints
+    is the distinguishing property: it is why usbhid won't bind this interface,
+    which is in turn why everything has to go through control transfers.
+
+    Iterating the device walks the cached configuration descriptors;
+    get_active_configuration() would open a handle and so need root just to
+    answer a question the descriptors already contain.
+    """
+    numbers = {
+        intf.bInterfaceNumber
+        for cfg in dev
+        for intf in cfg
+        if intf.bInterfaceClass == 0x03 and intf.bNumEndpoints == 0
+    }
+    return min(numbers) if numbers else None
+
+
 def main():
     db = float(sys.argv[1]) if len(sys.argv) > 1 else -90.0
 
@@ -72,14 +102,21 @@ def main():
         print("MC331 not on the bus, nothing to do")
         return 0
 
+    interface = tuning_interface(dev)
+    if interface is None:
+        sys.exit("no endpoint-less HID interface on %04x:%04x -- cannot tune"
+                 % (dev.idVendor, dev.idProduct))
+
     frame = packet(db)
-    print("device %04x:%04x  threshold %.2f dB  frame %s"
-          % (dev.idVendor, dev.idProduct, db, frame.hex()))
+    print("device %04x:%04x  interface %d  threshold %.2f dB  frame %s"
+          % (dev.idVendor, dev.idProduct, interface, db, frame.hex()))
 
     data = frame.ljust(64, b"\0")
     for name, rtype in REPORT_TYPES:
         try:
-            sent = dev.ctrl_transfer(0x21, SET_REPORT, (rtype << 8) | 0x00, 0, data, 2000)
+            sent = dev.ctrl_transfer(
+                0x21, SET_REPORT, (rtype << 8) | 0x00, interface, data, 2000
+            )
         except Exception as err:  # usb.core.USBError and friends
             print("%s report failed: %s" % (name, err))
             continue
