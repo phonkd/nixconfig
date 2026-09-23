@@ -24,7 +24,12 @@ VID = 0x8888
 PIDS = (0x1717, 0x171E)  # 1717 = input selector on USB, 171E = OPT/AUX/BT
 
 SET_REPORT = 0x09
+GET_DESCRIPTOR = 0x06
+HID_REPORT_DESC = 0x22
 REPORT_TYPES = (("Output", 0x02), ("Feature", 0x03))
+
+# What interface 3 declares on this amp. Used when the descriptor can't be read.
+DEFAULT_OUTPUT_BYTES = 256
 
 
 def crc8(data):
@@ -90,6 +95,46 @@ def tuning_interface(dev):
     return min(numbers) if numbers else None
 
 
+def output_report_size(dev, interface):
+    """How many bytes the interface's Output report is declared to be.
+
+    This matters more than it looks. The amp declares a 256-byte vendor Output
+    report, and a short transfer is ACKed and then silently dropped -- which is
+    precisely what happened while this sent 64 bytes: the amp reported every
+    frame as accepted and the DSP never saw one, at any threshold. hidapi pads
+    a report out to its declared length for you, so every community tool got
+    this for free; a hand-rolled control transfer has to do it itself.
+
+    Read from the report descriptor rather than hardcoded, since the interface
+    layout already turned out to differ between this amp's two modes.
+    """
+    try:
+        raw = bytes(
+            dev.ctrl_transfer(
+                0x81, GET_DESCRIPTOR, (HID_REPORT_DESC << 8) | 0, interface, 4096, 2000
+            )
+        )
+    except Exception:
+        return DEFAULT_OUTPUT_BYTES
+
+    size = count = None
+    i = 0
+    while i < len(raw):
+        head = raw[i]
+        length = head & 0x03
+        length = 4 if length == 3 else length
+        value = int.from_bytes(raw[i + 1:i + 1 + length], "little") if length else 0
+        tag, kind = (head >> 4) & 0x0F, (head >> 2) & 0x03
+        if kind == 1 and tag == 0x7:  # Global / REPORT_SIZE
+            size = value
+        elif kind == 1 and tag == 0x9:  # Global / REPORT_COUNT
+            count = value
+        elif kind == 0 and tag == 0x9 and size and count:  # Main / OUTPUT
+            return (size * count) // 8
+        i += 1 + length
+    return DEFAULT_OUTPUT_BYTES
+
+
 def main():
     # `--off` clears the flags byte instead of just lowering the threshold, i.e.
     # switches the suppressor off rather than moving its trigger point. Several
@@ -119,11 +164,12 @@ def main():
                  % (dev.idVendor, dev.idProduct))
 
     frame = packet(db, enable)
-    print("device %04x:%04x  interface %d  suppressor %s  threshold %.2f dB  frame %s"
-          % (dev.idVendor, dev.idProduct, interface,
+    report_bytes = output_report_size(dev, interface)
+    print("device %04x:%04x  interface %d  report %dB  suppressor %s  threshold %.2f dB  frame %s"
+          % (dev.idVendor, dev.idProduct, interface, report_bytes,
              "off" if enable == 0x00 else "on", db, frame.hex()))
 
-    data = frame.ljust(64, b"\0")
+    data = frame.ljust(report_bytes, b"\0")
     for name, rtype in REPORT_TYPES:
         try:
             sent = dev.ctrl_transfer(
