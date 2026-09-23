@@ -22,18 +22,19 @@
     }:
     lib.mkIf (noughtyLib.hostHasTag "fosi-mc331") (
       let
-        # Hundredths of a dB are honoured. -90 is the field-proven value; stock
-        # is -68. Lower = the gate stays out of the way for longer. The wrapper
-        # takes an override, so `fosi-mc331-fix -80` tries one without a rebuild.
-        threshold = "-90.0";
-
         python = pkgs.python3.withPackages (ps: [ ps.pyusb ]);
 
-        # No args -> the configured threshold. Anything passed wins, so
-        # `fosi-mc331-fix -80` or `fosi-mc331-fix --off` (disable the
-        # suppressor outright) can be tried by hand without a rebuild.
+        # No args -> the community Android app's payload verbatim, which is the
+        # only thing confirmed to work on this amp. Deliberately not "improved":
+        # it carries the *stock* -68 dB threshold, so it is the flags byte
+        # rather than the threshold that calls the gate off, and the -90 dB
+        # value the forum quotes was only ever proven under a framing we now
+        # know the amp ignores.
+        #
+        # Arguments pass straight through for experiments now that the framing
+        # is right: `fosi-mc331-fix -90` for a threshold, `--flags 0x00` for the
+        # other reading of that byte.
         fosi-mc331-fix = pkgs.writeShellScriptBin "fosi-mc331-fix" ''
-          if [ $# -eq 0 ]; then set -- ${threshold}; fi
           exec ${python}/bin/python3 ${./fosi-mc331-fix.py} "$@"
         '';
       in

@@ -1,11 +1,31 @@
 # Fosi MC331 — kill the low-volume noise gate
 
-**Repo(s):** nixconfig   **Status:** in-progress — the delivery mechanism is
-built, deployed on z14 and provably works at the USB level, but the amp has so
-far ignored every frame sent to it. The payload is decoded and settled; the
-*framing* is not, and is the live suspect. Read "What the hardware actually did"
-before acting on anything below it — parts of the original design were wrong and
-are corrected there.
+**Repo(s):** nixconfig   **Status:** done — working on z14. `modules/fosi-mc331.nix`
+re-sends the frame on every amp power-on and input-selector change. Read "What
+the hardware actually did" before touching it: several parts of the original
+design below are wrong, and the one that mattered is subtle.
+
+## The bug, in one paragraph
+
+**The payload was never the problem; the framing was.** The report must keep its
+leading `0x00` byte *in the data stage* and be padded to exactly **65 bytes**.
+The HID spec says that byte is the report ID and belongs in `wValue`, and the
+ESP32 community firmware duly strips it — so this repo did too. But the amp
+scans the raw report buffer, so a stripped frame arrives shifted one byte along
+and is silently discarded. The amp ACKs it regardless, which makes the failure
+invisible: every threshold from −1 to −1000 dB, every report length (17/64/256),
+both report types and both HID interfaces were "accepted" and ignored until the
+leading byte went back. The community Android app
+(`github.com/CaseresMaxi/fosi_MC331_fix`, `HidSender.kt`) passes all 65 bytes
+into the data stage and is the only implementation that made this explicit —
+reading it rather than reconstructing from the ESP32 source would have saved the
+entire detour.
+
+A second, quieter lesson: the working payload carries the **stock −68 dB
+threshold**. So it is the flags byte (`0xFF`), not the threshold, that calls the
+gate off — and the −90 dB value the forum quotes was only ever proven under a
+framing this amp ignores. The module therefore ships the app's bytes verbatim
+rather than an "improved" threshold.
 
 ## What the hardware actually did (z14, 2026-09-23)
 
@@ -36,55 +56,33 @@ them. Measured, not inferred:
   on Feature returns what looks like uninitialised SRAM (ARM pointers such as
   `0x20016cc8`).
 
-So the amp ACKs a well-formed SET_REPORT regardless of content, and there is no
-evidence the DSP ever sees these frames. Either this unit is a later firmware
-revision than the one the forum reverse-engineered (Fosi did say a revision was
-coming), or — more likely, since it is untested — the frames are going to the
-wrong interface. See below.
+So the amp ACKs a well-formed SET_REPORT regardless of content. **Resolved:** the
+frames were being discarded because the leading `0x00` had been stripped out of
+the data stage — see "The bug, in one paragraph" above. Nothing was wrong with
+the unit, the payload or the interface selection.
 
 The decoded frame format below still stands on its own terms — the CRC-8
 derivation reproduces both independent captures exactly — it simply isn't what
 this amp listens to.
 
-### What is still untested — the framing, not the payload
+### How it was found, for next time
 
-The forum hands over the payload, and that part is settled. What it does *not*
-hand over is the framing, because every community implementation goes through
-hidapi and hidapi made those choices invisibly:
+The forum hands over the payload, and that part was right all along. What it
+does *not* hand over is the framing, because every community implementation goes
+through hidapi, which picks the interface, the padding and the request type
+invisibly. Reconstructing from the ESP32 source inherited that firmware's one
+wrong choice (stripping the leading byte) with no way to see it, because the amp
+ACKs a malformed frame exactly like a good one.
 
-* **Which interface.** `hid.Device(vid, pid)` opens the *first* HID interface
-  hidapi enumerates for that VID/PID. In USB mode that is almost certainly
-  interface **2** (Consumer Control), not the vendor interface 3 this repo
-  reasoned its way to. If the firmware accepts commands on 2, everything we have
-  sent has gone to the wrong place.
-* **What length.** The forum's `usbhidtool` line passes **17 bytes**. hidapi's
-  Windows backend pads to the declared report length; its hidraw backend does
-  not. So "17" and "256" are both defensible readings and neither is confirmed.
-* **Which request.** Interrupt OUT where an endpoint exists, control SET_REPORT
-  otherwise — hidapi picks per backend.
+What broke the deadlock was reading the Android app's `HidSender.kt` — the only
+implementation that spells the framing out. **When a community fix exists as
+source, read the source before reconstructing the protocol from a description of
+it.** The sweeps over interface, length and report type were all reasonable and
+all useless, because the one variable that mattered wasn't in the matrix.
 
-That is a small matrix (interface × length × report type) and it is cheap to
-sweep with a `-10 dB` threshold, which should gate audibly the instant a
-combination lands. Do that before concluding anything.
-
-The other unfetched artifact is **Lozioandry's `fosi_watcher.zip`**, attached to
-the forum thread — the original field-proven implementation. It would pin down
-all three variables at once. Worth getting hold of.
-
-### Where to go next, cheapest first
-
-0. **Sweep the framing matrix** (above), and get `fosi_watcher.zip`.
-1. **Run the community Android APK against the amp**
-   (`github.com/CaseresMaxi/fosi_MC331_fix`). This is the decisive experiment and
-   needs no VM: if the app fixes the cut-off, our frame or framing is wrong and
-   is worth chasing; if it does nothing either, this unit simply isn't the one
-   the community fixed, and no host-side work will help.
-2. **Capture what ACPWorkbench really sends** — Windows VM with the amp passed
-   through, plus USBPcap. The only reliable way to learn the real protocol, and a
-   much bigger job than anything done so far.
-3. **Accept it.** If (1) fails, the honest answer is that this is a hardware/
-   firmware defect with no host-side remedy, and the lever is Fosi's promised
-   revision or a return.
+Still open, if anyone wants it: **Lozioandry's `fosi_watcher.zip`** on the forum
+thread (login-walled) is the original implementation, and would confirm whether
+it framed things the same way.
 
 ## Goal
 
