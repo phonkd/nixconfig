@@ -182,36 +182,6 @@
       # that makes that sink's volume reach the chain at all.
       noughty.hyprland.loudnessKnob = true;
 
-      # Workspaces to screens. The desk is
-      #
-      #     HDMI-A-1 (leftmost)          [a second external, some day]
-      #     eDP-1 (below HDMI-A-1)
-      #
-      # so 1-3 land on the laptop panel, 4-6 on the external, and 7-9 are
-      # parked on the panel until there is a second external to give them --
-      # at which point this is a one-line change, moving 7 8 9 to whatever
-      # `hyprctl monitors` calls it.
-      #
-      # Undocked, 4-6 simply open on the panel too: Hyprland puts a workspace
-      # whose monitor is absent on the focused one, and moves it back to
-      # HDMI-A-1 when the cable returns. That fallback is the compositor's,
-      # not something this config arranges.
-      noughty.hyprland.workspaceScreens = {
-        "eDP-1" = [
-          1
-          2
-          3
-          7
-          8
-          9
-        ];
-        "HDMI-A-1" = [
-          4
-          5
-          6
-        ];
-      };
-
       # The DisplayLink dock. The option (modules/work/default.nix) is off by
       # default because pkgs.displaylink is `requireFile` and flipping it on a
       # machine whose store lacks the installer turns every `deploy z14` into a
