@@ -1,9 +1,84 @@
 # Fosi MC331 — kill the low-volume noise gate
 
-**Repo(s):** nixconfig   **Status:** done — working on z14. `modules/fosi-mc331.nix`
-re-sends the frame on every amp power-on and input-selector change. Read "What
-the hardware actually did" before touching it: several parts of the original
-design below are wrong, and the one that mattered is subtle.
+**Repo(s):** nixconfig   **Status:** solved, parked — **the fix works** and is
+proven against the amp. `modules/fosi-mc331.nix` is in the repo and gated on a
+`fosi-mc331` host tag that **nothing currently carries**: it ran on z14 during
+development and the tag was removed again, because the amp shouldn't depend on a
+laptop being awake and plugged in. Resuming is one tag on whatever box ends up
+cabled to the amp — see "Picking the box" — plus `deploy <host>`.
+
+Read "What the hardware actually did" before touching any of it: several parts
+of the original design below are wrong, and the one that mattered is subtle.
+
+## Resuming this later, in one minute
+
+Nothing here needs re-deriving. What exists and works:
+
+* `modules/fosi-mc331-fix.py` — the sender. Finds the amp at either PID, picks
+  the tuning interface, sends the proven 65-byte frame. Plain pyusb, no Nix in
+  it, so it is equally usable from Ansible or a plain systemd unit if this ever
+  lands on a non-NixOS box.
+* `modules/fosi-mc331.nix` — packaging: the wrapper binary, a udev rule matching
+  `8888:1717|171e` that fires the unit on amp power-on *and* input-selector
+  change, a oneshot service, and a 5-minute safety-net timer. Self-gates on the
+  `fosi-mc331` tag.
+* The frame itself, decoded, in "The protocol, decoded" below — including the
+  CRC-8 derivation, so any threshold can be generated rather than copied.
+
+To bring it up: add `"fosi-mc331"` to the host's `tags` in `lib/registry.nix`,
+`deploy <host>`, then power-cycle the amp and check
+`journalctl -u fosi-mc331-fix` for `sent 65 bytes`.
+
+One known loose end: with the gate's character off but the threshold left at the
+factory −68 dB, low volume-knob settings attenuate hard, and one step up jumps
+roughly 5×. The suppressor evidently acts *after* the volume control. Untested
+next move now that framing works: `fosi-mc331-fix -90` (or −100) and make it the
+module default if it smooths the bottom of the range out.
+
+## Picking the box
+
+The amp needs a small always-on machine that is a USB *host*. The original plan
+assumed a Raspberry Pi; **prefer a cheap x86 mini PC or thin client instead.**
+
+Why x86 wins here, concretely:
+
+* Every host in this flake is `x86_64-linux`. An x86 box is just another
+  registry entry with a `deploy.hostname` — `205-builder` builds it natively and
+  `deploy <host>` works the way it does for 203/204/205. No SD image, no
+  first-boot firmware dance, no cross-compilation.
+* A Pi is *less* painful than this plan originally claimed — `205-builder`
+  already sets `boot.binfmt.emulatedSystems = [ "aarch64-linux" ]` and is already
+  registered as an aarch64 builder for the Droid profile, and aarch64-linux is a
+  first-class binary-cache platform, so little would actually compile. But
+  "less painful" is not "free", and NixOS on a Pi is still the more cumbersome
+  install.
+* Any of these boxes can also take over as the `gigaplayer-client` snapclient
+  feeding the amp over USB audio, which is what makes a dedicated box worth
+  having at all rather than a single-purpose gadget.
+
+Shortlist, cheapest first (all plain UEFI x86 — they install like any other host
+here; prices are the used-market ballpark, not verified Swiss listings):
+
+| Box | ~Price | Notes |
+|---|---|---|
+| **Dell Wyse 5070** (J4105/J5005) | CHF 40–80 used | The homelab default. Fanless, ~6 W idle, several USB-A ports. Best value by a distance; fanless matters next to an amp. |
+| HP t630 / t620 Plus thin client | CHF 40–80 used | Same idea, AMD. Fanless. |
+| HP EliteDesk 800 G3 Mini / Lenovo M710q Tiny | CHF 60–120 used | Far more machine than needed, ~7–12 W idle, but has a fan. |
+| **Radxa X4** | CHF 70–110 new | The literal "x86 Raspberry Pi": N100, Pi-5 form factor, 6 W TDP, proper UEFI. Buy it for the size, not for capability — the 40-pin header buys nothing here. |
+
+Swiss sourcing: ricardo.ch / tutti.ch / anibis.ch for used thin clients;
+digitec/galaxus/brack for new (new N100 mini PCs usually land above CHF 130);
+pi-shop.ch or berrybase.de for the Radxa.
+
+Whatever it is, wire the amp to a **USB-A host port** on it.
+
+### If NixOS on the box is ever the wrong answer
+
+The fallback the user floated — a separate repo with Raspberry Pi OS or Ubuntu
+plus Ansible — loses nothing. The three artifacts that matter are
+`modules/fosi-mc331-fix.py`, the udev rule and the systemd unit, all of which are
+plain Linux and are reproduced verbatim in `modules/fosi-mc331.nix`. Only the
+packaging would be rewritten.
 
 ## The bug, in one paragraph
 
