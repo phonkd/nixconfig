@@ -139,10 +139,12 @@
       "gigaplayer-client"
       "hyprland"
       "work"
-      # The Fosi MC331 amp hangs off this laptop's USB. The tag re-sends the
-      # DSP noise-gate fix whenever the amp powers on -- see
-      # modules/fosi-mc331.nix and plans/fosi-mc331-noise-gate.md.
-      "fosi-mc331"
+      # "fosi-mc331" lived here while the amp's DSP noise-gate fix was being
+      # worked out (it is solved -- see plans/fosi-mc331-noise-gate.md). Taken
+      # off again deliberately: the amp shouldn't depend on a laptop being awake
+      # and plugged in. modules/fosi-mc331.nix stays in the repo, dormant;
+      # adding this one tag to whatever small box ends up cabled to the amp is
+      # the entire deployment.
     ];
     username = "phonkd";
 
