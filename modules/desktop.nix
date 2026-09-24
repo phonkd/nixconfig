@@ -286,8 +286,11 @@
       programs.dconf.enable = true;
       users.users.phonkd.packages = with pkgs; [
         # Zen Browser (Firefox fork) from the zen-browser-flake input. Native
-        # GPU accel since the flake follows our nixpkgs (no nixGL needed on NixOS).
-        inputs.zen-browser.packages.${pkgs.system}.default
+        # GPU accel since the flake follows our nixpkgs (no nixGL needed on
+        # NixOS). Via modules/zen-browser.nix rather than the input directly:
+        # that is where the smooth-scrolling prefs are set, and the SUPER-B
+        # launcher in modules/hyprland/_scope.nix has to get the same build.
+        self.packages.${pkgs.system}.zen-browser
         gst_all_1.gstreamer
         gst_all_1.gst-plugins-base
         gst_all_1.gst-plugins-good

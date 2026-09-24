@@ -331,7 +331,11 @@ rec {
   # Launchers. Absolute store paths, for the same reason the KDE half used
   # them: `exec` is run by the compositor, not by a login shell, so nothing
   # guarantees the user profile is on its PATH.
-  zen = "${inputs.zen-browser.packages.${pkgs.system}.default}/bin/zen";
+  # modules/zen-browser.nix, not the flake input directly: that package carries
+  # the smooth-scrolling prefs, and this launcher is what actually starts the
+  # browser, so pointing it at the bare input would quietly hand the session a
+  # stock build while the one in the user profile was tuned.
+  zen = "${self.packages.${pkgs.system}.zen-browser}/bin/zen";
   kitty = "${config.programs.kitty.package}/bin/kitty";
 
   # The two audio helpers, from their own files in modules/hyprland/.
