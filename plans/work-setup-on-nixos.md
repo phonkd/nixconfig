@@ -217,6 +217,14 @@ module wiring is written and evaluated; only the download is outstanding.
 
 ## System-wide proxy on z14
 
+> **Superseded, and the code is gone.** Everything from here to *Transparent
+> mode — the original write-up* is the story of making sing-box a system-wide
+> proxy on z14; it got there, and then the tun was removed. See **Attempt 4
+> worked — and transparent mode is off anyway, by request** for where it
+> landed. The *system service* half of this section still stands; only the tun
+> and the tailscale endpoint were taken out. Option names below (`transparent`,
+> `tailscaleOutbound`, `tunStack`, …) no longer exist.
+
 The original approach (step 3) made sing-box a systemd **user** unit, mirroring
 the Mac's launchd agent. That was the wrong shape for what was actually wanted
 — one proxy the whole machine goes through, with homelab traffic riding the
@@ -459,10 +467,13 @@ tunnels up, and it took two goes to name:
   Fixed by installing it to `/etc/sing-box/config.json` — `/etc` < `/home` <
   `/nix` < `/run`.
 
-With those two, transparent mode worked. **It is off again regardless**, and
-this time not because anything broke:
+With those two, transparent mode worked. **It has been removed regardless**,
+and this time not because anything broke.
 
-    noughty.proxy.transparent = false   ← the option default now
+It was first turned off by flipping `noughty.proxy.transparent` to `false`,
+which left the tun, the endpoint and six options sitting in the tree behind a
+dead flag. That was the wrong shape — it read as mess rather than as an option
+— so the machinery is now deleted outright.
 
 The ask is an opt-in HTTP/SOCKS proxy on `127.0.0.1:2080`, not a system-wide
 one. The tun buys capture of whatever ignores `$http_proxy`, and costs a tun
@@ -471,26 +482,36 @@ device, an `auto_route` rewrite of the default route, the sniff rule, a
 proxies through, `CAP_NET_ADMIN`, and a standing way to take the laptop off
 the network on a bad change. Not worth it here.
 
-`tailscaleOutbound.enable` stays **false** alongside it, and that is now
-structural rather than a preference: the endpoint can only carry traffic the
-tun captures, because `no_proxy` keeps the tailnet out of the `$http_proxy`
-path. Switched on alone it would register a second `z14-singbox` node on the
-mesh and then route nothing to it. So headscale is *not* part of sing-box —
-the homelab rides tailscaled directly, which also decouples homelab
-reachability from proxy health. (The **Risks / rollout** section below lists
-"the homelab now depends on sing-box" as the most likely way this bites; it no
-longer does.)
+`tailscaleOutbound` went with it, and that was structural rather than a
+preference: the endpoint could only carry traffic the tun captured, because
+`no_proxy` keeps the tailnet out of the `$http_proxy` path. On without the tun
+it would register a second node on the mesh and route nothing to it. So
+headscale is *not* part of sing-box — the homelab rides tailscaled directly,
+which also decouples homelab reachability from proxy health. (The **Risks /
+rollout** section below lists "the homelab now depends on sing-box" as the
+most likely way this bites; it no longer does.)
 
-Unchanged by this: sing-box is still a **system** service with system-wide
-proxy env vars. That is a separate axis from the tun and only the tun was
-given up — `environment.sessionVariables` still reaches greetd-started
-graphical apps that home-manager's shells never touch.
+**Answering an open question this plan left.** "Whether it registers at all is
+still unobserved" — it registered. `headscale nodes list` on observability had
+node 20, `z14-singbox`, `100.64.0.20`, first seen 2026-09-18 20:33 and offline
+ever since, plus `/var/lib/sing-box/tailscale` on z14 holding its identity.
+Both were deleted as part of this cleanup.
 
-Nothing was deleted. The tun, the sniff rule, the process carve-out and the
-tailscale endpoint all remain in `modules/proxy/nixos.nix` behind their
-options, and the four traps are written up in `modules/proxy/README.md`, so a
-fifth attempt starts where the fourth finished instead of re-paying for it.
-The two leads never tried: a v6 address on the tun, and `strict_route = true`.
+Unchanged: sing-box is still a **system** service with system-wide proxy env
+vars. That is a separate axis from the tun and only the tun was given up —
+`environment.sessionVariables` still reaches greetd-started graphical apps
+that home-manager's shells never touch.
+
+`modules/proxy/nixos.nix` went from 544 lines to ~230: four options, one
+inbound, one outbound, no route rules of its own. What was deleted:
+`transparent`, `tunStack`, `tailnetCidr`, `homelabDomainSuffixes`,
+`tailscaleBypassCidrs`, `bootstrapProcessNames`, the `tailscaleOutbound`
+endpoint and its sops template, the `sniff` rule, `auto_detect_interface`, and
+`CAP_NET_ADMIN` + `StateDirectory` on the unit. The four traps are written up
+in `modules/proxy/README.md` and the code is in `git log -- modules/proxy/`,
+so a fifth attempt starts from what the fourth learned rather than from
+scratch. The two leads never tried: a v6 address on the tun, and
+`strict_route = true`.
 
 ### Transparent mode — the original write-up
 
@@ -533,6 +554,10 @@ tag references are right. It says nothing about whether the routes behave.
 Rollback, cheapest first: `noughty.proxy.tailscaleOutbound.enable = false`
 (back to the bypass, tun still on) → `noughty.proxy.transparent = false` (back
 to an `$http_proxy`-only proxy) → previous generation from the boot menu.
+
+*(Historical. The end of that ladder is where this ended up, and then the rungs
+themselves were removed — neither option exists now. Rollback today is the
+previous generation from the boot menu, nothing else.)*
 
 ## Open decisions
 

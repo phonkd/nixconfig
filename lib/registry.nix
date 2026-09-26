@@ -125,7 +125,7 @@
     # re-added deliberately: see plans/work-setup-on-nixos.md, which built the
     # Linux half of modules/work/ for this host and also brings up sing-box
     # here as an HTTP/SOCKS proxy on 127.0.0.1:2080 (opt-in -- the tun that
-    # briefly made it system-wide is off again). The tag is still the whole
+    # briefly made it system-wide has been removed). The tag is still the whole
     # opt-in -- everything it reaches self-gates on it, so removing it again is
     # the rollback.
     #

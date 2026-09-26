@@ -269,10 +269,10 @@
         # `homeModules.work` for why the proxy hangs off the platform modules
         # rather than off `work` itself.
         #
-        # What this gets is an opt-in HTTP/SOCKS proxy on 127.0.0.1:2080 --
-        # `noughty.proxy.transparent` (the tun that captured every socket) is
-        # off by request, so the homelab rides tailscaled and anything that
-        # ignores `$http_proxy` goes direct. modules/proxy/nixos.nix has the
+        # What this gets is an opt-in HTTP/SOCKS proxy on 127.0.0.1:2080.
+        # Nothing is captured: the tun that briefly made this a system-wide
+        # proxy has been removed, so the homelab rides tailscaled and anything
+        # ignoring `$http_proxy` goes direct. modules/proxy/nixos.nix has the
         # why; the README next to it has what the tun cost to get working,
         # should it ever be wanted again.
         noughty.proxy.enable = true;

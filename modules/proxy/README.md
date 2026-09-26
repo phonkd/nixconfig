@@ -5,28 +5,38 @@ Two halves that share nothing but the package:
 - `darwin.nix` — unprivileged launchd agent, mixed inbound on
   `127.0.0.1:2080`, app-layer only. Apps reach it via `http_proxy`, the macOS
   system proxy setting, or ssh `ProxyCommand`.
-- `nixos.nix` — root system service, same mixed inbound, plus a tun device and
-  an in-process tailscale node that are **both off by default**.
+- `nixos.nix` — root system service, same mixed inbound. App-layer too, since
+  the tun was removed.
 
-Both platforms are app-layer today. The Linux tun was built, debugged through
-the four traps below and confirmed working, then turned back off by request:
-an opt-in HTTP/SOCKS proxy is what is wanted, and the tun is a great deal of
-machinery — and a great many ways to take the laptop off the network — in
-exchange for catching the things that ignore `$http_proxy`. Nothing was
-deleted; `noughty.proxy.transparent = true` brings it back, and the traps are
-kept below precisely so a second attempt does not re-pay for them.
+**Both platforms are app-layer, and the Linux tun is gone from the tree.** It
+was built, debugged through the four traps below, and confirmed working — then
+deleted rather than left behind a default-off flag: an opt-in HTTP/SOCKS proxy
+is what is wanted, and the tun is a great deal of machinery, and a great many
+ways to take the laptop off the network, in exchange for catching the handful
+of things that ignore `$http_proxy`. The traps below are kept precisely so a
+future attempt does not re-pay for them; `git log -- modules/proxy/` has the
+code.
+
+Removed with it: `transparent`, `tunStack`, `tailnetCidr`,
+`homelabDomainSuffixes`, `tailscaleBypassCidrs`, `bootstrapProcessNames`, the
+whole `tailscaleOutbound` endpoint and its sops template, the `sniff` rule,
+`auto_detect_interface`, and `CAP_NET_ADMIN` + `StateDirectory` on the unit.
+What is left is four options and one inbound.
 
 The homelab is deliberately *not* routed through sing-box on either platform.
 `no_proxy` carries `.phonkd.net` and `100.64.0.0/10`, so it goes to tailscaled
 over the headscale mesh directly — one fewer thing whose failure takes the
-homelab down. `noughty.proxy.tailscaleOutbound` (sing-box's own userspace
-tsnet node) exists for the tun arrangement, where the tailnet *has* to re-enter
-sing-box; it is inert without the tun, and switching it on alone would register
-a second `z14-singbox` node on the mesh and then route nothing to it.
+homelab down. That is also why headscale is not wired into sing-box in any
+form: the in-process tsnet node (`tailscaleOutbound`) only ever made sense
+under the tun, where the tailnet *had* to re-enter sing-box to be routed. It
+did register a second `z14-singbox` node on the mesh while it existed, which
+is one of the leftovers this removal cleaned up.
 
 They were one file with platform branches until the Linux side grew a tun,
 three traffic classes and a secret. The resemblance was superficial and it made
-both harder to read; see the file headers.
+both harder to read; see the file headers. The two are close in shape again now
+that the tun is gone, but still not mergeable — each has a DNS wrinkle with no
+counterpart on the other platform.
 
 ## macOS: broad tun (`route_address = 0.0.0.0/0`) does not work
 
@@ -58,9 +68,10 @@ Extension auto-excludes the provider from its own tunnel, killing the
 chicken-and-egg — unlikely soon), or when switching tool entirely. Until then
 macOS stays app-layer.
 
-## Linux: the tun does work, with four traps
+## Linux: the tun did work, with four traps
 
-All four were hit, in this order, and each is guarded in `nixos.nix`:
+Kept as history — none of this is in `nixos.nix` any more. All four were hit,
+in this order, and a fifth attempt would have to handle each again:
 
 1. **`route.auto_detect_interface` is mandatory.** Without it `direct` dials
    follow the default route — which `auto_route` just pointed at the tun — so
@@ -82,6 +93,8 @@ All four were hit, in this order, and each is guarded in `nixos.nix`:
    domain rule had already been skipped. Hence installing it to
    `/etc/sing-box/config.json` — `/etc` < `/home` < `/nix` < `/run`. sing-box
    sorts by the path it is given, so a symlink into the store is fine.
+   **This one is not history**: the `/etc` install is still in `nixos.nix`, and
+   still load-bearing, because the work config is merged in either way.
 
 Debugging any of this starts with `logLevel = "debug"`: the
 `router: match[N] => …` lines name the winning rule and are the only external
