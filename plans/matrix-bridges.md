@@ -380,6 +380,25 @@ serving the two well-known JSON files from the apex deliberately.
     an `apply`. Verified by evaluating `builtins.attrNames` on each block before
     and after — a diff of rendered config keys is the only way this shows up.
 
+7. **`$PSQL` does not exist, and `ensureDatabases` no longer runs in
+   `postgresql.service`.** This one actually bit: the first `deploy ext-mail`
+   rolled back because `postgresql.service` failed with
+   `ExecStartPost=… (code=exited, status=127)`. The module had a
+   `systemd.services.postgresql.postStart` calling `$PSQL -tAc 'ALTER DATABASE …'`
+   to hand each bridge database to its role. In `nixos-26.05` nothing defines a
+   `PSQL` variable anywhere in `postgresql.nix`, so the line ran as a bare
+   `-tAc '…'` — command not found, 127, unit dead, and with it synapse and all
+   three bridges. It was wrong a second way too: `ensureDatabases` /
+   `ensureUsers` live in a separate **`postgresql-setup.service`** that runs
+   *after* `postgresql.service`, so the `ALTER` would have fired before the
+   databases existed. **Fix:** name each database exactly like its role
+   (`mautrix-whatsapp`, not `mautrix_whatsapp`) and set
+   `ensureDBOwnership = true` on all four — then the module does it and the
+   custom `postStart` goes away. The hyphen-avoidance that motivated the
+   underscores was unfounded: in a libpq URI the dbname is just the path
+   segment, and the module already quotes the SQL identifier
+   (`CREATE DATABASE "${database}"`).
+
 ## Steps
 
 Ordered; each verifiable on its own.

@@ -175,34 +175,48 @@
             "--encoding=UTF8"
           ];
 
+          # Database names match the role names exactly, which is what
+          # ensureDBOwnership needs -- it grants a user ownership of "a
+          # database with the same name". The bridges' system users are
+          # `mautrix-whatsapp` etc., so the databases are too.
+          #
+          # The previous shape (underscored databases + a hand-written
+          # ALTER DATABASE in systemd.services.postgresql.postStart) was wrong
+          # twice over, and it is what made the first deploy roll back:
+          #   - `$PSQL` is not a thing in this nixpkgs. Nothing defines it, so
+          #     the line ran as a bare `-tAc '...'` and exited 127, taking
+          #     postgresql.service down with it.
+          #   - ensureDatabases/ensureUsers moved out of postgresql.service
+          #     into postgresql-setup.service, which runs *after* it -- so the
+          #     ALTER would have fired before the databases existed anyway.
+          # Hyphens needed no avoiding in the first place: in a libpq URI the
+          # dbname is just the path segment, and the module already quotes the
+          # SQL identifier (`CREATE DATABASE "${database}"`).
           ensureDatabases = [
             "matrix-synapse"
-            "mautrix_whatsapp"
-            "mautrix_signal"
-            "mautrix_discord"
+            "mautrix-whatsapp"
+            "mautrix-signal"
+            "mautrix-discord"
           ];
           ensureUsers = [
             {
               name = "matrix-synapse";
               ensureDBOwnership = true;
             }
-            { name = "mautrix-whatsapp"; }
-            { name = "mautrix-signal"; }
-            { name = "mautrix-discord"; }
+            {
+              name = "mautrix-whatsapp";
+              ensureDBOwnership = true;
+            }
+            {
+              name = "mautrix-signal";
+              ensureDBOwnership = true;
+            }
+            {
+              name = "mautrix-discord";
+              ensureDBOwnership = true;
+            }
           ];
         };
-
-        # ensureDBOwnership asserts that the role name equals the database
-        # name, and it cannot hold for the bridges: their system users are
-        # `mautrix-whatsapp` while a postgres database name with a hyphen
-        # would have to be quoted everywhere in their connection URIs. So the
-        # databases are `mautrix_whatsapp` etc., and ownership is handed over
-        # here, once, after ensureDatabases has created them.
-        systemd.services.postgresql.postStart = lib.mkAfter ''
-          $PSQL -tAc 'ALTER DATABASE "mautrix_whatsapp" OWNER TO "mautrix-whatsapp";'
-          $PSQL -tAc 'ALTER DATABASE "mautrix_signal"   OWNER TO "mautrix-signal";'
-          $PSQL -tAc 'ALTER DATABASE "mautrix_discord"  OWNER TO "mautrix-discord";'
-        '';
 
         # ── synapse ───────────────────────────────────────────────────────
         services.matrix-synapse = {
@@ -257,7 +271,7 @@
             };
             database = {
               type = "postgres";
-              uri = pgUri "mautrix_whatsapp";
+              uri = pgUri "mautrix-whatsapp";
             };
             encryption = {
               allow = true;
@@ -293,7 +307,7 @@
             };
             database = {
               type = "postgres";
-              uri = pgUri "mautrix_signal";
+              uri = pgUri "mautrix-signal";
             };
             encryption = {
               allow = true;
@@ -329,7 +343,7 @@
             appservice = discordBlock "appservice" {
               database = {
                 type = "postgres";
-                uri = pgUri "mautrix_discord";
+                uri = pgUri "mautrix-discord";
               };
             };
             bridge = discordBlock "bridge" {
