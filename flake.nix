@@ -1,33 +1,25 @@
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
-    # Sole consumer: modules/secretspec.nix, which needs secretspec >= 0.18 --
-    # that is the release that added the `bw://` (Bitwarden) provider, and
-    # nixos-26.05 is still on 0.10.1. Note the *locked rev* is what matters,
-    # not the branch name: this input sat on a 2026-08-01 rev carrying 0.17.0,
-    # which fails at runtime with "Provider backend 'bw' not found". Keep it
-    # ahead of that, and re-check `secretspec --version` if you ever re-pin.
+    # Sole consumer: modules/secretspec.nix, which needs secretspec >= 0.18 for
+    # the `bw://` (Bitwarden) provider -- nixos-26.05 ships 0.10.1. The locked
+    # *rev* is what matters, not the branch name: this input once sat on a
+    # 2026-08-01 rev carrying 0.17.0, which fails at runtime with "Provider
+    # backend 'bw' not found". Re-check `secretspec --version` if you re-pin.
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-fork.url = "github:phonkd/nixpkgs/master";
     # Pinned ahead of nixpkgs-unstable purely to get Immich 3.0.2 (not yet
     # on nixpkgs-unstable's locked rev); used only for services.immich.package.
     nixpkgs-immich.url = "github:nixos/nixpkgs/e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3";
-    # nix-on-droid (modules/hosts/android.nix). PINNED as a pair, and both pins
-    # are load-bearing -- current nixpkgs/home-manager do not work on Android.
-    #
-    # The rev below is the one that was verified working on the phone in April
-    # 2026 (nixpkgs-unstable of 2026-01-21). It must be the *full* 40-char hash:
-    # a truncated 39-char rev is not a valid github ref and the flake will not
-    # even lock.
-    #
-    # home-manager is pinned to the rev this repo was locked to at that time,
-    # so the two stay the same era. Do NOT move either one on its own:
-    #  - a newer home-manager reads `${pkgs.path}/lib/services/lib.nix`, a file
-    #    the nixpkgs pin predates, and eval dies with
-    #    "path .../lib/services/lib.nix does not exist";
-    #  - an older home-manager (release-25.11 is older than this nixpkgs, not
-    #    newer) lacks options the shared homeModules use, e.g.
-    #    `programs.fzf.enableNushellIntegration`.
+    # nix-on-droid (modules/hosts/android.nix). PINNED as a pair, load-bearing
+    # -- current nixpkgs/home-manager don't work on Android. Verified working
+    # on the phone in April 2026 (nixpkgs-unstable 2026-01-21); must be the
+    # *full* 40-char hash (a 39-char rev isn't a valid github ref and won't
+    # lock). home-manager is pinned to the same era. Don't move either alone:
+    # a newer home-manager reads `${pkgs.path}/lib/services/lib.nix`, which
+    # this nixpkgs predates (eval dies: "path .../lib/services/lib.nix does
+    # not exist"); an older one (release-25.11) lacks
+    # `programs.fzf.enableNushellIntegration`.
     nixpkgs-android.url = "github:nixos/nixpkgs/88d3861acdd3d2f0e361767018218e51810df8a1";
     home-manager-android.url = "github:nix-community/home-manager/0adb9993274f27168ec0d6c13ec292f03dc328d0";
 
@@ -45,56 +37,37 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
-    # Makes nix-installed .app bundles launchable on the Mac. home-manager's
-    # `targets.darwin.linkApps` symlinks each bundle into ~/Applications/Home
-    # Manager Apps, but the symlink target lives on the /nix volume, which the
-    # nix installer mounts `nobrowse` -- the flag that tells Spotlight and
-    # Finder to skip a volume entirely. So the apps install correctly and are
-    # simply never indexed, and on Tahoe (where the Applications view is
-    # Spotlight-driven) they are unreachable. mac-app-util generates a
-    # "trampoline" -- a small real .app on the boot volume that launches the
-    # store one -- which Spotlight does index. Upstream is explicit that
-    # copying, symlinking and macOS aliases all fail here; the trampoline is
-    # the thing that works.
+    # Makes nix-installed .app bundles launchable on the Mac: home-manager's
+    # `targets.darwin.linkApps` symlinks bundles into ~/Applications/Home
+    # Manager Apps, but that target lives on the /nix volume (mounted
+    # `nobrowse`, invisible to Spotlight/Finder) -- apps install but are never
+    # indexed, unreachable on Tahoe's Spotlight-driven Applications view.
+    # mac-app-util's "trampoline" (a real, indexed .app on the boot volume
+    # that launches the store one) is upstream's only working fix; copying,
+    # symlinking and macOS aliases all fail.
     #
-    # Pointed at nixpkgs-unstable, NOT our nixos-26.05 and NOT its own pin,
-    # because both of those give sbcl 2.6.4 and sbcl < 2.6.6 cannot start at
-    # all under macOS 27. The kernel now reserves a ~52 GB "GPU Carveout"
-    # region that runs from just past the dyld shared cache up to
-    # 0xfc0000000, and sbcl's fixed low spaces sit inside it, so its first
-    # MAP_FIXED lands on EACCES:
-    #
-    #   failed to allocate 1048576 bytes at 0x300100000
-    #   (hint: Try "ulimit -a"; maybe you should increase memory limits.)
-    #
-    # That aborts `mac-app-util sync-trampolines`, which aborts the whole
-    # home-manager activation at trampolineApps. sbcl 2.6.6 moved the static
-    # addresses; 2.6.7 (unstable) is verified working here. Revert to plain
-    # `.url` once nixos-26.xx ships sbcl >= 2.6.6. The ~20s ASDF rebuild the
-    # old pin was avoiding is the price of a working activation.
+    # Pointed at nixpkgs-unstable, NOT nixos-26.05 or its own pin: both give
+    # sbcl 2.6.4, and sbcl < 2.6.6 can't start under macOS 27 -- its ~52 GB
+    # "GPU Carveout" region (past the dyld shared cache, up to 0xfc0000000)
+    # overlaps sbcl's fixed low spaces, so its first MAP_FIXED hits EACCES
+    # ("failed to allocate 1048576 bytes at 0x300100000"). That aborts
+    # `mac-app-util sync-trampolines` and the whole home-manager activation.
+    # sbcl 2.6.6 moved the addresses; 2.6.7 (unstable) works. Revert to plain
+    # `.url` once nixos-26.xx ships sbcl >= 2.6.6.
     mac-app-util = {
       url = "github:hraban/mac-app-util";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
-    # Caelestia -- the Quickshell desktop shell used by the Hyprland session
-    # (modules/hyprland.nix). Sole consumer: that module.
-    #
-    # Deliberately NOT following our nixpkgs, same reasoning as mac-app-util
-    # above but with bigger numbers behind it. Caelestia needs quickshell from
-    # git rather than the 0.3.0 in nixos-26.05, and against its OWN pin that
-    # costs a measured 7 derivations to build (quickshell 0.3.1 -- a tagged
-    # release, not a wild master -- plus cpptrace, m3shapes and three small
-    # caelestia C++ bits) with the other 654 paths, Qt6 included, substituting
-    # straight from cache.nixos.org.
-    #
-    # Repointing it at nixos-26.05 changes every one of those hashes, throws
-    # the 654 cached paths away, and rebuilds the lot against a Qt6 upstream
-    # never tested it against. The price of not following is a second nixpkgs
-    # in the lock and a second Qt6 in the closure; that is the honest cost of
-    # borrowing someone else's shell.
-    #
-    # The build does not land on the laptop: g14 is a builder-client, so the
-    # quickshell compile offloads to 205-builder like everything else.
+    # Caelestia -- the Quickshell desktop shell for the Hyprland session
+    # (modules/hyprland.nix), sole consumer. Deliberately NOT following our
+    # nixpkgs (same reasoning as mac-app-util, bigger numbers): needs
+    # quickshell from git, not the 0.3.0 in nixos-26.05, costing 7
+    # derivations against its own pin (quickshell 0.3.1 tagged release,
+    # cpptrace, m3shapes, three caelestia C++ bits) with the other 654 paths,
+    # Qt6 included, substituting from cache.nixos.org. Following nixos-26.05
+    # would rebuild all of that against an untested Qt6 -- a second nixpkgs
+    # and Qt6 in the closure is the honest cost of borrowing someone else's
+    # shell. Build offloads to 205-builder like everything else.
     caelestia.url = "github:caelestia-dots/shell";
     sops-nix.url = "github:Mic92/sops-nix";
     # deploy-rs: `deploy <host>` builds (offloaded to 205 via nix.buildMachines)
@@ -126,10 +99,9 @@
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Claude Code CLI, tracked at the latest npm release (rebuilt daily upstream)
-    # instead of nixpkgs' claude-code, which lags well behind. This is the NixOS
-    # analogue of the Mac's `claude-code@latest` Homebrew cask. Wired into the
-    # NixOS-desktop HM module in modules/desktop.nix.
+    # Claude Code CLI, tracked at the latest npm release (nixpkgs' lags well
+    # behind) -- the NixOS analogue of the Mac's `claude-code@latest` cask.
+    # Wired into the NixOS-desktop HM module in modules/desktop.nix.
     claude-code-nix = {
       url = "github:sadjow/claude-code-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -146,19 +118,16 @@
     # the package is built with uv2nix against the upstream-pinned
     # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
     hermes-agent.url = "github:NousResearch/hermes-agent";
-    # viewflow -- cross-device window sharing (g14 <-> blac-on-Windows).
-    # See plans/viewflow.md and modules/viewflow.nix.
+    # viewflow -- cross-device window sharing (g14 <-> blac-on-Windows). See
+    # plans/viewflow.md and modules/viewflow.nix. `flake = false`: upstream
+    # has no flake.nix, no releases, no tags.
     #
-    # `flake = false`: upstream has no flake.nix, no releases and no tags.
-    #
-    # PINNED to a rev, deliberately not following HEAD, and the pin is
-    # load-bearing rather than cautious: the QUIC control
+    # PINNED to a rev, not HEAD, load-bearing not cautious: the QUIC control
     # protocol version ("protocol 2.1") is negotiated *between peers*, so a
-    # half-updated pair simply refuses each other. Bumping this rev means
-    # rebuilding the Linux side AND rebuilding the Windows binaries on blac by
-    # hand, in the same change. Upstream is pre-alpha and rewrites its own
-    # runtime weekly; an implicit `nix flake update` that dragged in a new
-    # protocol version would break both halves of the pair at once.
+    # half-updated pair refuses each other. Bumping it means rebuilding the
+    # Linux side AND the Windows binaries on blac by hand, together --
+    # upstream is pre-alpha and rewrites weekly, and an implicit update
+    # dragging in a new protocol version would break both halves at once.
     viewflow = {
       url = "github:gfhdhytghd/viewflow/767739c1037eab84e7b5ba235056ec6b09b0e692";
       flake = false;

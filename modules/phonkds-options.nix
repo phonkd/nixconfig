@@ -1,16 +1,14 @@
-# Central type declaration for `phonkds.modules.*` — the homelab app
+# Central type declaration for `phonkds.modules.*` -- the homelab app
 # registry that producers (homelab-*) write into and consumers (traefik,
 # dashboard) read from.
 #
-# Always-imported because:
-#   * Producers may eventually run on hosts other than the reverse proxy;
-#     they need the option type in scope to set `phonkds.modules.<x>`.
-#   * The consumers (gated on `reverse-proxy`) also need the option in
-#     scope. Declaring it everywhere is cheap (empty default) and
-#     decouples producer/consumer placement.
+# Always-imported: producers may eventually run on hosts other than the
+# reverse proxy and need the option type in scope, and the reverse-proxy
+# consumers need it too. Declaring it everywhere is cheap (empty default)
+# and decouples producer/consumer placement.
 #
-# Also declares `label.labels`, a freeform host-classification list used
-# by a few legacy sites (e.g. 201-mono sets `label.labels = ["vm"]`).
+# Also declares `label.labels`, a freeform host-classification list used by
+# a few legacy sites (e.g. 201-mono sets `label.labels = ["vm"]`).
 {
   self,
   inputs,

@@ -1,35 +1,27 @@
 # Zen Browser (a Firefox fork), with smooth scrolling turned on.
 #
-# A perSystem package rather than a bare `inputs.zen-browser...default` at each
-# use site, for the reason the hyprland helpers are packaged that way: there is
-# more than one consumer. modules/desktop.nix installs it into the user profile
-# and modules/hyprland/_scope.nix builds an absolute store path for the SUPER-B
-# launcher, and those two must be the *same* derivation -- when they were two
-# separate references, tuning one left the other stock, and the launcher is the
-# one that actually starts the browser.
+# A perSystem package rather than a bare `inputs.zen-browser...default`:
+# modules/desktop.nix installs it into the user profile and
+# modules/hyprland/_scope.nix builds an absolute store path for the SUPER-B
+# launcher -- both must be the *same* derivation, or tuning one leaves the
+# other (the one that actually launches) stock.
 #
-# How the prefs get in
-# --------------------
-# nixpkgs' `wrapFirefox` takes an `extraPrefs` string and appends it to the
-# autoconfig file it writes at lib/zen-*/mozilla.cfg. That is the
-# profile-independent route, which is what matters here: Zen names its profile
-# directories randomly under ~/.zen, so a home.file user.js would have no fixed
-# path to be written to.
+# How the prefs get in: `wrapFirefox`'s `extraPrefs` string is appended to
+# the autoconfig file at lib/zen-*/mozilla.cfg -- profile-independent, which
+# matters since Zen names its profile dirs randomly under ~/.zen (no fixed
+# path for a home.file user.js).
 #
-# We call `wrapFirefox` ourselves on the input's *unwrapped* package rather than
-# doing `inputs'.zen-browser.packages.default.override { extraPrefs = ... }`,
-# which looks equivalent and is not. The input's `default` is built by
-# `callPackage ./zen-browser.nix`, so the `.override` on it belongs to
-# callPackage and overrides that file's *arguments* -- and since that file's
-# signature ends in `...`, an unknown `extraPrefs` argument is accepted and
-# silently dropped. The result builds happily to the byte-identical stock store
-# path, which is exactly how this was first written and how it was caught.
+# We call `wrapFirefox` ourselves on the input's *unwrapped* package, not
+# `inputs'.zen-browser.packages.default.override { extraPrefs = ... }`: that
+# `default` is built by `callPackage ./zen-browser.nix`, so `.override`
+# overrides that file's *arguments* -- and since its signature ends in
+# `...`, an unknown `extraPrefs` is silently dropped, building the
+# byte-identical stock package.
 #
-# `defaultPref` rather than `lockPref` on purpose. These set the *default*
-# branch, so about:config stays live-tunable while dialling the feel in and
-# whatever wins comes back here. The flip side is that a pref already set by
-# hand in an existing profile beats the value below -- if a change here seems
-# to do nothing, check whether about:config shows that row as "modified".
+# `defaultPref`, not `lockPref`: sets the *default* branch so about:config
+# stays live-tunable. A pref already set by hand in an existing profile wins
+# over the value below -- if a change seems to do nothing, check whether
+# about:config shows that row as "modified".
 {
   perSystem =
     {

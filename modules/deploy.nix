@@ -1,33 +1,28 @@
-# `deploy <host> [branch]` — a short, agent-friendly wrapper over deploy-rs.
+# `deploy <host> [branch]` -- a short, agent-friendly wrapper over deploy-rs.
 #
 # Two things live here:
 #
-#   1. flake.deploy.nodes   — one deploy-rs node per registry entry that opts in
-#      with `deploy.hostname = "<ip>"`. Each activates the host's system profile
-#      as root (over ssh as phonkd + sudo; root login is disabled everywhere),
-#      with magic rollback so a host that drops off the network after activation
-#      reverts itself. Builds run on whatever machine invokes `deploy` — on the
-#      Mac that offloads x86_64-linux to 205-builder via nix.buildMachines, so
-#      "builds happen on the beefy builder" needs no extra wiring here.
+#   1. flake.deploy.nodes -- one deploy-rs node per registry entry with
+#      `deploy.hostname = "<ip>"`, activating the host's system profile as
+#      root (ssh as phonkd + sudo) with magic rollback. Builds run on
+#      whatever invokes `deploy` -- on the Mac that's offloaded to
+#      205-builder via nix.buildMachines.
 #
-#      Node keys are the registry name with any leading "<digits>-" stripped
-#      ("201-mono" -> "mono"): deploy-rs parses the node as a Nix attr path, and
-#      a bare identifier can't start with a digit ("Unrecognized node or token").
-#      The profile still points at the real nixosConfigurations."201-mono".
+#      Node keys strip any leading "<digits>-" ("201-mono" -> "mono"):
+#      deploy-rs parses the node as a Nix attr path, and a bare identifier
+#      can't start with a digit ("Unrecognized node or token"). The profile
+#      still points at nixosConfigurations."201-mono".
 #
-#   2. perSystem packages.deploy-cli — the CLI (binary name `deploy`). `deploy
-#      201` deploys 201-mono from the current checkout; `deploy 201 somebranch`
-#      builds+deploys that git branch; `deploy --all` does every node;
-#      `deploy <host> --remote-build` builds on the target itself instead of
-#      offloading to 205 (fallback when the builder VM is offline); any other
-#      -flag (e.g. `--hostname`, `--ssh-opts`) is handed to deploy-rs. Wired
-#      onto the Mac in modules/hosts/mac.nix and onto every NixOS desktop in
-#      modules/desktop.nix (nixosDesktop gate). The package attr is deploy-cli, NOT
-#      deploy, so it doesn't collide with the flake.deploy output (deploy-rs
-#      evaluates `<flake>#deploy` and must get the schema, not this derivation).
+#   2. perSystem packages.deploy-cli -- the CLI (binary name `deploy`).
+#      `deploy 201` deploys 201-mono from the checkout; a branch arg
+#      builds+deploys that branch; `--all` does every node; `--remote-build`
+#      builds on the target instead of offloading (fallback when 205 is
+#      down); any other -flag is handed to deploy-rs. Wired onto the Mac and
+#      every NixOS desktop. Package attr is deploy-cli, NOT deploy, so it
+#      doesn't collide with the flake.deploy output (deploy-rs evaluates
+#      `<flake>#deploy` and needs the schema, not this derivation).
 #
 # Adding a host to `deploy` = adding `deploy.hostname` to its registry stanza.
-# Nothing here is edited per-host.
 {
   self,
   inputs,
@@ -90,13 +85,13 @@ in
       "-o"
       "ConnectTimeout=10"
       # deploy-rs replaces NIX_SSHOPTS with exactly this list for its
-      # `nix copy --to ssh://...` push, so any per-host `IdentitiesOnly yes`
-      # in ~/.ssh/config would otherwise force ONLY the configured key. The
-      # observability host's block pins a passphrase-locked id_rsa that isn't
-      # in the agent, which blocked `deploy observability` even though the
-      # agent's ed25519 key is authorized there. IdentitiesOnly=no lets the
-      # agent keys be offered alongside the configured one — it never breaks
-      # hosts that already authenticate (only widens which keys are tried).
+      # `nix copy --to ssh://...` push, so a per-host `IdentitiesOnly yes` in
+      # ~/.ssh/config would force ONLY the configured key. The observability
+      # host's block pins a passphrase-locked id_rsa not in the agent, which
+      # blocked `deploy observability` even though the agent's ed25519 key is
+      # authorized there. IdentitiesOnly=no offers the agent keys alongside
+      # the configured one -- it never breaks hosts that already
+      # authenticate, only widens which keys are tried.
       "-o"
       "IdentitiesOnly=no"
     ];
@@ -138,10 +133,10 @@ in
           EOF
           }
 
-          # Pull our own --remote-build/-r out of the args; --hostname and
-          # --ssh-opts each swallow a value and go to deploy-rs, as does any
-          # other -flag we don't know. The rest are positional (host, branch),
-          # so flags may sit anywhere on the line.
+          # Pull --remote-build/-r out of the args; --hostname/--ssh-opts each
+          # swallow a value and go to deploy-rs, as does any other unknown
+          # -flag. The rest are positional (host, branch) and may sit
+          # anywhere on the line.
           remote_build=0
           passthru=()
           positional=()

@@ -1,53 +1,36 @@
 { ... }:
 
 # sing-box on NixOS: an HTTP + SOCKS proxy on 127.0.0.1:2080, run as a root
-# systemd service. Gated on `noughty.proxy.enable`, which `nixosModules.work`
-# sets from the "work" host tag -- today that means z14 and nothing else. See
-# plans/work-setup-on-nixos.md for how the work setup reached Linux at all.
+# systemd service. Gated on `noughty.proxy.enable`, set by `nixosModules.work`
+# from the "work" host tag (today: z14 only). See plans/work-setup-on-nixos.md.
 #
-# App-layer, and only app-layer. What comes through here is what opts in:
-# anything honouring $http_proxy (set system-wide at the bottom of this file),
-# and the work ssh catch-all, which asks for SOCKS by hand with
-# `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`. That SOCKS half is
-# load-bearing for exactly that reason -- this cannot just be an HTTP proxy.
-# Everything else on the machine goes straight out, unaware this exists.
+# App-layer only: anything honouring $http_proxy (set system-wide below),
+# plus the work ssh catch-all's `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`
+# -- that SOCKS half is load-bearing, this can't just be an HTTP proxy.
+# Everything else goes straight out, unaware this exists.
 #
-# TWO traffic classes:
+# TWO traffic classes: bedag (the work config's domain/ip rules) -> SOCKS ssh
+# tunnels; everything else -> direct. The homelab is a third class that never
+# reaches sing-box: `no_proxy` carries `.phonkd.net` and 100.64.0.0/10,
+# routing to tailscaled over the headscale mesh -- keeping homelab
+# reachability independent of this service's health.
 #
-#   bedag (the work config's own domain/ip rules) -> SOCKS ssh tunnels
-#   everything else                               -> direct
+# THE TUN IS GONE: a transparent mode (tun inbound, sniff, ssh carve-out,
+# sing-box's own tailscale node) worked but cost a great deal of machinery
+# and ways to take the laptop off the network, for catching only what
+# ignores $http_proxy. modules/proxy/README.md and
+# `git log -- modules/proxy/` have the details.
 #
-# The homelab is a third class that deliberately never reaches sing-box:
-# `no_proxy` carries `.phonkd.net` and 100.64.0.0/10, so it goes to tailscaled
-# over the headscale mesh instead. That is what keeps homelab reachability
-# independent of this service's health, and it is why headscale is not wired
-# into sing-box in any form.
+# TWO config files, merged by sing-box: /etc/sing-box/config.json (generated
+# here, public: inbound/DNS/direct outbound -- path matters, see
+# `environment.etc` below) and ~/git/bedag-setup/singbox.json (private repo's
+# SOCKS outbounds + picking rules, referenced by path, never restated here --
+# what keeps this repo publishable).
 #
-# THE TUN IS GONE, and so is the tailscale endpoint. There was a transparent
-# mode here: a tun inbound with `auto_route` capturing every socket, a `sniff`
-# rule to recover the domain names the tun stripped, a `process_name` carve-out
-# so ssh could still bootstrap the very tunnels it proxies through, and
-# sing-box's own userspace tailscale node so the tailnet could be routed back
-# in. It was made to work, four traps deep, and then removed -- a great deal of
-# machinery, and a great many ways to take the laptop off the network, in
-# exchange for catching the handful of things that ignore $http_proxy.
-# modules/proxy/README.md records what it cost to get right;
-# `git log -- modules/proxy/` has the code, should it ever be wanted back.
-#
-# TWO config files, merged by sing-box, split by who may read them:
-#
-#   1. /etc/sing-box/config.json -- generated here. Public: the inbound, DNS,
-#      the direct outbound. Note the path; see `environment.etc` below, it is
-#      load-bearing.
-#   2. ~/git/bedag-setup/singbox.json -- the bedag SOCKS outbounds and the
-#      rules picking between them. Private repo, referenced by path, never
-#      restated here. That split is what keeps this repo publishable.
-#
-# Shares nothing with the macOS half (modules/proxy/darwin.nix) but the
-# package. They are close in shape again now that the tun is gone, but not
-# close enough to merge: that one needs a DNS split for a macOS-only reason
-# (scoped resolvers are invisible to sing-box), this one needs an explicit
-# upstream resolver for a Linux-only reason (see `upstreamDns`).
+# Shares only the package with the macOS half (modules/proxy/darwin.nix):
+# that one needs a DNS split for a macOS-only reason (scoped resolvers
+# invisible to sing-box), this one needs an explicit upstream resolver for a
+# Linux-only reason (see `upstreamDns`).
 
 {
   flake.nixosModules.proxy =
@@ -95,11 +78,10 @@
           # in 1.14).
           default_domain_resolver = "upstream";
 
-          # No `rules` of our own, deliberately. Every routing decision on this
-          # host belongs to the work config, which brings its own; anything it
-          # does not claim lands on `final`. The rules that used to be here --
-          # sniff, the tailnet, the ssh carve-out -- existed only to make the
-          # tun behave.
+          # No `rules` of our own, deliberately: every routing decision
+          # belongs to the work config, which brings its own; anything it
+          # doesn't claim lands on `final`. Old rules here (sniff, tailnet,
+          # ssh carve-out) existed only to make the removed tun behave.
           final = "direct";
         };
       };
@@ -167,17 +149,17 @@
           pkgs.socat
         ];
 
-        # The single least guessable thing left in this module: sing-box merges
-        # repeated `--config` files in order of their PATH, not the order given
-        # on the command line. Measured by moving one byte-identical file:
+        # The single least guessable thing here: sing-box merges repeated
+        # `--config` files in order of their PATH, not the order given on the
+        # command line. Measured by moving one byte-identical file:
         #
         #   /home/phonkd/.claude/…/x.json -> its rules land at match[0]
         #   /home/phonkd/zz-x.json        -> the same rules land at match[18]
         #
-        # 18 being the number of rules in the work config. /etc sorts first
-        # (/etc < /home < /nix < /run), which is the whole reason this is
-        # installed here rather than handed to sing-box from the store. sing-box
-        # sorts by the path it is GIVEN, so the symlink into the store is fine.
+        # (18 = the rule count in the work config.) /etc sorts first (/etc <
+        # /home < /nix < /run), which is why this is installed here rather
+        # than handed to sing-box from the store -- sing-box sorts by the
+        # path it's GIVEN, so the symlink into the store is fine.
         environment.etc."sing-box/config.json".source = configFile;
 
         systemd.services.sing-box = {
@@ -186,8 +168,8 @@
           wantedBy = [ "multi-user.target" ];
 
           # Keeps a host without the private checkout cleanly inactive rather
-          # than crash-looping: sing-box exits at startup if a --config file is
-          # missing.
+          # than crash-looping: sing-box exits at startup if a --config file
+          # is missing.
           unitConfig.ConditionPathExists = cfg.additionalConfigFile;
 
           serviceConfig = {
@@ -201,10 +183,10 @@
             ];
             Restart = "on-failure";
             RestartSec = 30;
-            # Root only because the config files live under /home -- the
-            # process itself opens sockets and reads two files. No
-            # AmbientCapabilities: CAP_NET_ADMIN was the tun's, and there is no
-            # tun. No StateDirectory either; that held the tsnet node identity.
+            # Root only because the config files live under /home; the
+            # process itself just opens sockets and reads two files. No
+            # AmbientCapabilities: CAP_NET_ADMIN was the tun's, now gone. No
+            # StateDirectory either; that held the tsnet node identity.
             ProtectSystem = "strict";
             ProtectHome = "read-only";
             PrivateTmp = true;
@@ -216,25 +198,24 @@
           };
         };
 
-        # With no tun these are not a convenience, they ARE the proxy: nothing
-        # is captured, so anything that does not read them (or dial 2080
-        # itself, as the work ssh catch-all does through socat) simply goes
-        # direct. Which is the point -- opt-in is the whole design.
+        # With no tun these ARE the proxy: anything that doesn't read them
+        # (or dial 2080 directly, as the ssh catch-all does via socat) goes
+        # direct -- opt-in is the whole design.
         #
-        # System-wide rather than home-manager's: they reach every login
-        # session and every graphical app greetd starts, where
-        # `home.sessionVariables` reaches only hm's own shells. Uppercase
-        # spellings because plenty of tooling reads only those.
+        # System-wide, not home-manager's: they reach every login session and
+        # graphical app greetd starts, where `home.sessionVariables` reaches
+        # only hm's shells. Uppercase too, since plenty of tooling reads only
+        # those.
         #
-        # NB systemd *system* units do not source /etc/set-environment, so
-        # nix-daemon stays unproxied -- on purpose, so builds do not start
-        # failing the moment the bedag tunnels are down.
+        # systemd *system* units don't source /etc/set-environment, so
+        # nix-daemon stays unproxied on purpose -- builds shouldn't fail just
+        # because the bedag tunnels are down.
         environment.sessionVariables =
           let
             url = "http://localhost:${toString cfg.listenPort}";
-            # Keeps homelab traffic out of the proxy path entirely, so it goes
-            # to tailscaled over the mesh. This is what decouples homelab
-            # reachability from sing-box being healthy.
+            # Keeps homelab traffic out of the proxy path so it goes to
+            # tailscaled over the mesh -- decoupling homelab reachability
+            # from sing-box's health.
             bypass = "localhost,127.0.0.1,.phonkd.net,100.64.0.0/10";
           in
           {

@@ -64,9 +64,9 @@
             alt-shift-i = "move-node-to-workspace X";
             alt-shift-o = "move-node-to-workspace C";
             alt-f = "fullscreen";
-            # Launched via LaunchServices (not exec'd as an AeroSpace child) so that
-            # kitty is its own TCC responsible process. Uses the signed /Applications
-            # bundle, whose stable code identity keeps Automation/Full Disk Access
+            # Launched via LaunchServices, not exec'd as an AeroSpace child, so
+            # kitty is its own TCC-responsible process: the signed /Applications
+            # bundle's stable code identity keeps Automation/Full Disk Access
             # grants alive across updates. -n forces a new instance.
             alt-v = "exec-and-forget /usr/bin/open -n -a /Applications/kitty.app --args --directory /Users/phonkd";
             alt-space = "layout floating tiling";

@@ -151,24 +151,23 @@
         enableZshIntegration = true;
         enableFishIntegration = false;
       }
-      # Ctrl-R stays fzf's own widget over zsh history. ctrl-d swaps the list
-      # for atuin's commands run in the current dir (e.g. a try-rs scratch dir);
-      # the widget pastes non-history lines as-is. Only the dir view comes from
-      # atuin: `atuin import zsh` can't date NO_EXTENDED_HISTORY lines and
-      # scrambles their order. --reverse is newest-first, despite atuin's help.
-      # Each element needs its own quoting: HM joins them into one env var that
-      # fzf word-splits. Guarded because android's pinned home-manager predates
-      # historyWidget.
+      # Ctrl-R stays fzf's own widget over zsh history; ctrl-d swaps to
+      # atuin's commands run in the current dir, pasting non-history lines
+      # as-is. Only the dir view uses atuin: `atuin import zsh` can't date
+      # NO_EXTENDED_HISTORY lines and scrambles their order. --reverse is
+      # newest-first despite atuin's help. Quoting is per-element since HM
+      # joins them into one env var that fzf word-splits. Guarded: android's
+      # pinned home-manager predates historyWidget.
       // lib.optionalAttrs (options.programs.fzf ? historyWidget) {
         historyWidget.options = [
           "--header='ctrl-d: only this dir'"
           "--bind='ctrl-d:reload(atuin search --cmd-only --print0 --reverse --filter-mode directory)+change-prompt(dir> )'"
         ];
       }
-      # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell is
-      # unused. Guarded on the option existing because the android host pins a
-      # pre-May-2026 home-manager (see nixpkgs-android in flake.nix) that
-      # predates the option -- there, false is already the behaviour.
+      # HM master asserts fzf >= 0.73 for this; 26.05 ships 0.72 and nushell
+      # is unused. Guarded on the option existing: the android host's pinned
+      # home-manager (nixpkgs-android in flake.nix) predates it, where false
+      # is already the behaviour.
       // lib.optionalAttrs (options.programs.fzf ? enableNushellIntegration) {
         enableNushellIntegration = false;
       };

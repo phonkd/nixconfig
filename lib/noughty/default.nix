@@ -79,10 +79,9 @@ in
           default = config.noughty.host.desktop != null;
           description = "Whether this host has a desktop environment (any OS).";
         };
-        # Platform-specific desktop predicates. Use these to gate modules
-        # that depend on NixOS- or Darwin-specific option namespaces.
-        # A Mac is is.workstation but not is.nixosDesktop, so it won't
-        # accidentally activate NixOS-only desktop modules.
+        # Platform-specific desktop predicates, for gating NixOS- or
+        # Darwin-specific modules -- a Mac is is.workstation but not
+        # is.nixosDesktop.
         nixosDesktop = lib.mkOption {
           type = lib.types.bool;
           default = config.noughty.host.desktop != null && config.noughty.host.os == "linux";

@@ -1,15 +1,12 @@
-# The repo's development shell: `nix develop` in this directory.
-#
-# Carries the secret-management tooling, which is the one workflow here that is
-# genuinely awkward without help -- `sops set` needs the exact file, the exact
-# JSON-quoted value, and a matching .sops.yaml creation rule, and gives an
-# unhelpful error when any of the three is off.
+# The repo's development shell: `nix develop` in this directory. Carries the
+# secret-management tooling -- `sops set` needs the exact file, a JSON-quoted
+# value and a matching .sops.yaml rule, and fails unhelpfully if any is off.
 #
 #   sops-secret <app>.<key>     add/update one secret in a per-app sops file
 #   sso-secret  <app> -r <uri>  mint an Authelia OIDC client for an app
 #   task --list                 the same two, through go-task
 #
-# See plans/authelia-sso.md for what these are for.
+# See plans/authelia-sso.md.
 {
   self,
   inputs,

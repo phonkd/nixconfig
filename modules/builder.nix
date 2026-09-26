@@ -5,15 +5,14 @@
 # routed by the entry's platform suffix. Each built config gets:
 #
 #   1. The noughty options module (always)
-#   2. A generated module that sets noughty.host.* / noughty.user.*
-#      from the registry entry
-#   3. The platform-appropriate Home Manager loader (hmNixosBase /
-#      hmDarwinBase). HM is wired into every host -- it's harmless when
-#      no `home-manager.users.*` are configured (e.g. on servers).
-#   4. `alwaysImport` (NixOS) / `alwaysImportDarwin` (Darwin): modules
-#      that self-gate on noughty.* and are safe to import everywhere.
-#   5. `extraModules` from the entry: per-host escape hatch (typically
-#      just hardware-configuration.nix paths).
+#   2. A generated module setting noughty.host.* / noughty.user.* from the
+#      registry entry
+#   3. The platform Home Manager loader (hmNixosBase / hmDarwinBase) --
+#      harmless with no `home-manager.users.*` configured (e.g. servers)
+#   4. `alwaysImport` / `alwaysImportDarwin`: modules that self-gate on
+#      noughty.* and are safe everywhere
+#   5. `extraModules` from the entry: per-host escape hatch, typically just
+#      hardware-configuration.nix paths
 {
   self,
   inputs,
@@ -25,9 +24,8 @@ let
 
   isDarwin = entry: lib.hasSuffix "-darwin" (entry.platform or "x86_64-linux");
 
-  # NixOS-side: cross-host feature modules. Each self-gates and is
-  # safe to import everywhere. Host-specific modules belong in the
-  # registry entry's extraModules, not here.
+  # NixOS-side: cross-host feature modules, each self-gating and safe
+  # everywhere. Host-specific modules belong in extraModules, not here.
   alwaysImport = with self.nixosModules; [
     # Foundation (no gate -- safe on every NixOS host).
     # IMPORTANT: only import each function module via ONE path. Function
@@ -85,9 +83,9 @@ let
     observability-sender
 
     # Headscale mesh control plane (gated on "observability-server") + the
-    # Tailscale client on every server (gated on host.is.server). The client
-    # self-registers with the sops pre-auth key (headscale_authkey) minted after
-    # headscale came up. See plans/headscale-mesh.md.
+    # Tailscale client on every server (host.is.server), which self-registers
+    # with the sops pre-auth key (headscale_authkey) minted after headscale
+    # comes up. See plans/headscale-mesh.md.
     headscale-server
     tailnet
   ];
@@ -100,16 +98,15 @@ let
       dns # scoped /etc/resolver for *.w.phonkd.net → 201 over the tailnet
     ])
     ++ [
-      # Trampolines for /Applications/Nix Apps, so system-level nix apps are
-      # reachable from Spotlight. The home-manager half (for ~/Applications/
-      # Home Manager Apps) is imported next to the other HM modules in
-      # modules/hosts/types/gui/default.nix. See the input comment in flake.nix
-      # for why linkApps alone leaves apps unindexed.
+      # Trampolines for /Applications/Nix Apps (Spotlight-reachable); the
+      # home-manager half lives in modules/hosts/types/gui/default.nix. See
+      # flake.nix's mac-app-util comment for why linkApps alone leaves apps
+      # unindexed.
       inputs.mac-app-util.darwinModules.default
     ];
 
-  # Always-on Home Manager wiring. Safe on hosts with no HM users
-  # (the user-import list stays empty and HM activation is a no-op).
+  # Always-on Home Manager wiring, harmless with no HM users (empty
+  # user-import list; activation is a no-op).
   hmNixosBase = [
     inputs.home-manager.nixosModules.home-manager
     { home-manager.backupFileExtension = "hm-backup"; }
@@ -153,12 +150,10 @@ let
       modules = [
         ../lib/noughty
         (noughtyHostModule name entry)
-        # Record the git revision this config was built from, so every host
-        # reports it via `nixos-version --configuration-revision` and (via
-        # the observability-sender textfile metric) into Mimir -- i.e. which
-        # rev each host actually runs, so a merged-but-not-deployed host is
-        # visible without ssh. Dirty trees get the "<rev>-dirty" pseudo-rev
-        # (or null on nix without dirtyRev).
+        # Records the git revision this config was built from -- via
+        # `nixos-version --configuration-revision` and the observability
+        # textfile metric into Mimir, so a merged-but-undeployed host is
+        # visible without ssh. Dirty trees get "<rev>-dirty" (or null).
         { system.configurationRevision = self.rev or self.dirtyRev or null; }
       ]
       ++ hmNixosBase

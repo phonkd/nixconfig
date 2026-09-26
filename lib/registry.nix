@@ -13,12 +13,12 @@
 #   gpu         : { vendors = [...]; compute = { vendor; vram; unified; }; }
 #
 #   deploy      : { hostname = "<ip>"; }  (optional)
-#       Opt a NixOS host into `deploy <host>` (deploy-rs, modules/deploy.nix).
-#       Only entries that set this become deploy-rs nodes. hostname is the
-#       address the Mac reaches it at — the host's tailnet IP (100.64.0.x).
-#       Per-host ssh quirks
-#       (e.g. the hetzner VMs' :5432 sshd + id_rsa key) live in that host's
-#       programs.ssh.matchBlocks, not here — deploy-rs honors ~/.ssh/config.
+#       Opts a NixOS host into `deploy <host>` (deploy-rs, modules/deploy.nix).
+#       Only entries setting this become deploy-rs nodes; hostname is the
+#       host's tailnet IP (100.64.0.x), the address the Mac reaches it at.
+#       Per-host ssh quirks (e.g. the hetzner VMs' :5432 sshd + id_rsa key)
+#       live in programs.ssh.matchBlocks, not here — deploy-rs honors
+#       ~/.ssh/config.
 #
 #   extraModules : { self, inputs }: [ modules ]
 #       Escape hatch. Should shrink to per-host hardware paths over time.
@@ -31,10 +31,8 @@
     tags = [
       "gaming"
       "gigaplayer-client"
-      # The only session on this host. It used to sit next to Plasma -- this
-      # field read "kde" and SDDM offered both -- but KDE is gone from the repo
-      # and Hyprland is what is left. See modules/hyprland/ and
-      # plans/hyprland.md.
+      # The only session on this host now (KDE dropped). See modules/hyprland/
+      # and plans/hyprland.md.
       "hyprland"
     ];
     username = "phonkd";
@@ -52,16 +50,14 @@
       [
         /etc/nixos/hardware-configuration.nix
         self.nixosModules.blac
-        # blac runs `deploy` (the CLI comes from the shared desktop baseline in
-        # modules/desktop.nix). Same reason g14 has this: without it the desktop
-        # compiles every homelab closure itself instead of handing x86_64-linux
-        # off to 205-builder. Supplies the nixremote key via sops and pins 205's
-        # host key.
+        # blac runs `deploy` (shared desktop baseline, modules/desktop.nix);
+        # without it the desktop compiles every homelab closure itself
+        # instead of offloading x86_64-linux to 205-builder. Supplies the
+        # nixremote key via sops and pins 205's host key.
         self.nixosModules.builder-client
-        # Hyprland -- the session (gated on the "hyprland" tag above). Named
-        # here rather than in modules/builder.nix's alwaysImport purely to
-        # keep the change that introduced it off a file a concurrent refactor
-        # was rewriting; it self-gates and would be equally at home there.
+        # Hyprland -- the session (gated on "hyprland"). Placed here rather
+        # than builder.nix's alwaysImport to avoid touching a file
+        # mid-refactor; it self-gates and would fit there equally well.
         self.nixosModules.hyprland
       ];
   };
@@ -88,84 +84,63 @@
         /etc/nixos/hardware-configuration.nix
         self.nixosModules.g14
         # Offload x86_64-linux builds to 205-builder, same as every homelab VM
-        # (they get it transitively via oldblac-vm). g14 runs `deploy` too, and
-        # without this the laptop compiles every host's closure itself.
-        # Supplies the nixremote key via sops and pins 205's host key.
-        #
-        # It targets 205 over the tailnet (100.64.0.2), so offload works from
-        # wherever the laptop is, not just on the home network. It used to point
-        # at the LAN address 192.168.3.205, which meant every off-LAN `deploy`
-        # silently fell back to compiling the closure on the laptop after the
-        # builder failed to answer.
+        # (via oldblac-vm); without it the laptop compiles every host's
+        # closure itself. Supplies the nixremote key via sops, pins 205's
+        # host key, and targets 205 over the tailnet (100.64.0.2) so offload
+        # works from anywhere -- the old LAN address let an off-LAN `deploy`
+        # silently fall back to compiling locally when the builder didn't
+        # answer.
         self.nixosModules.builder-client
         # Hyprland -- see the note on blac's entry.
         self.nixosModules.hyprland
       ];
   };
 
-  # The ASUS Zenbook 14 UM3406GA. Same *role* as g14 was -- gigaplayer client,
-  # build-offload client, no deploy.hostname because laptops are deploy
-  # clients rather than deploy targets -- but not the same hardware: this one is
-  # a Radeon 840M iGPU with no dGPU, no ROG firmware and no fingerprint reader.
-  # See plans/z14-zenbook.md.
+  # The ASUS Zenbook 14 UM3406GA. Same *role* as g14 -- gigaplayer/build-offload
+  # client, no deploy.hostname (laptops are deploy clients, not targets) --
+  # different hardware: Radeon 840M iGPU, no dGPU, no ROG firmware, no
+  # fingerprint reader. See plans/z14-zenbook.md.
   #
-  # Hyprland (below) is the only session -- as it now is on blac and g14 too.
-  # `desktop` still has to be non-null: it also drives
-  # noughty.host.is.nixosDesktop, which the whole desktop baseline
-  # (modules/desktop.nix) and modules/hyprland/ key off, so it can't just
-  # become null. "hyprland" is the value every NixOS desktop here carries --
-  # see the greetd/tuigreet branch in modules/desktop.nix, which is the login
-  # screen it selects.
+  # Hyprland is the only session, as on blac/g14. `desktop` must stay
+  # non-null: it drives noughty.host.is.nixosDesktop (desktop baseline +
+  # modules/hyprland/) and selects the greetd/tuigreet login screen in
+  # modules/desktop.nix.
   z14 = {
     kind = "computer";
     platform = "x86_64-linux";
     formFactor = "laptop";
     desktop = "hyprland";
-    # "work" is back. It was dropped once (work had moved to the Mac) and is
-    # re-added deliberately: see plans/work-setup-on-nixos.md, which built the
-    # Linux half of modules/work/ for this host and also brings up sing-box
-    # here as an HTTP/SOCKS proxy on 127.0.0.1:2080 (opt-in -- the tun that
-    # briefly made it system-wide has been removed). The tag is still the whole
-    # opt-in -- everything it reaches self-gates on it, so removing it again is
-    # the rollback.
+    # work setup on this host (plans/work-setup-on-nixos.md): sing-box as an
+    # HTTP/SOCKS proxy on 127.0.0.1:2080 (opt-in). Everything it reaches
+    # self-gates on this tag; removing it is the rollback.
     #
-    # Know what it re-arms: the bedag ssh config ends in a `Host *` catch-all
-    # whose ProxyCommand is socat into the SOCKS listener, and it applies to
-    # *every* destination. That is why `ssh ext-mail` used to fail here as
-    # "Connection closed by UNKNOWN port 65535" rather than as an unknown host
-    # -- ext-mail matches no block, so it fell through to the proxy. The tag
-    # brings back homeModules.work-ssh-bypass, which punches the tailnet, the
-    # LAN and github.com back out of it; anything NOT in that list now goes
-    # through the work tunnels again. Verify with `ssh 201-mono` after deploy.
+    # What it re-arms: the bedag ssh config's `Host *` catch-all dials SOCKS
+    # via ProxyCommand for *every* destination -- `ssh ext-mail` used to fail
+    # as "Connection closed by UNKNOWN port 65535" (matched no block, fell
+    # through to the proxy). The tag brings homeModules.work-ssh-bypass,
+    # punching the tailnet, LAN and github.com back out; verify with
+    # `ssh 201-mono` after deploy.
     tags = [
       "gigaplayer-client"
       "hyprland"
       "work"
-      # "fosi-mc331" lived here while the amp's DSP noise-gate fix was being
-      # worked out (it is solved -- see plans/fosi-mc331-noise-gate.md). Taken
-      # off again deliberately: the amp shouldn't depend on a laptop being awake
-      # and plugged in. modules/fosi-mc331.nix stays in the repo, dormant;
-      # adding this one tag to whatever small box ends up cabled to the amp is
-      # the entire deployment.
+      # fosi-mc331 lived here during the DSP noise-gate fix (solved; see
+      # plans/fosi-mc331-noise-gate.md) -- removed since the amp shouldn't
+      # depend on a laptop being awake. modules/fosi-mc331.nix stays dormant;
+      # adding this tag to the box cabled to the amp is the entire deployment.
     ];
     username = "phonkd";
 
-    # AMD only. This is load-bearing rather than documentation: it is what keeps
-    # nvidia-desktop's config block off (it gates on gpu.hasNvidia) while the
-    # shared desktop baseline still arrives through that module's unconditional
-    # `imports`.
+    # AMD only -- load-bearing: keeps nvidia-desktop's config block off
+    # (gates on gpu.hasNvidia) while the desktop baseline still arrives via
+    # that module's unconditional `imports`.
     #
-    # Still no `compute`, though something does now schedule work onto the
-    # 840M: modules/hosts/z14.nix runs ollama against it through Vulkan. The
-    # field stays unset because setting it would make this *less* accurate,
-    # not more -- `compute.acceleration` is derived from `compute.vendor`, so
-    # "amd" would imply hasROCm, and ROCm is precisely what does not work on
-    # gfx1153. modules/builder.nix also copies only vendor/vram/unified out of
-    # the registry and drops `acceleration`, so the "vulkan" enum value that
-    # would say the true thing cannot be spelled here anyway. Nothing reads
-    # hasROCm or hasCuda today, so the question is moot until something does --
-    # at which point teach builder.nix to pass `acceleration` through, then
-    # set it here.
+    # No `compute` set, though ollama runs against the 840M via Vulkan
+    # (modules/hosts/z14.nix): compute.vendor = "amd" would imply hasROCm,
+    # which doesn't work on gfx1153, and builder.nix drops `acceleration`
+    # from the registry anyway so "vulkan" can't be spelled here. Nothing
+    # reads hasROCm/hasCuda today -- teach builder.nix to pass acceleration
+    # through before setting this.
     gpu = {
       vendors = [ "amd" ];
     };
@@ -175,9 +150,9 @@
       [
         /etc/nixos/hardware-configuration.nix
         self.nixosModules.z14
-        # Offload x86_64-linux builds to 205-builder over the tailnet, exactly
-        # as g14 does -- without it the laptop compiles every host's closure
-        # itself. Supplies the nixremote key via sops and pins 205's host key.
+        # Offload x86_64-linux builds to 205-builder over the tailnet, as g14
+        # does -- without it the laptop compiles every host's closure itself.
+        # Supplies the nixremote key via sops and pins 205's host key.
         self.nixosModules.builder-client
         # Hyprland -- the session, same as blac/g14.
         self.nixosModules.hyprland
@@ -196,9 +171,8 @@
       "vm"
     ];
     username = "phonkd";
-    # Tailnet IP (headscale mesh) — was 192.168.3.201 over sing-box. deploy now
-    # rides the tailnet, independent of the sing-box SOCKS proxy (whose Mac->201
-    # hairpin is dead anyway). See plans/headscale-mesh.md Phase 2.
+    # Tailnet IP (headscale mesh). deploy rides the tailnet now, independent
+    # of the (dead) sing-box SOCKS proxy. See plans/headscale-mesh.md Phase 2.
     deploy.hostname = "100.64.0.5";
 
     extraModules =
@@ -223,11 +197,11 @@
       "observability-sender"
     ];
     username = "phonkd";
-    deploy.hostname = "100.64.0.3"; # tailnet (was 192.168.3.203 via sing-box)
+    deploy.hostname = "100.64.0.3"; # tailnet
 
-    # RTX 3060 Ti (Ampere, 8 GB) passed through from Proxmox — drives Jellyfin
-    # NVENC and ollama-cuda (see arr-slime.nix / 203-media.nix). Declaring it
-    # here is what gates the nvidia-gpu exporter in the observability sender
+    # RTX 3060 Ti (Ampere, 8 GB) passed through from Proxmox -- drives
+    # Jellyfin NVENC and ollama-cuda (arr-slime.nix / 203-media.nix). Gates
+    # the nvidia-gpu exporter in the observability sender
     # (noughty.host.gpu.hasNvidia).
     gpu = {
       vendors = [ "nvidia" ];
@@ -257,7 +231,7 @@
       "observability-sender"
     ];
     username = "phonkd";
-    deploy.hostname = "100.64.0.1"; # tailnet (was 192.168.3.204 via sing-box)
+    deploy.hostname = "100.64.0.1"; # tailnet
 
     extraModules =
       { self, inputs }:
@@ -279,7 +253,7 @@
       "observability-sender"
     ];
     username = "phonkd";
-    deploy.hostname = "100.64.0.2"; # tailnet (was 192.168.3.205 via sing-box)
+    deploy.hostname = "100.64.0.2"; # tailnet
 
     extraModules =
       { self, inputs }:
@@ -317,17 +291,17 @@
       "observability-sender"
     ];
     username = "phonkd";
-    # Public IP, not a tailnet address, and deliberately so. ext-mail is the
-    # last server to join the mesh (modules/tailnet.nix already covers it via
-    # the is.server gate — enrolling it was only ever a matter of deploying
-    # it). Its sshd is the hetzner-vm one on :5432, so `deploy mail` needs the
-    # port and key spelled out until Tailscale SSH is live here too:
+    # Public IP, not tailnet, deliberately: ext-mail is the last server to
+    # join the mesh (tailnet.nix's is.server gate already covers it --
+    # enrolling it was only ever a matter of deploying). Its sshd is the
+    # hetzner-vm one on :5432, so `deploy mail` needs the port and key
+    # spelled out until Tailscale SSH is live here too:
     #
     #   deploy mail --ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"
     #
-    # Keeping this off-tailnet is also the standing fix for the footgun in the
-    # nixconfig-ops runbook: activation restarts tailscaled and kills a deploy
-    # that is riding the tailnet itself. Over the public IP it cannot.
+    # Also the standing fix for the nixconfig-ops footgun: activation
+    # restarts tailscaled and kills a deploy riding the tailnet itself --
+    # over the public IP it cannot.
     deploy.hostname = "157.180.27.152";
 
     extraModules =
@@ -352,9 +326,9 @@
       "observability-sender"
     ];
     username = "phonkd";
-    # Management (deploy + ssh) now rides the headscale tailnet like every other
-    # host — Tailscale SSH by identity, no sing-box. The metrics/log data plane
-    # moved onto the tailnet too and wg-obs is gone (plans/retire-wg-obs.md).
+    # Management (deploy + ssh) rides the headscale tailnet, Tailscale SSH by
+    # identity, no sing-box. Metrics/logs moved onto the tailnet too; wg-obs
+    # is gone (plans/retire-wg-obs.md).
     deploy.hostname = "100.64.0.4";
 
     extraModules =

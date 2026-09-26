@@ -4,20 +4,19 @@
   flake.homeModules.terminal =
     { pkgs, lib, ... }:
     let
-      # Fuzzy tab picker that spans every running kitty. Each kitty window here
-      # is its own process with its own control socket, so the usual pickers
-      # (built-in select_tab, kitty-tab-switcher) only ever see the OS window
-      # they were launched from; this one walks all the sockets.
+      # Fuzzy tab picker spanning every running kitty: each is its own process
+      # with its own control socket, so the usual pickers (select_tab,
+      # kitty-tab-switcher) only see the OS window they were launched from --
+      # this one walks all the sockets.
       #
-      # writeShellScriptBin rather than writeShellApplication: the latter forces
-      # `set -o errexit`, which would kill the script when fzf exits non-zero
-      # (Esc with no selection) or when a grep finds nothing.
+      # writeShellScriptBin, not writeShellApplication: the latter's
+      # `set -o errexit` would kill the script on fzf's non-zero exit (Esc,
+      # no selection) or an empty grep.
       kitty-tab-search = pkgs.writeShellScriptBin "kitty-tab-search" ''
-        # kitty's remote-control protocol is version-matched, and the kitty that
-        # actually runs on this Mac is the Homebrew cask in /Applications, not
-        # pkgs.kitty. So: our own tools first, then the inherited PATH (whose
-        # `kitten` belongs to the running kitty), and pkgs.kitty only as a
-        # last-resort fallback for a machine without one installed.
+        # kitty's remote-control protocol is version-matched, and the kitty
+        # running on this Mac is the Homebrew cask in /Applications, not
+        # pkgs.kitty -- our tools go first, then the inherited PATH (`kitten`
+        # from the running kitty), with pkgs.kitty only as a last resort.
         export PATH=${
           lib.makeBinPath [
             pkgs.jq
@@ -39,32 +38,26 @@
         themeFile = "cherry-midnight";
         settings = {
           pixel_scroll = "yes";
-          # Cursor trail: the cursor streaks to its new position instead of
-          # teleporting there. The 3 is the *trigger* threshold in ms, not the
-          # animation length -- only a cursor that held still that long gets a
-          # trail, which stops TUIs that reposition the cursor many times per
-          # redraw (nvim's statusline, fzf, cava) from smearing constantly.
-          # Decay is the fastest/slowest fade pair in seconds.
-          # cursor_trail_start_threshold stays at its default 2 cells on
-          # purpose: typing advances the cursor one cell at a time, so a lower
-          # value would put a trail on every keystroke.
+          # Cursor trail: streaks to the new position instead of teleporting.
+          # The 3 is the *trigger* threshold in ms (not animation length) so
+          # TUIs that reposition the cursor constantly (nvim's statusline,
+          # fzf, cava) don't smear; decay is the fastest/slowest fade pair,
+          # in seconds. cursor_trail_start_threshold stays at its default (2
+          # cells) since typing advances one cell at a time.
           cursor_trail = 3;
           cursor_trail_decay = "0.1 0.4";
           font_size = 16;
           clipboard_control = "write-clipboard write-primary read-clipboard no-append";
-          # Smoother redraws for fast-updating TUIs like cava.
           repaint_delay = 6;
           input_delay = 1;
           sync_to_monitor = "yes";
-          # Close tabs, OS windows, and the app without a confirmation prompt.
           confirm_os_window_close = 0;
-          # Translucent background with strong macOS blur behind it.
           background_opacity = "0.6";
           background_blur = 64;
-          # One control socket per kitty process, named after its pid, so
-          # kitty-tab-search can enumerate every instance. socket-only leaves
-          # the escape-code control channel closed — anything that can write to
-          # the tty would otherwise be able to drive the terminal.
+          # One control socket per kitty process (named by pid) so
+          # kitty-tab-search can enumerate every instance; socket-only closes
+          # the escape-code channel so nothing that can write to the tty can
+          # drive the terminal.
           allow_remote_control = "socket-only";
           listen_on = "unix:/tmp/kitty-{kitty_pid}";
         };

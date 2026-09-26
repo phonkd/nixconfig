@@ -10,10 +10,10 @@ in
     description = "numtide devshell (nixpkgs follows, no packages)";
   };
 
-  # New try-rs experiments start as an empty numtide devshell project.
-  # try-rs has no create hook, so this wraps its zsh function: when it cd's
-  # into a directory that is empty (a fresh `try-rs <name>`; clones and
-  # worktrees never are), devshell-init seeds it.
+  # New try-rs experiments start as an empty numtide devshell project. try-rs
+  # has no create hook, so this wraps its zsh function: when it cd's into an
+  # empty directory (a fresh `try-rs <name>`; clones/worktrees never are),
+  # devshell-init seeds it.
   flake.homeModules.try-devshell =
     { pkgs, lib, ... }:
     let
