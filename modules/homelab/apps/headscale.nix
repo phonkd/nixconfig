@@ -2,11 +2,8 @@
 #
 # Runs on observability (public Hetzner box, tag "observability-server"). Every
 # server enrols as a Tailscale client (modules/tailnet.nix) and reaches every
-# other by MagicDNS name over WireGuard, regardless of physical network — this
-# is what retires the hub-and-spoke wg-obs + sing-box + per-host ssh
-# proxyCommand/port/key sprawl. See plans/headscale-mesh.md.
-#
-# Fully self-hosted: embedded DERP relay (no tailscale.com DERP map), so nothing
+# other by MagicDNS name over WireGuard, regardless of physical network. See
+# plans/headscale-mesh.md. Fully self-hosted: embedded DERP relay, so nothing
 # but the clients themselves touches Tailscale's infra.
 #
 # Coordinator is internet-facing (unlike the rest of obs, which is wg-only):
@@ -44,21 +41,15 @@
             override_local_dns = false; # don't hijack clients' resolvers
 
             # Split DNS: send ONLY home.phonkd.net (the internal, ipfilter =
-            # true services) to 201's dnsmasq over the tailnet. Everything else
-            # keeps using whatever resolver the client already had —
-            # override_local_dns = false above stays honoured, because a split
-            # route is a per-domain addition, not a global resolver swap.
-            #
-            # This is what makes `ipfilter = true` usable away from home. 201's
+            # true services) to 201's dnsmasq over the tailnet — a per-domain
+            # addition, so override_local_dns = false above stays honoured.
+            # This is what makes `ipfilter = true` usable away from home: 201's
             # dnsmasq answers 100.64.0.5 for this domain (modules/dns.nix), so
             # the client connects over the tailnet and traefik sees a
-            # 100.64.0.x source, which `ip-filter` already allows. Without this
-            # a remote client resolves the name through public DNS and gets an
-            # RFC1918 address it cannot route to.
-            #
+            # 100.64.0.x source, which `ip-filter` already allows; otherwise a
+            # remote client resolves an RFC1918 address it can't route to.
             # A wildcard is why this is a split route rather than
-            # dns.extra_records: extra_records is per-name, and internal
-            # services are added often.
+            # dns.extra_records, which is per-name.
             nameservers.split = {
               "home.phonkd.net" = [ "100.64.0.5" ];
             };

@@ -13,9 +13,8 @@
       ...
     }:
     let
-      # apps are sourced across all nixos modules containing phonkds.modules configs
-      # the option type lives in modules/phonkds-options.nix
-      # Filter apps that have traefik enabled and a domain configured
+      # phonkds.modules apps with traefik enabled and a domain configured; the
+      # option type lives in modules/phonkds-options.nix.
       traefikservices = lib.filterAttrs (
         name: app: app.traefik.enable && app.traefik.domain != null
       ) config.phonkds.modules;
@@ -24,19 +23,14 @@
           services = lib.mapAttrs (name: svc: {
             loadBalancer = {
               servers = [
-                # Use svc.traefik.scheme instead of hardcoded "http"
                 { url = "${svc.traefik.scheme}://${svc.ip}:${toString svc.port}${toString svc.path}"; }
               ];
-              # Only add serversTransport if one is defined
-              passHostHeader = true; # Generally safe to default to true
+              passHostHeader = true;
             }
             // (lib.optionalAttrs (svc.traefik.transport != null) {
               serversTransport = svc.traefik.transport;
             });
           }) traefikservices;
-
-          # ERROR WAS HERE: "middlewares" removed from here.
-          # You cannot assign a list here, and 'traefikservices' doesn't have an .auth property.
 
           routers = lib.mapAttrs (name: svc: {
             entryPoints = [ "websecure" ];
@@ -44,9 +38,7 @@
             service = name;
             tls.certResolver = "cloudflare";
 
-            # CORRECT LOCATION: Apply middlewares dynamically to this specific router
-            #
-            # Which forward-auth depends on the domain: authelia can only set a
+            # Which forward-auth applies depends on the domain: authelia can only set a
             # session cookie for a parent it lives under, so a service on
             # home.phonkd.net must be sent to the portal on THAT domain or it
             # authenticates and still gets bounced. Picked by suffix here so no
@@ -86,13 +78,11 @@
                 "192.168.2.0/24"
                 "10.8.0.0/16"
                 # The headscale tailnet. Without it every `ipfilter = true`
-                # service 403s whenever you're away from home, since a remote
-                # client arrives as 100.64.0.x rather than a LAN address —
-                # verified live: notes.int over the tailnet returned 403 while
-                # an ipfilter = false route on the same host returned 302.
-                # Trust-equivalent to the LAN: the tailnet is authenticated by
-                # headscale and holds only our own devices. Same reasoning as
-                # samba's `hosts allow` on 203.
+                # service 403s away from home, since a remote client arrives as
+                # 100.64.0.x rather than a LAN address — verified live: an
+                # ipfilter route over the tailnet 403'd while the same route
+                # with ipfilter = false returned 302. Trust-equivalent to the
+                # LAN: headscale-authenticated, holds only our own devices.
                 "100.64.0.0/10"
               ];
             };
@@ -126,16 +116,14 @@
             };
 
             # ── Matrix client autodiscovery ────────────────────────────────
-            # Element resolves @phonkd:phonkd.net by fetching
+            # Element resolves @phonkd:phonkd.net via
             # https://phonkd.net/.well-known/matrix/client, and the apex
-            # resolves *here*, not to ext-mail where synapse lives. Redirect
-            # to the document ext-mail already serves rather than keeping a
-            # second copy of the JSON in sync (the spec allows 30x here).
-            #
-            # Only the *client* document, deliberately. /.well-known/matrix/server
-            # is left to 404, which makes a remote server fall through to the
-            # _matrix-fed._tcp SRV record -- so federation keeps working off
-            # DNS alone and never depends on this uplink being up.
+            # resolves *here*, not to ext-mail where synapse lives. Redirect to
+            # the document ext-mail already serves rather than keeping a
+            # second copy in sync (spec allows 30x here). Only the *client*
+            # document: /.well-known/matrix/server is left to 404, so a remote
+            # server falls through to the _matrix-fed._tcp SRV record and
+            # federation keeps working off DNS alone.
             matrix-wellknown-redirect = {
               redirectRegex = {
                 regex = "^https://phonkd\\.net/\\.well-known/matrix/client/?$";
@@ -177,9 +165,8 @@
 
           # Never actually reached: the redirect middleware answers before the
           # backend is dialled. Traefik still requires every router to name a
-          # service, so this is a deliberate dead end rather than noop@internal
-          # -- and if the redirect ever stops firing, a 502 here says so loudly
-          # instead of failing quietly.
+          # service, so this is a deliberate dead end -- if the redirect ever
+          # stops firing, a 502 here says so loudly instead of failing quietly.
           services.matrix-wellknown-sink.loadBalancer.servers = [
             { url = "http://127.0.0.1:1"; }
           ];
@@ -214,11 +201,9 @@
               # oCIS tus upload chunks. ownCloud's own traefik example
               # uses 12h for upload workloads.
               transport.respondingTimeouts.readTimeout = "12h";
-              # We keep TLS generic here; router will say which certResolver to use
               http = {
                 tls = { };
               };
-              # Trust forwarded headers from local network
               forwardedHeaders = {
                 trustedIPs = [
                   "192.168.3.0/24"
@@ -261,24 +246,16 @@
                 dnsChallenge = {
                   provider = "cloudflare";
                   # Check propagation against the zone's AUTHORITATIVE
-                  # nameservers, not a recursive resolver.
-                  #
-                  # These were 1.1.1.1 / 1.0.0.1, and that quietly broke every
-                  # new domain. lego queries the challenge name *before* it
-                  # creates the TXT record (walking up for the SOA), so the
-                  # recursive resolver caches an NXDOMAIN for it — and
-                  # phonkd.net's SOA minimum is 1800s, so that negative answer
-                  # sticks for 30 minutes while lego gives up after ~2. The
-                  # record was created correctly every time; lego just kept
-                  # being handed its own stale NXDOMAIN. Symptom was
+                  # nameservers, not a recursive resolver. These were
+                  # 1.1.1.1/1.0.0.1, and that quietly broke every new domain:
+                  # lego queries the challenge name *before* creating the TXT
+                  # record (walking up for the SOA), so the recursive resolver
+                  # caches an NXDOMAIN that sticks for phonkd.net's 1800s SOA
+                  # minimum while lego gives up after ~2 minutes. Symptom:
                   # `dns01: time limit exceeded: ... did not return the
-                  # expected TXT record`, and it took out all 14 names in the
-                  # home.phonkd.net migration at once. The earlier one-off on
-                  # affine.int.w was the same bug — a retry only "fixed" it by
-                  # landing on a different anycast node with a cold cache.
-                  #
-                  # Cloudflare's own nameservers answer authoritatively with no
-                  # caching layer, so the check sees the record immediately.
+                  # expected TXT record`, took out all 14 names in the
+                  # home.phonkd.net migration at once. Cloudflare's own
+                  # nameservers answer authoritatively with no caching layer.
                   # By name, not IP: these are anycast addresses that change
                   # (chin ≈ 108.162.192.84, drake ≈ 108.162.195.14 today).
                   resolvers = [
@@ -297,18 +274,15 @@
         dynamicConfigOptions = lib.recursiveUpdate autoTraefikConfig manualTraefikConfig;
       };
 
-      # systemd: load CF token env file correctly
+      # Secret file must contain: CF_DNS_API_TOKEN=supersecrettoken
       systemd.services.traefik.serviceConfig = {
-        # the secret file itself must contain lines like:
-        # CF_DNS_API_TOKEN=supersecrettoken
         EnvironmentFile = [ config.sops.secrets.CF_DNS_API_TOKEN.path ];
       };
 
       # Ship traefik's Prometheus metrics through the local Alloy into Mimir.
-      # Alloy loads every *.alloy file in /etc/alloy into one shared
-      # namespace, so this forwards straight into the remote_write pipeline
-      # that config.alloy (observability-sender module) defines. Gated on
-      # that tag so the reference can't dangle if the tags ever diverge.
+      # Alloy loads every *.alloy file in /etc/alloy into one shared namespace,
+      # forwarding into the remote_write pipeline config.alloy defines. Gated
+      # on that tag so the reference can't dangle if the tags ever diverge.
       environment.etc."alloy/traefik.alloy" = lib.mkIf (noughtyLib.hostHasTag "observability-sender") {
         text = ''
           prometheus.scrape "traefik" {

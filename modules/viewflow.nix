@@ -1,27 +1,17 @@
 # viewflow -- cross-device window sharing between g14 (Hyprland) and blac.
+# See plans/viewflow.md for the full design and pairing decision.
 #
-# See plans/viewflow.md for the full design, the hardware constraints and the
-# pairing decision. The short version of what this file is and is not:
+# Ships *packages on PATH*, not a service: pairing uses a per-session ephemeral
+# CA (7-day leaf certs), so there's no sops secret and nothing for a systemd
+# unit to hold -- deliberate, since upstream is pre-alpha with
+# session-terminating bugs still open. NVIDIA-only on Linux in *both* roles
+# (not a degraded fallback): the source bails without `--features
+# native-gpu-nvenc`, and the presenter's CMake requires CUDAToolkit with no
+# VAAPI/software path -- hence the hasNvidia gate below, and hence z14 can't
+# participate.
 #
-#   * It ships *packages on PATH*, not a service. Upstream is explicit that
-#     "nothing runs at login or changes the main desktop persistently", and
-#     pairing uses a per-session ephemeral CA (7-day leaf certs in a 0700 dir)
-#     rather than long-lived credentials -- so there is no sops secret to add
-#     and nothing for a systemd unit to hold. That is deliberate: upstream is
-#     pre-alpha with session-terminating bugs still open, and a package that is
-#     structurally incapable of running unattended cannot break a boot.
-#
-#   * It is NVIDIA-only on Linux, in *both* roles. Not a degraded fallback -- a
-#     refusal. The source bails without `--features native-gpu-nvenc`
-#     (crates/viewflowd/src/bin/vf-hyprland-windows.rs), and the presenter's
-#     CMake does `find_package(CUDAToolkit REQUIRED)` and creates only
-#     AV_HWDEVICE_TYPE_CUDA with no VAAPI or software path
-#     (platform/linux-reverse/gpu_decoder.cpp). Hence the hasNvidia gate below,
-#     and hence z14 cannot participate at all.
-#
-# The Windows half of the pair (blac booted into Windows) is NOT built here and
-# cannot be -- it needs MSVC, the Windows SDK and WGC/Media Foundation. Its
-# build and install steps are written up in plans/viewflow.md.
+# The Windows half of the pair (blac booted into Windows) is NOT built here --
+# needs MSVC/WGC/Media Foundation, see plans/viewflow.md.
 {
   self,
   inputs,
@@ -39,13 +29,11 @@ in
   perSystem =
     { system, ... }:
     let
-      # perSystem's default `pkgs` carries no unfree allowance, and the NVENC /
+      # perSystem's default `pkgs` carries no unfree allowance, and the NVENC/
       # CUDA builds need one. The host-wide `nixpkgs.config.allowUnfree = true`
-      # in modules/hosts/types/minimal/default.nix does NOT reach these: a host
-      # consumes them as `self.packages.<system>.*`, which is built with the
-      # flake's own nixpkgs instance rather than the host's. So scope the
-      # allowance to the CUDA/NVIDIA packages here instead of turning unfree on
-      # wholesale for every perSystem package in the repo.
+      # doesn't reach these (built with the flake's own nixpkgs, not the
+      # host's), so scope the allowance to CUDA/NVIDIA packages here instead of
+      # turning unfree on wholesale for every perSystem package in the repo.
       pkgs = import inputs.nixpkgs {
         inherit system;
         config.allowUnfreePredicate =
@@ -59,12 +47,10 @@ in
       inherit (pkgs) cudaPackages;
 
       # build.rs reaches for a *vendored prebuilt* protoc
-      # (protoc_bin_vendored::protoc_bin_path). That binary is a foreign ELF
-      # with an interpreter that does not exist in the sandbox, so it cannot
-      # run here. Point it at nixpkgs' protoc instead. The surrounding
-      # `.expect(...)` is kept by re-wrapping in a Result, so this stays a
-      # one-token substitution rather than a patch that will rot on the next
-      # rev bump.
+      # (protoc_bin_vendored::protoc_bin_path), a foreign ELF that can't run in
+      # the sandbox. Point it at nixpkgs' protoc instead, re-wrapping the
+      # surrounding `.expect(...)` in a Result so this stays a one-token
+      # substitution rather than a patch that rots on the next rev bump.
       protocPatch = ''
         substituteInPlace crates/viewflow-protocol/build.rs \
           --replace-fail 'protoc_bin_vendored::protoc_bin_path()' \
@@ -130,17 +116,14 @@ in
 
           env.PROTOC = "${pkgs.protobuf}/bin/protoc";
 
-          # The GPU encoder is configured by crates/viewflowd/build.rs, which
-          # runs `cmake` itself with a fixed argument list -- so there is no
-          # place to pass -DCUDAToolkit_ROOT or any other -D flag. CMake does
-          # honour CMAKE_LIBRARY_PATH / CMAKE_INCLUDE_PATH from the
-          # environment, and that is the only lever available here.
-          #
-          # It needs libcuda.so (`find_library(NAMES cuda)`), which ships with
-          # the *driver* rather than the toolkit. nixpkgs provides a build-time
-          # stub for it; the lib/stubs directory is not on any default search
-          # path, hence spelling it out. getOutput "stubs" falls back to `out`
-          # when there is no separate stubs output, so all layouts are covered.
+          # crates/viewflowd/build.rs runs `cmake` itself with a fixed argument
+          # list, so there's no place to pass -DCUDAToolkit_ROOT -- CMAKE_LIBRARY_PATH
+          # / CMAKE_INCLUDE_PATH from the environment is the only lever.
+          # Needs libcuda.so (`find_library(NAMES cuda)`), which ships with the
+          # *driver* rather than the toolkit; nixpkgs' build-time stub lives in
+          # lib/stubs, not on any default search path, hence spelling it out.
+          # getOutput "stubs" falls back to `out` when there's no separate
+          # stubs output, so all layouts are covered.
           preBuild = lib.optionalString withNvenc (
             let
               cudart = cudaPackages.cuda_cudart;
@@ -250,12 +233,11 @@ in
 
   # Self-gating, so it is safe to sit in builder.nix's alwaysImport list.
   #
-  # `hyprland` tag AND hasNvidia == blac and g14, and nothing else. The tag is
-  # load-bearing beyond taste: the *source* role talks Hyprland IPC and needs a
+  # `hyprland` tag AND hasNvidia == blac and g14, and nothing else. The tag
+  # matters beyond taste: the *source* role talks Hyprland IPC and needs a
   # capture plugin in the running compositor. z14 has the tag but is AMD, so
   # the GPU half of the gate is what keeps a CUDA closure off a laptop that
-  # could never run it. (Every desktop carries the tag now that KDE is gone;
-  # it used to mark the hosts running Hyprland *as well as* Plasma.)
+  # could never run it.
   flake.nixosModules.viewflow =
     {
       pkgs,
@@ -271,22 +253,14 @@ in
       ];
 
       # QUIC is UDP on a port chosen per session; 44220 is upstream's example
-      # and what plans/viewflow.md's configs use.
-      #
-      # This has to be opened explicitly, and the reason is worth recording
-      # because the obvious assumption is wrong: `services.tailscale.openFirewall`
-      # (modules/tailnet.nix) opens **only** udp/41641, tailscale's own transport,
-      # and nothing in this repo sets `networking.firewall.trustedInterfaces`.
-      # So the NixOS firewall filters traffic arriving on `tailscale0` exactly as
-      # it does on any other interface -- pairing over 100.64.0.x would have been
-      # blocked too, and a blocked QUIC handshake is silent rather than an error.
-      #
-      # Opened on all interfaces rather than scoped to one: the pair runs over
-      # the home LAN (blac is stationary, g14 is on wifi), and the LAN interface
-      # name differs per host and per link -- wlp2s0 on g14 today, enp9s0 on
-      # blac -- so pinning an interface here would be brittle. The exposure is
-      # one UDP port on a home LAN, behind mTLS: a peer without a certificate
-      # signed by the session's pair CA gets nowhere. Narrow it with
+      # and what plans/viewflow.md's configs use. Must be opened explicitly:
+      # `services.tailscale.openFirewall` opens only udp/41641, so the NixOS
+      # firewall filters `tailscale0` like any other interface, and a blocked
+      # QUIC handshake is silent rather than an error. Opened on all interfaces
+      # rather than scoped to one, since the LAN interface name differs per
+      # host (wlp2s0 on g14, enp9s0 on blac); exposure is one UDP port on the
+      # home LAN, behind mTLS (a peer without a cert signed by the session's
+      # pair CA gets nowhere). Narrow with
       # `networking.firewall.interfaces.<name>.allowedUDPPorts` if this ever
       # leaves the house.
       networking.firewall.allowedUDPPorts = [ 44220 ];

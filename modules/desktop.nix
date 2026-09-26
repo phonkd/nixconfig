@@ -40,17 +40,12 @@
       home.packages = with pkgs; [
         dracula-theme
         yt-dlp
-        # Visual disk-usage analyzer -- the requested "squirreldisk" is dead
-        # weight in nixpkgs (unfree, marked broken there, and dropped
-        # entirely from unstable once it depended on the removed webkitgtk
-        # 4.0), so this is the maintained stand-in doing the same job.
+        # Visual disk-usage analyzer -- "squirreldisk" is dead weight in nixpkgs
+        # (unfree, marked broken, dropped from unstable); maintained stand-in.
         qdirstat
-        # AFFiNE desktop client for the self-hosted server on 201 (see
-        # plans/affine.md). Linux-only on purpose: on the Mac, HM apps are
-        # symlinks into /nix/store under ~/Applications/Home Manager Apps,
-        # and Spotlight indexes neither symlinks nor the store -- the app
-        # installs but is unlaunchable. The Mac gets the homebrew cask
-        # instead (modules/hosts/types/gui/default.nix).
+        # AFFiNE desktop client for the self-hosted server on 201 (plans/affine.md).
+        # Linux-only: on the Mac, HM apps are store symlinks that Spotlight can't
+        # index and so can't launch -- the Mac gets the homebrew cask instead.
         affine
         # Latest Claude Code from the claude-code-nix flake, not the lagging
         # nixpkgs claude-code (see the input comment in flake.nix).
@@ -69,20 +64,11 @@
       # GTK configuration
       gtk = {
         enable = true;
-        # Kept from the KDE era: Plasma rewrote ~/.gtkrc-2.0 at runtime (KDE's
-        # GTK bridge), so every rebuild HM found an unmanaged file and tried to
-        # back it up -- failing the moment a .hm-backup from an earlier rebuild
-        # was already there ("Existing file '.gtkrc-2.0.hm-backup' would be
-        # clobbered"). Nothing writes that file behind HM's back any more, but
-        # the content is generated from the settings below either way, so there
-        # is still nothing worth preserving and no reason to start backing it
-        # up again.
+        # Nothing writes ~/.gtkrc-2.0 out-of-band anymore, but its content is
+        # fully generated below either way, so there's nothing worth backing up.
         gtk2.force = true;
-        # mkDefault throughout so a host or a session module can replace the
-        # whole look without mkForce. Nothing does today -- modules/hyprland/
-        # only layers wallpaper-derived @define-colors on top of this theme --
-        # but this is where the Windows 7 rice used to take over, and the
-        # defaults are still the right shape for the next thing that wants it.
+        # mkDefault throughout so a host or session module can replace the whole
+        # look without mkForce.
         theme = lib.mkDefault {
           package = pkgs.nordic;
           name = "Nordic-darker";
@@ -99,24 +85,14 @@
         };
       };
 
-      # The GTK4 line above is not enough on its own, and that is the whole
-      # reason EasyEffects -- and every other libadwaita app -- came up light
-      # on a dark desktop: libadwaita deliberately ignores
-      # `gtk-application-prefer-dark-theme`. It takes light-vs-dark from
-      # AdwStyleManager, which follows the XDG portal's
-      # `org.freedesktop.appearance color-scheme`, and xdg-desktop-portal-gtk
-      # answers that from exactly this dconf key.
-      #
-      # Unset (or `prefer-light`) means libadwaita loads its *light*
-      # stylesheet, so every name modules/hyprland/ does not override --
-      # card_bg_color, sidebar_bg_color, dialog_bg_color -- stays white. A
-      # window painted a dark `window_bg_color` full of white cards is what
-      # "some apps are in light mode" actually looks like.
-      #
-      # mkDefault for the same reason as the gtk block above. It is also the
-      # value modules/hyprland/_matugen.nix reads as `declaredColorScheme` and
-      # restores when the session stops, so this is the resting state of the
-      # key and not just its initial one.
+      # The GTK4 line above is not enough on its own: libadwaita (EasyEffects and
+      # every other libadwaita app) ignores `gtk-application-prefer-dark-theme`
+      # and instead takes light-vs-dark from AdwStyleManager, which follows the
+      # XDG portal's `org.freedesktop.appearance color-scheme` -- exactly this
+      # dconf key. Unset means libadwaita loads its light stylesheet, so
+      # card/sidebar/dialog bg colors stay white on an otherwise dark window --
+      # "some apps are in light mode". Also read by modules/hyprland/_matugen.nix
+      # as `declaredColorScheme` and restored when the session stops.
       dconf.settings."org/gnome/desktop/interface".color-scheme =
         lib.mkDefault "prefer-dark";
 
@@ -131,29 +107,18 @@
       ...
     }:
     let
-      # Desktop environment name comes from the registry via
-      # noughty.host.desktop. This module is the single place that maps
-      # that string onto an actual display-manager + desktop-manager, so
-      # hosts never hand-wire GDM/SDDM again -- flip the registry field.
+      # Desktop environment name comes from the registry (noughty.host.desktop);
+      # this module is the single place mapping it onto GDM/SDDM etc.
       de = config.noughty.host.desktop;
 
-      # The session list the greeter below offers: NixOS' merged
-      # wayland-sessions directory, minus "Hyprland (uwsm-managed)".
-      #
-      # That entry is *not* controlled by programs.hyprland.withUWSM (which
-      # only decides whether programs.uwsm gets enabled) -- the Hyprland
-      # package ships the .desktop file itself, so it shows up in the picker
-      # either way. Picking it hands the user's systemd session to uwsm, which
-      # starts graphical-session.target and wayland-wm@Hyprland.service and
-      # never touches hyprland-session.target -- the target every user service
-      # in modules/hyprland.nix is bound to. So it logs you into a compositor
-      # with no bar, no wallpaper daemon and no idle handling, which is exactly
-      # the "that option doesn't work" it earned. One Hyprland in the list,
-      # the one this repo is actually wired for.
-      #
-      # Copy-then-remove rather than copy-one-file: any other session a host
-      # installs still shows up, and a rename upstream degrades to "the uwsm
-      # entry is back", not "the list is empty".
+      # The session list the greeter below offers: NixOS' merged wayland-sessions
+      # directory, minus "Hyprland (uwsm-managed)". That entry ships with the
+      # Hyprland package itself (independent of programs.hyprland.withUWSM), and
+      # picking it hands the session to uwsm, which never touches
+      # hyprland-session.target -- the target every user service in
+      # modules/hyprland.nix is bound to, so it logs you into a compositor with
+      # no bar, no wallpaper daemon, no idle handling. Copy-then-remove rather
+      # than copy-one-file so any other session a host installs still shows up.
       sessionsWithoutUwsm = pkgs.runCommand "wayland-sessions-no-uwsm" { } ''
         mkdir -p $out/share/wayland-sessions
         cp ${config.services.displayManager.sessionData.desktops}/share/wayland-sessions/*.desktop \
@@ -167,28 +132,19 @@
       services.xserver.enable = true;
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
       services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
-      # There used to be a third branch here: KDE -- SDDM, Plasma 6 and the
-      # AeroThemePlasma shell, in modules/kde.nix. It is gone, and with it the
-      # only session blac and g14 had besides Hyprland; both now read
-      # `desktop = "hyprland"` in the registry and take the branch below.
 
-      # Hyprland desktops (blac, g14, z14 -- every NixOS desktop today):
-      # greetd running tuigreet, deliberately *not* SDDM. SDDM's Wayland
-      # greeter is a Qt/Plasma-shaped thing that leans on pieces a KDE-less
-      # host never installs -- a cursor theme above all -- and without them it
-      # comes up drawing no pointer at all. The greeter is still there and
-      # still takes keyboard input, but with nothing to point with the session
-      # dropdown is unreachable, so you are stuck with whatever entry happened
-      # to be preselected. tuigreet has no such failure mode: it is a text UI
-      # on VT1, so it needs no compositor, no Qt theme and no cursor, and it
-      # reads the very same wayland-sessions entries
+      # Hyprland desktops: greetd running tuigreet, deliberately *not* SDDM.
+      # SDDM's Wayland greeter leans on a cursor theme a KDE-less host never
+      # installs, and without it comes up drawing no pointer -- so the session
+      # dropdown is unreachable and you're stuck with whatever was preselected.
+      # tuigreet is a text UI on VT1: no compositor, no Qt theme, no cursor
+      # needed, and it reads the same wayland-sessions entries
       # `programs.hyprland.enable` installs -- session picker on F3.
       services.greetd = lib.mkIf (de == "hyprland") {
         enable = true;
-        # tuigreet draws on the VT directly, so systemd's boot chatter would
-        # otherwise scribble over it. This flag is upstream's fix: it sends the
-        # unit's stderr to the journal and gives it /dev/tty1 properly (TTYPath
-        # + TTYReset + TTYVTDisallocate).
+        # Sends the unit's stderr to the journal and gives it /dev/tty1 properly
+        # (TTYPath + TTYReset + TTYVTDisallocate) instead of boot chatter
+        # scribbling over tuigreet's direct VT draw.
         useTextGreeter = true;
         settings.default_session.command = lib.concatStringsSep " " [
           (lib.getExe pkgs.greetd.tuigreet)
@@ -198,39 +154,26 @@
           "--remember"
           "--remember-user-session"
           "--asterisks"
-          # tuigreet's built-in default is the FHS /usr/share path, which does
-          # not exist here. See `sessionsWithoutUwsm` above for what this is
-          # and why it isn't sessionData.desktops directly. With the uwsm entry
-          # gone this leaves exactly one session, so a first-ever login -- the
-          # case --remember-user-session has nothing remembered for -- lands on
-          # the right one without any default needing to be named.
+          # tuigreet's built-in default is the FHS /usr/share path, which
+          # doesn't exist here; sessionsWithoutUwsm above stands in.
           "--sessions ${sessionsWithoutUwsm}/share/wayland-sessions"
         ];
       };
-      # The Plymouth invariant the quiet-boot params below assume. kde.nix used
-      # to set this for the KDE hosts (PlymouthVista needed something to
-      # theme); this is the only place that turns it on now. mkDefault so a
-      # host can still opt out of the boot splash.
+      # mkDefault so a host can still opt out of the boot splash.
       boot.plymouth.enable = lib.mkIf (de == "hyprland") (lib.mkDefault true);
 
       # --- Quiet boot ---------------------------------------------------
-      # Desktops boot behind Plymouth (the branch above turns it on), so
-      # the kernel/udev/stage-1 chatter underneath just flickers past the
-      # splash -- nobody reads it, and on a failed boot you drop to a console
-      # anyway. Deliberately NOT applied to servers: when one of those fails
-      # to come up, the verbose console is the entire diagnosis.
-      #
-      # The recipe is upstream's, from the boot.initrd.verbose docs. Note the
-      # two params NixOS already emits for us: `loglevel=` comes from
-      # boot.consoleLogLevel (kernel.nix), and `splash` from boot.plymouth
-      # (plymouth.nix) -- writing either here by hand would duplicate it.
+      # Desktops boot behind Plymouth, so kernel/udev/stage-1 chatter just
+      # flickers past the splash. Deliberately NOT applied to servers: when one
+      # of those fails to come up, the verbose console is the entire diagnosis.
+      # `loglevel=` and `splash` are already emitted by boot.consoleLogLevel and
+      # boot.plymouth respectively -- writing either here would duplicate it.
       boot.kernelParams = [
         "quiet"
         "udev.log_level=3"
       ];
-      # 3 = KERN_ERR, not upstream's 0: silences the boot narration but still
-      # lets a real error reach the console. Also becomes the kernel.printk
-      # sysctl (mkDefault), so it governs runtime dmesg-to-console too.
+      # 3 = KERN_ERR, not upstream's 0: silences boot narration but still lets a
+      # real error reach the console; also becomes the runtime dmesg sysctl.
       boot.consoleLogLevel = 3;
       boot.initrd.verbose = false;
 
@@ -245,25 +188,16 @@
       services.hardware.bolt.enable = true;
       services.gvfs.enable = true;
 
-      # --- What Plasma used to provide for free -------------------------
-      # These came with services.desktopManager.plasma6 on blac and g14, and
-      # had to be asked for by hand on z14, the one host that never ran it.
-      # With modules/kde.nix gone there is no desktop environment on any of
-      # them, so the baseline owns them and z14 stops being the special case.
-      #
-      # upower: battery/AC state on D-Bus. The status bar reads it, and so
-      # does anything that wants to know the lid is on mains.
+      # --- Desktop baseline (no DE provides these) -----------------------
+      # upower: battery/AC state on D-Bus, read by the status bar.
       services.upower.enable = lib.mkDefault true;
       # power-profiles-daemon: the performance/balanced/power-saver switch.
-      # g14 in particular would have lost this the moment Plasma left -- it
-      # had upower of its own but never ppd, because plasma6.nix was supplying
-      # it. tlp stays off everywhere; the two fight over the same CPU governor.
+      # tlp stays off everywhere; the two fight over the same CPU governor.
       services.power-profiles-daemon.enable = lib.mkDefault true;
-      # A Secret Service (org.freedesktop.secrets). KDE's ksecretd owned that
-      # name, and the ProtonVPN app below needs *something* to own it or its
-      # login has nowhere to put a token. gnome-keyring is the DE-agnostic
-      # implementation; the PAM line is what unlocks it with the password
-      # already typed at greetd, rather than prompting a second time.
+      # A Secret Service (org.freedesktop.secrets) -- the ProtonVPN app below
+      # needs one to own for its login token. gnome-keyring is the DE-agnostic
+      # implementation; the PAM line unlocks it with the password already typed
+      # at greetd, rather than prompting a second time.
       services.gnome.gnome-keyring.enable = true;
       security.pam.services.greetd.enableGnomeKeyring = true;
       users.users.phonkd.extraGroups = [
@@ -285,11 +219,10 @@
 
       programs.dconf.enable = true;
       users.users.phonkd.packages = with pkgs; [
-        # Zen Browser (Firefox fork) from the zen-browser-flake input. Native
-        # GPU accel since the flake follows our nixpkgs (no nixGL needed on
-        # NixOS). Via modules/zen-browser.nix rather than the input directly:
-        # that is where the smooth-scrolling prefs are set, and the SUPER-B
-        # launcher in modules/hyprland/_scope.nix has to get the same build.
+        # Zen Browser (Firefox fork) via modules/zen-browser.nix rather than the
+        # zen-browser-flake input directly: that's where the smooth-scrolling
+        # prefs live, and the SUPER-B launcher in modules/hyprland/_scope.nix
+        # has to get the same build.
         self.packages.${pkgs.system}.zen-browser
         gst_all_1.gstreamer
         gst_all_1.gst-plugins-base
@@ -303,24 +236,17 @@
         obs-studio
         vlc
         wireguard-tools
-        # ProtonVPN — for untrusted/public wifi. The official GTK client
-        # (tray icon, server picker, kill switch, NetShield), not a
-        # declarative wg-quick tunnel like 203's: here you want to pick a
-        # nearby country on the spot, which is runtime state, not config.
-        # 203 is headless with one fixed egress, so the declarative shape
-        # fits there and not here. Nothing connects until you click it.
-        #
-        # Needs two things beyond the package, both already true here: the
-        # "networkmanager" group above (the app drives NM), and a Secret
-        # Service for its login. That used to be KDE's ksecretd, which owned
-        # org.freedesktop.secrets on its own; with KDE gone it is
-        # gnome-keyring, enabled in the baseline block above.
+        # ProtonVPN — for untrusted/public wifi. The official GTK client (tray
+        # icon, server picker, kill switch, NetShield), unlike 203's declarative
+        # wg-quick tunnel: here you want to pick a nearby country on the spot,
+        # which is runtime state. Needs the "networkmanager" group above (drives
+        # NM) and the gnome-keyring Secret Service above (login token). Nothing
+        # connects until you click it.
         proton-vpn
         # Tray applet for tailscale — its exit-node picker is how the 201-mono
-        # exit node gets toggled by hand, so there is no wrapper script for it.
-        # Equivalent to `tailscale set --exit-node=201-mono` / `--exit-node=`,
-        # which work just as well from a shell (--operator=phonkd in
-        # modules/tailnet.nix is what lets both do it without sudo).
+        # exit node gets toggled by hand; equivalent to `tailscale set
+        # --exit-node=201-mono` / `--exit-node=` from a shell (--operator=phonkd
+        # in modules/tailnet.nix lets both do it without sudo).
         trayscale
         exfat
         spotify
@@ -358,36 +284,22 @@
         pulse.enable = true;
       };
 
-      # Make the volume of EasyEffects' virtual sink mean something -- on the
-      # hosts that asked for it.
-      #
-      # The switch is `noughty.hyprland.loudnessKnob`, declared in
-      # modules/hyprland.nix because the Alt+M binds it also controls live
-      # there, and this rule exists only to serve those binds. The two move
-      # together on purpose: a host with the rule and no binds gains nothing
-      # and loses a cosmetic mute, and a host with the binds and no rule gets
-      # two keys that appear to do nothing at all.
+      # Make the volume of EasyEffects' virtual sink mean something, gated on
+      # `noughty.hyprland.loudnessKnob` (modules/hyprland.nix, where the Alt+M
+      # binds live too -- the two move together on purpose).
       #
       # EasyEffects builds its filter chain off `easyeffects_sink`'s MONITOR
-      # ports, and a monitor tap is taken BEFORE the node's volume and mute
-      # stage by default -- so that recording what is playing does not come out
-      # quiet just because the volume is down. Sensible for a recorder, wrong
-      # here: it means the sink's own volume lands on a path nothing in the
-      # graph listens to, and turning it does nothing at all.
+      # ports, and by default a monitor tap is taken BEFORE the node's volume/
+      # mute stage (sensible for a recorder, wrong here: turning the sink's
+      # volume does nothing at all). This moves the tap to after the volume
+      # stage, which is what makes the Alt+M loudness knob
+      # (modules/hyprland/ee-volume.nix) work, and makes muting that sink real.
       #
-      # This moves the tap to after the volume stage, which is what makes the
-      # Alt+M loudness knob in modules/hyprland/ee-volume.nix work -- the
-      # preset's bass lift is level-driven, so the knob that changes the tone
-      # has to attenuate what the chain receives. It also means muting that
-      # sink now really mutes, where it used to be cosmetic, and that anything
-      # capturing easyeffects_sink.monitor records at the knob's level.
-      #
-      # `node.rules` rather than a WirePlumber rule: the property is read when
-      # the adapter is built, and easyeffects_sink is created through the
-      # server-side `support.null-audio-sink` factory, so the core's own rules
-      # are what reach it in time. Setting it at runtime with pw-cli instead
-      # silences the monitor on the next volume change rather than attenuating
-      # it -- a dead end, already investigated, do not repeat it.
+      # `node.rules`, not a WirePlumber rule: easyeffects_sink is created
+      # through the server-side `support.null-audio-sink` factory, so only the
+      # core's own rules reach it in time. Setting it at runtime with pw-cli
+      # only silences the monitor on the next volume change rather than
+      # attenuating it -- already investigated, do not repeat it.
       services.pipewire.extraConfig.pipewire."60-easyeffects-volume" =
         lib.mkIf config.noughty.hyprland.loudnessKnob {
           "node.rules" = [
@@ -416,15 +328,12 @@
 
       environment.systemPackages = [
         # `deploy <host> [branch]` -- the deploy-rs wrapper from
-        # modules/deploy.nix. Every NixOS desktop gets it, not just g14 (which
-        # carried it per-host until now): the deploy nodes in lib/registry.nix
-        # are tailnet IPs and modules/tailnet.nix enrols nixosDesktop hosts too,
-        # so `deploy 201` resolves from any of them. Nothing here makes a
-        # desktop deployABLE -- that is `deploy.hostname` in the registry, which
-        # no desktop sets; these are deploy *clients*.
-        #
-        # Offload is the other half and it does NOT come with the CLI: see the
-        # `builder-client` import next to each desktop in lib/registry.nix.
+        # modules/deploy.nix. Every NixOS desktop gets it: registry deploy nodes
+        # are tailnet IPs and modules/tailnet.nix enrols desktops too, so
+        # `deploy 201` resolves from any of them. These are deploy *clients* --
+        # deployABLE is `deploy.hostname` in the registry, which no desktop sets.
+        # Offload is separate: see `builder-client` next to each desktop in
+        # lib/registry.nix.
         self.packages.${pkgs.system}.deploy-cli
       ]
       ++ (with pkgs; [

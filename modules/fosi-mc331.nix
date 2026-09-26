@@ -1,16 +1,11 @@
 # Fosi Audio MC331 -- stop the DSP noise gate chopping up quiet passages.
 #
 # The amp ships with its noise-suppressor threshold at -68 dB, which cuts off
-# fade-ins, film ambience and anything played quietly. The threshold is
-# writable over USB, but the amp's MCU reloads the factory parameter set into
-# the DSP at every power-on, so there is nothing to configure once -- the
-# packet has to be re-sent whenever the amp comes back. That is the whole
-# reason this is a service and not a one-off.
-#
-# plans/fosi-mc331-noise-gate.md has the decoded frame format and the hardware
-# reasoning; modules/fosi-mc331-fix.py is the sender.
-#
-# Self-gates on the "fosi-mc331" host tag.
+# fade-ins and anything played quietly. Writable over USB, but the amp's MCU
+# reloads the factory parameter set into the DSP at every power-on, so the
+# packet has to be re-sent whenever the amp comes back -- hence a service, not
+# a one-off. plans/fosi-mc331-noise-gate.md has the decoded frame format;
+# modules/fosi-mc331-fix.py is the sender. Self-gates on the "fosi-mc331" tag.
 { ... }:
 {
   flake.nixosModules.fosi-mc331 =
@@ -24,16 +19,11 @@
       let
         python = pkgs.python3.withPackages (ps: [ ps.pyusb ]);
 
-        # No args -> the community Android app's payload verbatim, which is the
-        # only thing confirmed to work on this amp. Deliberately not "improved":
-        # it carries the *stock* -68 dB threshold, so it is the flags byte
-        # rather than the threshold that calls the gate off, and the -90 dB
-        # value the forum quotes was only ever proven under a framing we now
-        # know the amp ignores.
-        #
-        # Arguments pass straight through for experiments now that the framing
-        # is right: `fosi-mc331-fix -90` for a threshold, `--flags 0x00` for the
-        # other reading of that byte.
+        # No args -> the community Android app's payload verbatim, the only
+        # thing confirmed to work: it carries the *stock* -68 dB threshold, so
+        # it's the flags byte, not the threshold, that turns the gate off.
+        # Arguments pass through for experiments: `fosi-mc331-fix -90` for a
+        # threshold, `--flags 0x00` for the other reading of that byte.
         fosi-mc331-fix = pkgs.writeShellScriptBin "fosi-mc331-fix" ''
           exec ${python}/bin/python3 ${./fosi-mc331-fix.py} "$@"
         '';
@@ -42,12 +32,10 @@
         environment.systemPackages = [ fosi-mc331-fix ];
 
         # Match the USB device, not hidraw: this amp's HID interface has no
-        # endpoints, so usbhid never binds it and /dev/hidraw* never appears for
-        # it -- the sender talks control transfers through /dev/bus/usb instead.
-        #
-        # Both PIDs are matched because the amp re-enumerates under a different
-        # one depending on the input selector (1717 = USB, 171E = OPT/AUX/BT).
-        # Handy side effect: turning the selector also re-fires the fix.
+        # endpoints, so /dev/hidraw* never appears -- the sender talks control
+        # transfers through /dev/bus/usb instead. Both PIDs matched because the
+        # amp re-enumerates under a different one per input selector (1717 =
+        # USB, 171E = OPT/AUX/BT); turning the selector also re-fires the fix.
         services.udev.extraRules = ''
           ACTION=="add", SUBSYSTEM=="usb", ATTR{idVendor}=="8888", ATTR{idProduct}=="1717|171e", TAG+="systemd", ENV{SYSTEMD_WANTS}+="fosi-mc331-fix.service"
         '';

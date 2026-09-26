@@ -11,10 +11,8 @@ in
   flake.homeModules.work-external-config =
     { pkgs, ... }:
     {
-      # NB: no jjconfig.nix. It was imported here but has never existed in the
-      # bedag-setup checkout (not tracked, not on disk), which made this module
-      # fail to evaluate on any host not carrying an untracked local copy --
-      # the first reason the work setup could not simply be imported on Linux.
+      # NB: no jjconfig.nix -- it doesn't exist in the bedag-setup checkout, and
+      # importing it fails eval on any host without an untracked local copy.
       imports = [
         "${bedagSetup}/ssh.nix"
         "${bedagSetup}/shell.nix"

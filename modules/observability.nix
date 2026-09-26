@@ -239,12 +239,9 @@
       #   # add a line:  grafana-secret-key: <openssl rand -base64 32>
       sops.secrets."grafana-secret-key".owner = "grafana";
 
-      # Expose the stack on the TAILNET only — never publicly. Senders push
-      # to 100.64.0.4 (see obsHost below); Grafana is reached the same way.
-      # Access is bounded by the headscale ACL, which is a tighter boundary
-      # than the wg-obs tunnel it replaces: that carried every home RFC1918
-      # range (10/8, 172.16/12, 192.168/16), so any host on any home subnet
-      # could reach these ports. See plans/retire-wg-obs.md.
+      # Expose the stack on the TAILNET only — never publicly. Senders push to
+      # 100.64.0.4 (see obsHost below); Grafana is reached the same way. Access
+      # is bounded by the headscale ACL. See plans/retire-wg-obs.md.
       networking.firewall.interfaces.tailscale0.allowedTCPPorts = [
         grafanaPort
         lokiHttpPort
@@ -460,16 +457,14 @@
           #
           # `rules sync` is a mirror operation: it deletes any namespace not
           # present in the given files, tenant-wide. rulesFile lives at a
-          # hashed nix store path, so passing it directly would make the
-          # namespace name (mimirtool derives it from the filename) churn
-          # every time the rule content changes, and — worse — a bare `sync`
-          # would wipe out any other namespace in this tenant, including ones
-          # a tool like Hermes creates dynamically via the same API. Copying
-          # to a fixed filename fixes the namespace as "homelab", and
-          # --namespaces=homelab scopes the sync to only that namespace so
-          # everything else is left alone. Verified live against the
-          # observability server: an unscoped sync deleted an unrelated
-          # namespace it had no business touching.
+          # hashed nix store path, so passing it directly would churn the
+          # namespace name (mimirtool derives it from the filename) on every
+          # content change, and a bare `sync` would wipe out any other
+          # namespace in this tenant (e.g. ones Hermes creates dynamically via
+          # the same API). Copying to a fixed filename fixes the namespace as
+          # "homelab"; --namespaces=homelab scopes the sync so everything else
+          # is left alone — verified live: an unscoped sync deleted an
+          # unrelated namespace it had no business touching.
           script = ''
             install -m 0644 ${rulesFile} /run/mimir-rules-sync/homelab.yaml
             for i in $(seq 1 30); do
@@ -486,11 +481,8 @@
     };
 
   # ───────────────────────────────────────────────────────────────────────────
-  # Sender side (tag "observability-sender") — stub.
-  #
-  # Home VMs will ship logs/metrics to the central stack from here (Grafana
-  # Alloy / Promtail → Loki, Prometheus remote_write / Alloy → Mimir).
-  # Wired up later — no host carries this tag yet, so this module is inert.
+  # Sender side (tag "observability-sender"): ships logs/metrics to the
+  # central stack via Grafana Alloy (Loki + Mimir remote_write).
   # ───────────────────────────────────────────────────────────────────────────
   flake.nixosModules.observability-sender =
     {

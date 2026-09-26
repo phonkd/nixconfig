@@ -9,27 +9,21 @@
   # Cross-platform HM half of the work setup. Imported by mac.nix directly,
   # and on NixOS by `nixosModules.work` below.
   #
-  # Deliberately thin. The work config itself is private and lives in the
-  # separate work repo (imported by path in external.nix) -- this repo is
-  # public, so it carries only the wiring, never the content. There used to be
-  # a `work-tools` module here duplicating that repo's own tools.nix package
-  # list almost exactly; both were imported, so the public copy was redundant
-  # as well as a needless disclosure of the work toolchain. It is gone, and
-  # the private list is now the single source.
+  # Deliberately thin: the work config itself is private, in the separate work
+  # repo (imported by path in external.nix); this repo carries only the
+  # wiring, never the content.
   flake.homeModules.work =
     { pkgs, ... }:
     {
       imports = [
         self.homeModules.work-external-config
-        # NB: `homeModules.proxy` is deliberately NOT imported here even though
-        # the work ssh config's `Host *` catch-all depends on it. On the Mac,
+        # `homeModules.proxy` is deliberately NOT imported here even though the
+        # work ssh config's `Host *` catch-all depends on it: on the Mac,
         # gui-darwin already imports it for every darwin desktop, and a second
         # import path to the same function module would duplicate its option
-        # definitions (Nix can't dedupe function modules), colliding on
-        # `home.sessionVariables`. Linux does not import it at all any more:
-        # the proxy is a *system* service there (`nixosModules.proxy`, which
-        # `nixosModules.work` below just enables), so `homeModules.proxy` is
-        # darwin-only and still reached by exactly one path.
+        # definitions, colliding on `home.sessionVariables`. On Linux the proxy
+        # is a *system* service (`nixosModules.proxy`, enabled below), so
+        # `homeModules.proxy` stays darwin-only and reached by one path.
       ];
     };
 
@@ -38,19 +32,16 @@
   # The work repo's ssh.nix ends in a `Host *` catch-all whose ProxyCommand is
   # `socat - SOCKS:127.0.0.1:%h:%p,socksport=2080`, and ssh_config is
   # first-match-wins *per keyword*: a block that matches earlier but says
-  # nothing about ProxyCommand still inherits the catch-all's. So bypassing it
-  # takes an explicit `ProxyCommand none`, not merely an earlier block --
-  # the same reason modules/hosts/mac.nix spells it out on every tailnet entry.
+  # nothing about ProxyCommand still inherits the catch-all's, so bypassing it
+  # takes an explicit `ProxyCommand none` (same reason mac.nix spells it out on
+  # every tailnet entry). home-manager renders all `matchBlocks` before
+  # `extraConfig` (where that catch-all blob lands), so this is guaranteed to
+  # sit above it.
   #
-  # Ordering is in our favour: home-manager renders all `matchBlocks` first and
-  # only then `extraConfig` (which is where that whole blob lands), so
-  # anything declared here is guaranteed to sit above the catch-all.
-  #
-  # This is the Linux counterpart of those mac.nix blocks and is imported ONLY
-  # from nixosModules.work -- the Mac already declares its own, and two
-  # definitions of the same matchBlock name would collide. Unlike the Mac, no
-  # `hostname` mapping is needed: NixOS hosts accept MagicDNS (tailscaled owns
-  # resolv.conf -- see modules/tailnet.nix), so the short names resolve.
+  # Linux counterpart of the mac.nix blocks, imported ONLY from
+  # nixosModules.work (the Mac declares its own; two definitions of the same
+  # matchBlock name would collide). No `hostname` mapping needed here: NixOS
+  # hosts accept MagicDNS (modules/tailnet.nix), so short names resolve.
   flake.homeModules.work-ssh-bypass =
     { lib, ... }:
     {
@@ -85,11 +76,6 @@
 
   # NixOS half, gated on the "work" host tag (lib/registry.nix). Wired via
   # builder.nix alwaysImport, same as every other cross-host feature module.
-  #
-  # This replaces a `flake.module.nixos."work"` that was dead code: nothing in
-  # this flake ever read `flake.module.*` -- the builder consumes
-  # `flake.nixosModules.*` -- so the yubikey/pcscd bits below never reached a
-  # single host despite being written years ago.
   flake.nixosModules.work =
     {
       pkgs,
@@ -99,65 +85,35 @@
       ...
     }:
     let
-      # Citrix Workspace, for the ICA sessions.
+      # Citrix Workspace, for the ICA sessions. Pulled from nixpkgs-unstable's
+      # `citrix-workspace` (our pin only has `citrix_workspace_26_01_0`, which
+      # links libsoup 2.4 -- nixpkgs marks it insecure and needs a
+      # `permittedInsecurePackages` allowance, and current nixpkgs has already
+      # replaced it with a `throw` for that reason). Unstable's build is the
+      # GCC 11 line (libsoup 3 + WebKitGTK 4.1, no allowance needed) and
+      # carries the `wfica` X11 pin (NixOS/nixpkgs#540102): wfica is an X11
+      # client under XWayland, and without the pin Mesa's EGL loader selects
+      # the Wayland platform for its startup GL probe and segfaults in
+      # wl_proxy_create_wrapper -- every launch, since Hyprland is the only
+      # session on the host carrying this tag.
       #
-      # This used to read `citrix-workspace` straight out of `pkgs`, which does
-      # not exist on our pin -- nixpkgs only renamed the attribute away from
-      # `citrix_workspace*` later. `lib.optional` is lazy and the option below
-      # defaults false, so the missing attribute never evaluated and the
-      # mistake stayed invisible: the first `citrix.enable = true` would have
-      # failed eval with `attribute 'citrix-workspace' missing` rather than
-      # installing anything.
-      #
-      # Naming the pin's real attribute instead would mean
-      # `citrix_workspace_26_01_0`, which is a trap of its own: it links
-      # libsoup 2.4, which nixpkgs marks insecure, so that does not evaluate
-      # either without a system-wide
-      # `permittedInsecurePackages = [ "libsoup-2.74.3" ]` on this host. It is
-      # also a dead end -- current nixpkgs has already replaced that attribute
-      # with a `throw` for exactly that reason, so it would break at the next
-      # flake bump. Unstable's `citrix-workspace` is the GCC 11 package line,
-      # links libsoup 3 + WebKitGTK 4.1, and needs no allowance.
-      #
-      # It also carries the `wfica` X11 pin (NixOS/nixpkgs#540102) that the pin
-      # lacks, and that one matters here specifically: wfica is an X11 client
-      # running under XWayland, and on a Wayland session Mesa's EGL loader
-      # otherwise selects the Wayland platform for its startup GL probe and it
-      # segfaults in wl_proxy_create_wrapper. Hyprland is the only session on
-      # the one host carrying this tag, so that would be every launch.
-      #
-      # `import` rather than the `inputs.nixpkgs-unstable.legacyPackages.<sys>`
-      # spelling used in modules/zed-editor.nix and modules/desktop.nix: those
-      # pull *free* packages, and an input's bare legacyPackages carries that
-      # input's own default config, where allowUnfree is false. Ours is set on
-      # the host, not on the input.
+      # `import`, not the `inputs.nixpkgs-unstable.legacyPackages.<sys>`
+      # spelling used elsewhere: that pulls *free* packages via the input's own
+      # default config (allowUnfree false); ours is set on the host.
       unstable = import inputs.nixpkgs-unstable {
         inherit (pkgs.stdenv.hostPlatform) system;
         config.allowUnfree = true;
       };
 
-      # Re-pinned off nixpkgs' 26.04.0.105, which cannot be obtained any more.
-      #
-      # That version is a *tech preview* build, and Citrix does not keep those
-      # around: by the time this was wired up, 26.04 had been demoted to
-      # "Earlier Versions", where only the `linuxx64-gcc-8-26.04.0.105.tar.gz`
-      # variant is still published. The GCC 8 tarball is not interchangeable
-      # with the GCC 11 one this expression is written against -- different
-      # build line, different checksum, and the expression strips a
-      # WebKitGTK 4.0 bundle and links libsoup 3 on the assumption of GCC 11 --
-      # so feeding it the file that *is* still downloadable would not have
-      # worked either.
-      #
-      # 26.08.0.153 is the current tech preview and the same GCC 11 line, so
-      # only the version and the file it asks for change. Nothing else in the
-      # expression reads `version` (it appears in `src.name` and in the
-      # requireFile message, nothing more), which is what makes this a clean
-      # two-field override rather than a fork of the package.
-      #
-      # Expect to redo this. Citrix rotates tech previews out of the download
-      # portal, so the version here goes stale the same way 26.04 did; when the
-      # build starts asking for a tarball the portal no longer lists, bump both
-      # fields to whatever the tech preview page currently offers.
+      # Re-pinned to 26.08.0.153, the current *tech preview* build (same GCC 11
+      # line the expression is written against). Citrix rotates tech previews
+      # out of the download portal and demotes old ones to "Earlier Versions",
+      # where only a GCC 8 tarball remains -- not interchangeable with this
+      # GCC 11 expression (different checksum, assumes libsoup 3 + no
+      # WebKitGTK 4.0 bundle). Nothing else in the expression reads `version`
+      # (only `src.name` and the requireFile message), so this stays a clean
+      # two-field override. Expect to redo this: bump both fields to whatever
+      # the tech preview page currently offers when the hash stops matching.
       citrixWorkspace = unstable.citrix-workspace.overrideAttrs (prev: {
         version = "26.08.0.153";
         src = unstable.requireFile {
@@ -225,22 +181,13 @@
           [
             yubioath-flutter
 
-            # Teams. `pkgs.teams` is the Mac cask's counterpart and is
-            # darwin-only (its `platforms` lists only x86_64/aarch64-darwin),
-            # so this unofficial Electron wrapper is the only packaged route
-            # on Linux -- the alternative was the PWA, which is the same
-            # Electron shell with fewer knobs.
-            #
-            # Screen sharing -- the part that actually breaks -- needs nothing
-            # added here, which is worth stating because it looks like it
-            # should. It wants three things and z14 already has all three:
-            # xdg-desktop-portal-hyprland (installed by programs.hyprland, see
-            # modules/hyprland/_nixos.nix), pipewire (modules/desktop.nix), and
-            # the app launched with `--enable-features=WebRTCPipeWireCapturer`.
-            # The last one is in the nixpkgs wrapper already, guarded on
-            # `NIXOS_OZONE_WL` + `WAYLAND_DISPLAY` being set -- and
-            # modules/desktop.nix:407 sets NIXOS_OZONE_WL = "1". So an
-            # overrideAttrs re-adding those flags would be pure duplication.
+            # Teams. `pkgs.teams` (the Mac cask's counterpart) is darwin-only,
+            # so this unofficial Electron wrapper is the packaged route here.
+            # Screen sharing needs nothing added here even though it looks like
+            # it should: it wants xdg-desktop-portal-hyprland, pipewire, and
+            # `--enable-features=WebRTCPipeWireCapturer` guarded on
+            # NIXOS_OZONE_WL + WAYLAND_DISPLAY, all already true (the wrapper
+            # sets the flag itself; modules/desktop.nix sets NIXOS_OZONE_WL).
             teams-for-linux
           ]
           # let-bound above, not a pkgs attribute -- a `let` binding wins over
@@ -248,33 +195,25 @@
           ++ lib.optional config.noughty.work.citrix.enable citrixWorkspace;
 
         # DisplayLink. Membership in this list is the *sole* gate on
-        # nixos/modules/hardware/video/displaylink.nix, which is what brings
-        # the evdi kernel module, the udev rules and the dlm service.
-        #
-        # Two things that module does are Xorg-shaped and simply inert here,
-        # rather than broken: its `sessionCommands` xrandr call only runs in an
-        # X session, and its `after = [ "display-manager.service" ]` orders
-        # against a unit z14 does not have (greetd, per modules/desktop.nix) --
-        # systemd ignores ordering against absent units, so nothing blocks.
-        # dlm is not `wantedBy` anything either way: the displaylink package's
-        # own udev rules start it when the dock appears, which is what we want.
+        # nixos/modules/hardware/video/displaylink.nix (evdi kernel module,
+        # udev rules, dlm service). Two things that module does are Xorg-shaped
+        # and simply inert here, not broken: its `sessionCommands` xrandr call
+        # only runs in an X session, and its `display-manager.service`
+        # ordering targets a unit z14 doesn't have (greetd) -- systemd ignores
+        # ordering against absent units. dlm starts via the package's own udev
+        # rules when the dock appears.
         services.xserver.videoDrivers = lib.mkIf config.noughty.work.displaylink.enable [
           "displaylink"
         ];
 
-        # The Linux side of the sing-box proxy. It is no longer a home-manager
-        # import at all: on NixOS it is a *system* service, so all this does is
-        # flip the switch on `nixosModules.proxy` (which alwaysImport already
-        # carries and which self-gates on this option). See the note in
-        # `homeModules.work` for why the proxy hangs off the platform modules
-        # rather than off `work` itself.
+        # The Linux side of the sing-box proxy: a *system* service, so this
+        # just flips the switch on `nixosModules.proxy` (self-gated on this
+        # option). See the note in `homeModules.work` for why the proxy hangs
+        # off the platform modules rather than off `work` itself.
         #
-        # What this gets is an opt-in HTTP/SOCKS proxy on 127.0.0.1:2080.
-        # Nothing is captured: the tun that briefly made this a system-wide
-        # proxy has been removed, so the homelab rides tailscaled and anything
-        # ignoring `$http_proxy` goes direct. modules/proxy/nixos.nix has the
-        # why; the README next to it has what the tun cost to get working,
-        # should it ever be wanted again.
+        # Opt-in HTTP/SOCKS proxy on 127.0.0.1:2080 only -- no tun, nothing
+        # captured; the homelab rides tailscaled and anything ignoring
+        # `$http_proxy` goes direct. modules/proxy/nixos.nix has the why.
         noughty.proxy.enable = true;
 
         home-manager.users.${config.noughty.user.name}.imports = [

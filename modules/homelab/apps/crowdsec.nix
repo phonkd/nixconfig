@@ -7,11 +7,10 @@
   flake.nixosModules."homelab-crowdsec" = { config, pkgs, lib, noughtyLib, ... }:
     lib.mkIf (noughtyLib.hostHasTag "homelab-server") {
       # No phonkds.modules registry entry: the LAPI on 8081 is a
-      # machine-to-machine REST API with no web UI, so a traefik route
-      # would 404 forever. Dashboards live at app.crowdsec.net (console,
-      # see enroll note below) and in Grafana ("CrowdSec Metrics" and
-      # "CrowdSec Firewall Bouncer", modules/grafana-dashboards) via the
-      # Alloy scrapes at the bottom of this file.
+      # machine-to-machine REST API with no web UI. Dashboards live at
+      # app.crowdsec.net (console, see enroll note below) and in Grafana
+      # ("CrowdSec Metrics"/"CrowdSec Firewall Bouncer") via the Alloy
+      # scrapes at the bottom of this file.
       services.crowdsec = {
         enable = true;
         autoUpdateService = true;
@@ -28,38 +27,25 @@
           }
           {
             # Traefik logs come from Loki rather than the local journal:
-            # traefik already ships app+access logs to Loki via OTLP (see
-            # traefik.nix), and 201 reaches Loki over the tailnet as an
-            # observability-sender. crowdsec tails the query below via
-            # Loki's websocket API. labels.type feeds the s00-raw
-            # non-syslog parser, which sets program="traefik" — the hub
-            # traefik parser's filter matches on that.
+            # traefik ships app+access logs to Loki via OTLP (traefik.nix), and
+            # crowdsec tails the query below via Loki's websocket API.
+            # labels.type feeds the s00-raw non-syslog parser, which sets
+            # program="traefik" — the hub traefik parser's filter matches on
+            # that.
             source = "loki";
             url = "http://100.64.0.4:3100";
             query = ''{service_name="traefik"}'';
             labels.type = "traefik";
-            # Do NOT make startup depend on the tailnet being converged.
-            # By default the datasource probes <url>/ready for
-            # wait_for_ready (10s) before acquisition starts and a failure
-            # there is FATAL — crowdsec exits with "loki is not ready:
-            # context deadline exceeded". Loki is only reachable from 201
-            # over the tailnet (100.64.0.4; the wg-obs 10.9.0.1 path does
-            # not exist here — 201's wg0 is the client VPN on 10.8.0.0/24),
-            # and the tailnet takes 1-2 minutes to reconverge after
-            # activation restarts tailscaled. So every deploy was a coin
-            # flip; it lost on 2026-08-14 19:05:36 and rolled back an
-            # otherwise fine generation.
-            #
-            # no_ready_check skips that probe, so StreamingAcquisition
-            # returns immediately and the start job succeeds. The tail is
-            # not silently dropped: its background query loop retries with
-            # exponential backoff, logging "loki is not available, will
-            # retry for 10m0s" and then "loki is back after ...". Only
-            # after max_failure_duration of CONTINUOUS failure does the
-            # source give up and crowdsec exit — so a genuinely dead Loki
-            # still surfaces, it just no longer punishes a 2-minute tailnet
-            # reconvergence. (Upstream default is 30s, which is shorter than
-            # the reconvergence itself.)
+            # Do NOT make startup depend on the tailnet being converged. By
+            # default the datasource probes <url>/ready before acquisition
+            # starts and a failure there is FATAL. The tailnet takes 1-2
+            # minutes to reconverge after activation restarts tailscaled, so
+            # every deploy was a coin flip; it lost on 2026-08-14 19:05:36 and
+            # rolled back an otherwise fine generation. no_ready_check skips
+            # the probe; the tail isn't silently dropped — it retries with
+            # exponential backoff and only gives up (crowdsec exits) after
+            # max_failure_duration of CONTINUOUS failure, so a genuinely dead
+            # Loki still surfaces.
             no_ready_check = true;
             max_failure_duration = "10m";
           }
@@ -74,26 +60,23 @@
         # into crowdsec's own state dir (not sops - they don't exist until
         # first start). lapi: `cscli machine add --auto` for the local agent;
         # eval FAILS with a null-coerce error if unset while api.server is
-        # enabled. capi: triggers `cscli capi register`, which signs 201 up
-        # for the community blocklists.
+        # enabled. capi: triggers `cscli capi register`, signing 201 up for
+        # the community blocklists.
         settings.lapi.credentialsFile = "/var/lib/crowdsec/state/lapi-credentials.yaml";
         settings.capi.credentialsFile = "/var/lib/crowdsec/state/capi-credentials.yaml";
         # The module defaults console_path to a generated file in the nix
-        # store, so `cscli console enroll` dies rewriting it ("read-only
-        # file system"). Point it at the state dir instead; the tmpfiles
-        # rule below seeds it once with the module's defaults. Enroll
-        # manually after rebuild (then accept the machine on the site):
+        # store, so `cscli console enroll` dies rewriting it ("read-only file
+        # system"). Point it at the state dir instead (tmpfiles rule below
+        # seeds it once); enroll manually after rebuild:
         #   sudo cscli console enroll <key from app.crowdsec.net>
         # (settings.console.tokenFile would automate this, but its setup
-        # script is broken too: the existence check on the token file is
-        # inverted, and enroll would still hit the store path.)
+        # script is also broken: an inverted existence check still hits the
+        # store path.)
         settings.general.api.server.console_path = "/var/lib/crowdsec/state/console.yaml";
         # The module ships NO profiles (upstream warns about this at eval),
-        # which means alerts never become ban decisions — detection worked
-        # but local remediation was a no-op. This is upstream's stock
-        # default_ip_remediation. No notifications: bans are watched in
-        # Grafana instead (a per-ban Discord ping used to live here and was
-        # dropped as noise).
+        # so alerts never become ban decisions without one. This is
+        # upstream's stock default_ip_remediation; bans are watched in
+        # Grafana instead of via notifications.
         localConfig.profiles = [
           {
             name = "default_ip_remediation";
@@ -110,26 +93,21 @@
 
         # Our own devices must never be banned. Without this, browsing an *arr
         # web UI over the tailnet trips crowdsecurity/http-crawl-non_statics
-        # (those UIs fire dozens of distinct non-static XHRs per page load) and
-        # the firewall bouncer then DROPs the device in 201's INPUT chain for
-        # the 4h profile duration above — silently, and ahead of traefik, so
-        # every home.phonkd.net service simply hangs with no 403 and nothing in
-        # the traefik log to look at. Measured on 2026-09-19: z14 arrived as
-        # 100.64.0.17, earned a ban on 41 events, and sat in the
-        # `crowdsec-blacklists-1` ipset while sabnzbd/sonarr/radarr/jellyfin all
-        # timed out from that host. Port 22 kept working throughout, which is
-        # what made it look like a routing or sing-box fault rather than a ban.
+        # (dozens of non-static XHRs per page load), and the firewall bouncer
+        # DROPs the device in 201's INPUT chain — silently, ahead of traefik,
+        # so every home.phonkd.net service hangs with no 403 and nothing in
+        # the traefik log. Measured 2026-09-19: z14 (100.64.0.17) earned a ban
+        # on 41 events and sat in `crowdsec-blacklists-1` while
+        # sabnzbd/sonarr/radarr/jellyfin all timed out; port 22 kept working,
+        # which is what made it look like a routing fault rather than a ban.
         #
         # s02-enrich runs before any scenario sees the event, so a whitelisted
-        # source never fills a bucket in the first place — cheaper than a
-        # postoverflow, and it keeps the alert list readable too.
+        # source never fills a bucket in the first place.
         #
-        # THE CIDR LIST IS A MIRROR, not an independent policy: it is the same
-        # set as traefik's `ip-filter` allow-list and authelia's `internal`
-        # network (see traefik.nix and authelia/authelia.nix, both of which
-        # already carry a note about keeping the three in step). A source one of
-        # them trusts and another does not is exactly the asymmetry that
-        # produces a silent, un-debuggable failure. Change all three or none.
+        # THE CIDR LIST IS A MIRROR, not an independent policy: same set as
+        # traefik's `ip-filter` allow-list and authelia's `internal` network
+        # (traefik.nix, authelia/authelia.nix — both note keeping the three in
+        # step). Change all three or none.
         localConfig.parsers.s02Enrich = [
           {
             name = "homelab/trusted-networks";
@@ -153,28 +131,13 @@
         ];
       };
 
-      # Both of these shell out to `cscli hub update`, which resolves and
-      # fetches cdn-hub.crowdsec.net — and on 201 a name lookup needs dnsmasq
-      # plus tailscaled, both of which activation restarts (see
-      # modules/dns.nix for dns-online.service and the full explanation).
-      #
-      # crowdsec already carries `Wants=network-online.target` from nixpkgs,
-      # but that target is reached on this host while the resolver is still
-      # down: on 2026-08-14 19:04:29 crowdsec-setup ran ~100ms BEFORE dnsmasq
-      # had finished starting and died with "Temporary failure in name
-      # resolution". The setup script is `set -euo pipefail`, so the whole
-      # ExecStartPre failed, switch-to-configuration exited 4 and deploy-rs
-      # discarded the generation.
-      #
-      # Note `Restart=` does not help here — crowdsec already has
-      # Restart=always/RestartSec=60 and the deploy still rolled back.
-      # switch-to-configuration-ng sets exit 4 the instant a *start job* ends
-      # with result `failed`, long before any restart timer runs. The only fix
-      # is for the start not to fail.
-      #
-      # crowdsec-update-hub is timer-driven so it never aborts its own deploy,
-      # but a unit left in `failed` aborts the NEXT one: switch-to-configuration
-      # also lists every failed unit on the system after activation settles.
+      # Both shell out to `cscli hub update`, which needs DNS -- see
+      # modules/dns.nix's dns-online.service for the full race explanation.
+      # crowdsec-setup ran ~100ms before dnsmasq finished starting on
+      # 2026-08-14 19:04:29 and died ("Temporary failure in name resolution"),
+      # failing its ExecStartPre and rolling back an otherwise fine deploy.
+      # `Restart=` doesn't help: switch-to-configuration-ng exits 4 the
+      # instant a start job fails, before any restart timer runs.
       systemd.services.crowdsec = {
         after = [ "dns-online.service" ];
         wants = [ "dns-online.service" ];
@@ -185,14 +148,12 @@
       };
 
       # autoUpdateService's crowdsec-update-hub oneshot runs as the
-      # unprivileged crowdsec DynamicUser (NoNewPrivileges, PrivateUsers),
-      # but upstream tacks on `ExecStartPost = systemctl reload
-      # crowdsec.service` — which needs root/polkit and so dies with
-      # "Access denied" (exit 4/NOPERMISSION), failing the whole unit even
-      # though `cscli hub update` already succeeded. The reload is pointless
-      # anyway: `hub update` only refreshes the local .index.json metadata,
-      # it never upgrades an *installed* collection, so a live crowdsec has
-      # nothing new to pick up. Drop the broken post-hook.
+      # unprivileged crowdsec DynamicUser, but upstream tacks on
+      # `ExecStartPost = systemctl reload crowdsec.service` — needs
+      # root/polkit and dies "Access denied", failing the unit even though
+      # `hub update` already succeeded. Also pointless: `hub update` only
+      # refreshes local metadata, never upgrades an installed collection.
+      # Drop the broken post-hook.
       systemd.services.crowdsec-update-hub.serviceConfig.ExecStartPost = lib.mkForce [ ];
 
       # cscli loads the whole config on EVERY invocation and hard-fails if
@@ -226,14 +187,12 @@
       # traefik. api_url follows listen_uri above; mode resolves to
       # "iptables" because 201 doesn't run nftables.
       #
-      # registerBouncer is deliberately OFF, twice broken as of
-      # nixpkgs 26.05: its oneshot pairs DynamicUser with
-      # StateDirectory=crowdsec, which migrates /var/lib/crowdsec into
-      # root-only /var/lib/private and bricks the crowdsec service itself
-      # (mkdir EACCES on every restart); and its script calls raw cscli
-      # without -c, expecting an /etc/crowdsec/config.yaml this module
-      # never writes. Instead the API key lives in sops; register it once
-      # on the host after the first successful crowdsec start:
+      # registerBouncer is deliberately OFF, twice broken as of nixpkgs 26.05:
+      # its oneshot pairs DynamicUser with StateDirectory=crowdsec, which
+      # migrates /var/lib/crowdsec into root-only /var/lib/private and bricks
+      # crowdsec itself (mkdir EACCES on every restart); and its script calls
+      # raw cscli without -c, expecting a config.yaml this module never
+      # writes. Instead register the API key (lives in sops) once by hand:
       #   sudo cscli bouncers add firewall-bouncer \
       #     --key "$(sudo cat /run/secrets/crowdsec-bouncer-api-key)"
       sops.secrets."crowdsec-bouncer-api-key" = { };
@@ -252,14 +211,12 @@
         };
       };
 
-      # Ship crowdsec's and the bouncer's telemetry to Mimir: the nixpkgs
-      # crowdsec module enables its Prometheus endpoint by default
-      # (127.0.0.1:6060, level "full"), the bouncer's is switched on above,
-      # but nothing scrapes either. Alloy (observability-sender, which this
-      # host also is) loads every /etc/alloy/*.alloy file and cross-file
-      # references work, so forward straight to the remote_write defined
-      # in config.alloy — same pattern as pve.alloy in observability.nix.
-      # Logs need no wiring: alloy already ships the whole journal to Loki.
+      # Ship crowdsec's and the bouncer's telemetry to Mimir: both expose a
+      # Prometheus endpoint but nothing scrapes them by default. Alloy loads
+      # every /etc/alloy/*.alloy file with cross-file references working, so
+      # forward straight to the remote_write in config.alloy — same pattern
+      # as pve.alloy in observability.nix. Logs need no wiring: alloy already
+      # ships the whole journal to Loki.
       environment.etc."alloy/crowdsec.alloy".text = ''
         prometheus.scrape "crowdsec" {
           targets = [{

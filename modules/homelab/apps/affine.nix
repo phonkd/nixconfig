@@ -1,26 +1,19 @@
 # AFFiNE -- self-hosted block-based docs/whiteboard workspace. Routing and
-# dashboard on 201 (reverse-proxy), workload on 203-media, split the same way as
-# ocis.nix / immich.nix. Additive to homelab-notes (memos keeps
-# notes.home.phonkd.net); nothing migrates.
+# dashboard on 201 (reverse-proxy), workload on 203-media, split the same way
+# as ocis.nix / immich.nix. Additive to homelab-notes; nothing migrates.
 #
-# Why this module looks different from every other app here: nixpkgs has no
-# AFFiNE *server*. `pkgs.affine` / `pkgs.affine-bin` are the Electron desktop
-# client, and there is no `services.affine`. Upstream ships self-hosting only
-# as a container image, so the app runs under oci-containers -- the only
-# container in this config.
+# nixpkgs has no AFFiNE *server* (`pkgs.affine`/`affine-bin` is the Electron
+# desktop client), so this runs under oci-containers -- the only container in
+# this config. podman, not docker: docker's daemon installs its own iptables
+# chains and bridge, and both candidate hosts are routing-sensitive (201 does
+# NAT for wg0 and is the tailscale exit node, 203 runs a ProtonVPN full tunnel
+# whose ip rules must stay below Tailscale's) -- podman with --network=host
+# adds neither.
 #
-# It lives on 203 rather than 201 because 203 is already the busy host, and
-# because 201 fronts everything. podman rather than docker for the same reason
-# in both directions: docker's daemon installs its own iptables chains and a
-# bridge, and BOTH candidate hosts are routing-sensitive -- 201 does NAT for
-# wg0 and is the tailscale exit node, 203 runs a ProtonVPN full tunnel whose ip
-# rules have to stay below Tailscale's (see nixconfig-ops). podman with
-# --network=host adds neither. Backend is two lines if that ever changes.
-#
-# Postgres and Redis are NOT containers. Upstream's compose stands up
-# pgvector/pgvector:pg16 + redis next to the app; here they are ordinary NixOS
-# services, and on 203 postgres already exists because immich enables it -- so
-# this module merges into it rather than declaring its own. See plans/affine.md.
+# Postgres and Redis are NOT containers: upstream's compose stands up
+# pgvector/pgvector:pg16 + redis next to the app, but here they're ordinary
+# NixOS services, merged into the postgres immich already enables on 203. See
+# plans/affine.md.
 {
   self,
   inputs,
@@ -114,16 +107,12 @@
       (lib.mkIf (noughtyLib.hostHasTag "media-server") {
         services.postgresql = {
           enable = true;
-          # NO `package` here on purpose. immich already enables postgres on
-          # this host and leaves the version at the nixpkgs default (17.10 as
-          # deployed), with a data dir to match. Pinning 16 to mirror upstream's
+          # NO `package` here on purpose: immich already enables postgres at
+          # the nixpkgs default (17.10), and pinning 16 to mirror upstream's
           # pgvector:pg16 image would point a pg16 binary at a pg17 cluster and
-          # refuse to start. AFFiNE is happy on 17.
-          #
-          # `extensions` is functionTo (listOf path), which the module system
-          # merges by CONCATENATION -- verified, not assumed -- so this adds to
-          # immich's list rather than replacing it, and the duplicate pgvector
-          # both modules ask for is the same store path.
+          # refuse to start. AFFiNE is happy on 17. `extensions` is functionTo
+          # (listOf path), merged by CONCATENATION, so this adds to immich's
+          # list rather than replacing it.
           extensions = ps: [ ps.pgvector ];
           ensureDatabases = [ dbName ];
           ensureUsers = [

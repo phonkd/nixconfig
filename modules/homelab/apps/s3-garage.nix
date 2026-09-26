@@ -63,7 +63,6 @@
         mode = "0400";
       };
 
-      # 3. Configure Garage
       services.garage = {
         enable = true;
         package = pkgs.garage_2;
@@ -96,10 +95,8 @@
 
             bind_addr = "127.0.0.1:3902";
 
-            # 2. Define the suffix for your websites
-            #    If you create a bucket named "mysite", it will be served at:
-            #    http://mysite.web.phonkd.net
-            #    (You can also name a bucket "example.com" to serve that exact domain)
+            # Bucket "mysite" is served at http://mysite.s3.w.phonkd.net
+            # (or name a bucket "example.com" to serve that exact domain).
             root_domain = ".s3.w.phonkd.net";
 
             add_host_to_metrics = true;
@@ -107,12 +104,10 @@
         };
       };
 
-      # 4. OVERRIDE SYSTEMD SETTINGS
-      #    We must explicitly disable DynamicUser.
-      #    If we don't, Systemd will ignore our static 'garage' user and create a random one,
-      #    which won't have permission to read the secrets.
+      # Explicitly disable DynamicUser -- otherwise systemd ignores the static
+      # 'garage' user, creates a random one, and it can't read the secrets.
       systemd.services.garage.serviceConfig = {
-        DynamicUser = lib.mkForce false; # FORCE this off
+        DynamicUser = lib.mkForce false;
         User = "garage";
         Group = "garage";
       };
@@ -120,11 +115,8 @@
         device = "/dev/disk/by-id/virtio-vm-202-disk-2";
         fsType = "xfs";
         options = [
-          # If you don't have this options attribute, it'll default to "defaults"
-          # boot options for fstab. Search up fstab mount options you can use
-          "users" # Allows any user to mount and unmount
-          "nofail" # Prevent system from failing if this drive doesn't mount
-
+          "users" # any user can mount/unmount
+          "nofail" # don't fail boot if this drive doesn't mount
         ];
         autoFormat = true;
         autoResize = true;

@@ -76,19 +76,16 @@
       '';
     in
     lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
-      # Install dependencies
       environment.systemPackages = with pkgs; [
         curl
         jq
       ];
 
-      # Install the script
       environment.etc."local/bin/cloudflare-ddns.sh" = {
         text = ddnsScript;
         mode = "0755";
       };
 
-      # Cron job every 15 minutes
       services.cron = {
         enable = true;
         systemCronJobs = [
@@ -96,7 +93,6 @@
         ];
       };
 
-      # Your existing SOPS secret
       sops.secrets.cfapikey = { };
     };
 

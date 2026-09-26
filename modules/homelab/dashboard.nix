@@ -9,7 +9,6 @@
       ...
     }:
     let
-      # Retrieve the central app configuration
       apps = config.phonkds.modules;
 
       # Show an app when the dashboard is enabled AND it's reachable: either
@@ -21,8 +20,7 @@
         && ((v.traefik.enable && v.traefik.domain != null) || v.dashboard.link != null)
       ) apps;
 
-      # Convert the filtered apps into the homepage-dashboard service format
-      # Structure: [ { "AppName" = { icon = "..."; href = "..."; ... }; } ]
+      # -> [ { "AppName" = { icon = "..."; href = "..."; ... }; } ]
       mkServiceList = lib.mapAttrsToList (
         name: app:
         let
@@ -51,7 +49,7 @@
     lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
       services.homepage-dashboard = {
         enable = true;
-        openFirewall = false; # Expose the dashboard port (default 8082)
+        openFirewall = false;
         settings = {
           background = {
             image = "https://s3.phonkd.net/walls/20251117_071020.jpg";
