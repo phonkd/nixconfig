@@ -124,12 +124,65 @@
                 ];
               };
             };
+
+            # ── Matrix client autodiscovery ────────────────────────────────
+            # Element resolves @phonkd:phonkd.net by fetching
+            # https://phonkd.net/.well-known/matrix/client, and the apex
+            # resolves *here*, not to ext-mail where synapse lives. Redirect
+            # to the document ext-mail already serves rather than keeping a
+            # second copy of the JSON in sync (the spec allows 30x here).
+            #
+            # Only the *client* document, deliberately. /.well-known/matrix/server
+            # is left to 404, which makes a remote server fall through to the
+            # _matrix-fed._tcp SRV record -- so federation keeps working off
+            # DNS alone and never depends on this uplink being up.
+            matrix-wellknown-redirect = {
+              redirectRegex = {
+                regex = "^https://phonkd\\.net/\\.well-known/matrix/client/?$";
+                replacement = "https://matrix.phonkd.net/.well-known/matrix/client";
+                permanent = false;
+              };
+            };
+
+            # A cross-origin fetch runs the CORS check against *every* response
+            # in a redirect chain, not just the final one, so the 302 itself
+            # needs the header -- without it Element Web fails here and never
+            # reaches ext-mail (which does send it). Listed before the redirect
+            # below so it wraps it and can stamp the 302 on the way out.
+            matrix-wellknown-cors = {
+              headers.customResponseHeaders."Access-Control-Allow-Origin" = "*";
+            };
           };
           serversTransports = {
             insecureTransport = {
               insecureSkipVerify = true;
             };
           };
+
+          routers.matrix-wellknown = {
+            entryPoints = [ "websecure" ];
+            # Path(), not PathPrefix(): this must not shadow anything else that
+            # ever wants to live on the bare apex.
+            rule = "Host(`phonkd.net`) && Path(`/.well-known/matrix/client`)";
+            service = "matrix-wellknown-sink";
+            middlewares = [
+              "matrix-wellknown-cors"
+              "matrix-wellknown-redirect"
+            ];
+            # First router to claim the bare apex, so this is also what makes
+            # traefik get a certificate for it -- via the same cloudflare
+            # DNS-01 resolver as everything else.
+            tls.certResolver = "cloudflare";
+          };
+
+          # Never actually reached: the redirect middleware answers before the
+          # backend is dialled. Traefik still requires every router to name a
+          # service, so this is a deliberate dead end rather than noop@internal
+          # -- and if the redirect ever stops firing, a 502 here says so loudly
+          # instead of failing quietly.
+          services.matrix-wellknown-sink.loadBalancer.servers = [
+            { url = "http://127.0.0.1:1"; }
+          ];
         };
 
       };
