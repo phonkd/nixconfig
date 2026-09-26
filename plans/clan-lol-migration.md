@@ -28,7 +28,7 @@ things this repo does by hand:
 | Ask | Verdict |
 |---|---|
 | **Secrets → clan** | **Yes, and cheaper than expected.** `clan secrets import-sops` + clanCore's auto-declaration keeps every existing consumer working *verbatim* — zero edits to the 20 modules. Full `vars` adoption is a separate, much larger step that is **not** required to get here. |
-| **tailscale/headscale → clan** | **No. Clan cannot own this.** There is no tailscale and no headscale clan service; the string "headscale" appears **zero times** in clan-core. Clan can only *ride* the tailnet. |
+| **tailscale/headscale → clan** | **Clan cannot own it — and does not need to.** There is no tailscale/headscale clan service ("headscale" appears **zero times** in clan-core). But keeping headscale costs nothing: a ~60-line local `clan.service` teaches clan the tailnet (verified), and headscale remains the most self-hosted option of anything on offer. |
 | **deploy-rs → `clan machines update`** | **Not recommended.** `clan machines update` has **no magic rollback** — a straight capability regression for hosts reachable only over the mesh. |
 | **Module system → clan inventory** | **Partially, and it is optional.** Tags survive intact (verified). The registry's *other* fields have nowhere to live: `inventory.machines.<name>` has no freeform type. |
 
@@ -248,7 +248,50 @@ modules" is **wrong** — in `clan_lib/network/network.py` the inventory
 `deploy.targetHost` short-circuits, while the machine-level
 `clan.core.networking.targetHost` is tried **last**, after every network fails.
 
-Two live footguns if the tailnet becomes the deploy path:
+### Option (c) works — verified, and it is not cumbersome
+
+The open question was whether a *self-authored* networking service — one that
+produces `exports`, registered locally rather than coming from a named flake
+input — actually works. It does. Spiked with a ~60-line
+`clan.modules."phonkd/tailnet"` carrying a `coordinator` role (headscale) and a
+`peer` role (tailscale client), instanced with `module.input = "self"` across
+three machines:
+
+```json
+{"phonkd/tailnet:tailnet::":
+   {"networking":{"module":"clan_lib.network.direct","priority":1500}},
+ "phonkd/tailnet:tailnet:peer:201-mono":
+   {"peer":{"hosts":[{"plain":"100.64.0.5"}],"port":22,"user":"root"}},
+ "phonkd/tailnet:tailnet:peer:203-media":
+   {"peer":{"hosts":[{"plain":"100.64.0.3"}],"port":22,"user":"root"}},
+ "phonkd/tailnet:tailnet:peer:observability":
+   {"peer":{"hosts":[{"plain":"100.64.0.4"}],"port":22,"user":"root"}}}
+```
+
+Exports land under the documented `service:instance:role:machine` scope keys,
+`networking.module` falls back to `clan_lib.network.direct` (so **no Python
+plugin is needed**), and the per-role `nixosModule`s apply to exactly the right
+machines — `coordinator` only on `observability`, `peer` on all three. In the real
+repo those two role modules are just `self.nixosModules.headscale-server` and
+`self.nixosModules.tailnet`, which already exist and already self-gate.
+
+Caveat on what this proves: evaluation and export shape, not a live
+`clan network ping` against the real tailnet — that needs the CLI and real hosts.
+
+**This is the answer to "can I keep a self-hosted control plane under clan?"
+— yes, and clan never has to own headscale for it to work.** Ranking clan's
+options purely on how self-hosted they are:
+
+| | control plane | discovery | relay/fallback |
+|---|---|---|---|
+| **headscale (today)** | yours | yours | yours (embedded DERP) |
+| clan `wireguard` | yours (the git repo) | n/a — static endpoints | n/a, but all peer traffic hairpins through a controller |
+| clan `zerotier` | yours (controller role) | **ZeroTier Inc's planet** | **clan-infra's TCP box** |
+| clan `p2p-ssh-iroh` | n/a | iroh relays | third-party, and experimental |
+
+Headscale wins that table outright, and it is what is already deployed. Nothing
+in clan improves on it; the only question was whether adopting clan would cost
+it, and the answer is no.
 
 - **Host-key churn.** Tailscale SSH serves `:22` on the tailnet with tailscaled's
   own key, while the real sshd is on `:5432`. Clan always passes a
@@ -530,3 +573,77 @@ nix eval --impure --json .#nixosConfigurations.h.config --apply \
 
 (That machine needs `sops.validateSopsFiles = false;` since the fake secret is not
 real SOPS output.)
+
+### The tailnet clan.service, as spiked
+
+Register it and instance it; the two role modules are ones this repo already has.
+
+```nix
+# modules/clan-services/tailnet.nix
+{ config, clanLib, lib, ... }:
+{
+  _class = "clan.service";
+  manifest.name = "phonkd/tailnet";
+  manifest.description = "Reach clan machines over the self-hosted headscale tailnet";
+  manifest.categories = [ "Network" ];
+  manifest.exports.out = [ "networking" "peer" ];
+
+  exports = lib.mapAttrs' (instanceName: _: {
+    name = clanLib.buildScopeKey {
+      inherit instanceName;
+      serviceName = config.manifest.name;
+    };
+    # above wireguard (1000), below internet (2000) so a LAN entry still wins.
+    # networking.module omitted => "clan_lib.network.direct" (ssh + nc -z).
+    value.networking.priority = 1500;
+  }) config.instances;
+
+  roles.coordinator = {
+    description = "Runs headscale, the self-hosted control plane";
+    perInstance.nixosModule = { ... }: { imports = [ self.nixosModules.headscale-server ]; };
+  };
+
+  roles.peer = {
+    description = "Runs the tailscale client";
+    interface = { lib, ... }: {
+      options.tailnetIp = lib.mkOption { type = lib.types.str; };
+      options.user = lib.mkOption { type = lib.types.nullOr lib.types.str; default = "root"; };
+    };
+    perInstance = { mkExports, settings, ... }: {
+      exports = mkExports {
+        peer = { hosts = [ { plain = settings.tailnetIp; } ]; user = settings.user; port = 22; };
+      };
+      nixosModule = { ... }: { imports = [ self.nixosModules.tailnet ]; };
+    };
+  };
+}
+```
+
+```nix
+clan = {
+  modules."phonkd/tailnet" = ./modules/clan-services/tailnet.nix;
+  inventory.instances.tailnet = {
+    module.name = "phonkd/tailnet";
+    module.input = "self";          # NOT null -- null means "look in clan-core"
+    roles.coordinator.machines.observability.settings.serverUrl = "https://hs.phonkd.net";
+    roles.peer.machines = {
+      "201-mono".settings.tailnetIp   = "100.64.0.5";
+      "203-media".settings.tailnetIp  = "100.64.0.3";
+      "204-agent".settings.tailnetIp  = "100.64.0.1";
+      "205-builder".settings.tailnetIp = "100.64.0.2";
+      observability.settings.tailnetIp = "100.64.0.4";
+    };
+  };
+};
+```
+
+```bash
+nix eval --impure --json .#clan.exports
+#  => phonkd/tailnet:tailnet::            {"networking":{"module":"clan_lib.network.direct","priority":1500}}
+#     phonkd/tailnet:tailnet:peer:201-mono {"peer":{"hosts":[{"plain":"100.64.0.5"}],"port":22,"user":"root"}}
+#     ...
+```
+
+Note `roles.peer.tags = [ "server" ]` would be tidier than listing machines, but
+the per-machine `tailnetIp` has to go somewhere, and per-tag `settings` do not
+exist in 26.05 (main-only). Listing machines is the 26.05-compatible spelling.
