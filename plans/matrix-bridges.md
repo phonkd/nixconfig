@@ -759,3 +759,37 @@ alternative considered was adding `age19qhp…` as a second recipient in
 `.sops.yaml` and `sops updatekeys`-ing both files, which keeps the fleet-wide key
 off the most internet-exposed host; not taken, but it remains the better shape if
 that key is ever rotated.
+
+## Where it stands (deployed 2026-09-26)
+
+Live on `ext-mail`, deployed with `deploy ext-mail` (note: **not** `deploy mail`
+— that alias does not exist, despite the registry comment saying it does).
+
+Verified working:
+
+- `https://matrix.phonkd.net/_matrix/client/versions` → 200 with a **verified**
+  Let's Encrypt cert, so ACME completed against the shared nginx.
+- `/_matrix/federation/v1/version` → `Synapse 1.159.0`.
+- postgresql, postgresql-setup, matrix-synapse and all three mautrix bridges
+  `active`, zero restarts on the bridges, no errors in the journal.
+- **Landmine 1 held in practice:** `ss -ltn` shows exactly one listener on
+  :5432 (sshd). Postgres bound no TCP at all.
+- **Mail is undisturbed:** 25 / 465 / 993 still listening, `mail.phonkd.net`
+  → 200 and `cal.phonkd.net` → 302, both with verified certs. (The unit is
+  `dovecot`, not `dovecot2` — worth knowing before a health check scares you.)
+
+Outstanding:
+
+1. **Federation does not resolve yet.** `_matrix-fed._tcp.phonkd.net` is
+   NXDOMAIN and the apex `phonkd.net/.well-known/matrix/server` answers nothing,
+   so no remote server can discover `phonkd.net`. Clients pointed straight at
+   `https://matrix.phonkd.net` work fine. Creating the SRV record is a manual
+   Cloudflare action — `modules/homelab/ddns.nix` only rewrites one existing A
+   record with the home IP, it does not manage records declaratively. This is
+   still the plan's open "federation on vs off" decision, so it is deliberately
+   left unmade rather than defaulted.
+   `matrix.phonkd.net` already serves `{"m.server":"matrix.phonkd.net:443"}`, so
+   the SRV record is the only missing piece if federation is wanted.
+2. **The bridges are running but not logged in** — each still needs its QR scan
+   (`!wa login`, `!signal login`) and the Discord token decision (landmine 4).
+3. Phase 3 (backups, growth control, apex well-known, Element web) untouched.
