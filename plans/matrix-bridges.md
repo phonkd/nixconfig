@@ -793,3 +793,71 @@ Outstanding:
 2. **The bridges are running but not logged in** — each still needs its QR scan
    (`!wa login`, `!signal login`) and the Discord token decision (landmine 4).
 3. Phase 3 (backups, growth control, apex well-known, Element web) untouched.
+
+## Federation turned on (2026-09-26)
+
+Decided: **federation on**, `server_name` stays `phonkd.net` (so MXIDs read
+`@phonkd:phonkd.net`). The alternative — moving `server_name` to
+`matrix.phonkd.net`, which needs no delegation at all — was considered and
+rejected: it would have meant a permanently uglier MXID and wiping the fresh
+Synapse database. That was the last cheap moment to make that call.
+
+### The SRV record alone was not enough
+
+Adding `_matrix-fed._tcp.phonkd.net SRV 10 0 443 matrix.phonkd.net` was
+necessary but not sufficient, and the reason is easy to miss: on the SRV route
+the spec requires the target to present a certificate valid for the
+**server_name** (`phonkd.net`), *not* for the delegated host. ext-mail only had
+a `matrix.phonkd.net` cert, so every federating server connected, failed
+validation and bailed with
+`x509: certificate is valid for cal.phonkd.net, not phonkd.net` — that being
+nginx's default vhost, since no server block matched SNI `phonkd.net`.
+
+The apex stays pointed at the home IP (85.195.231.133) by the user's
+requirement, so the well-known route was not available and HTTP-01 for the apex
+name was impossible — that challenge would be answered by traefik at home.
+
+**Fix (`modules/chat.nix`):** a second nginx vhost for the apex name sharing one
+location set with `matrixHost`, its certificate issued by **DNS-01** — which
+does not care where the A record points. It reuses traefik's existing
+Cloudflare token (`modules/homelab/apps/traefik/traefik-secret.txt`, already
+encrypted to the one shared age key), under its own secret name so it cannot
+collide with traefik's if a host ever has both modules. `dnsResolver` is pinned
+to the zone's authoritative nameserver for the reason documented at length in
+`traefik.nix`.
+
+### Verified after deploy
+
+- `curl --resolve phonkd.net:443:157.180.27.152 https://phonkd.net/_matrix/key/v2/server`
+  — i.e. exactly what a federating server does — returns the signed keys over a
+  **verified** cert, `subject: CN=phonkd.net`, issuer Let's Encrypt.
+- federationtester's `Version` field returns `Synapse 1.159.0`. That field uses
+  the modern resolver, and the only route to Synapse is `_matrix-fed._tcp` plus
+  the new cert, so real servers federate.
+- Client API 200, `mail.` 200, `cal.` 302 — all undisturbed.
+
+### Two things still true
+
+1. **federationtester reports `FederationOK: false`, and that is the tester,
+   not us.** Its report path still queries only the *deprecated* `_matrix._tcp`
+   name (deprecated in Matrix 1.8), gets NXDOMAIN, falls back to apex:8448 at
+   the home IP and times out. Adding a second SRV at `_matrix._tcp` with
+   identical values would both green the tester and cover servers old enough to
+   still use that lookup. Harmless, optional, one Cloudflare record.
+2. **Client autodiscovery is still unavailable** and this design cannot fix it:
+   clients fetch `/.well-known/matrix/client` from the apex, which is home. In
+   Element you must click Edit and enter `https://matrix.phonkd.net`. Fixing it
+   means a traefik router at home for the bare apex serving (or redirecting to)
+   the two well-known documents — the spec permits 30x redirects here.
+
+### Deploy gotcha worth remembering
+
+`deploy ext-mail` on its own **fails at the copy step** with
+`Connection closed by UNKNOWN port 65535`. Nothing is wrong with the host:
+`ssh -G 157.180.27.152` resolves to port 22 and `~/.ssh/id_ed25519`, while
+ext-mail's sshd is on :5432 with `id_ed25519_priv`. The registry documents the
+working form at `lib/registry.nix:326`:
+
+    deploy ext-mail --ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"
+
+(The same comment calls the alias `deploy mail`, which does not exist.)
