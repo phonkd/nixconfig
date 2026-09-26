@@ -884,3 +884,35 @@ bridges `active` with **0 restarts**.
 **Phase 1 is done.** What is left is Phase 2's bridge logins (the QR scans and
 the Discord token decision, inherently manual) and Phase 3 (backups, growth
 control, Element web).
+
+### Client autodiscovery fixed (2026-09-26, later still)
+
+Caveat 2 is now closed too. `modules/homelab/apps/traefik/traefik.nix` grows a
+router for the bare apex that redirects `/.well-known/matrix/client` to the
+document ext-mail already serves, rather than keeping a second copy of the JSON
+in sync. Element now resolves `@phonkd:phonkd.net` on its own; no homeserver URL
+to type.
+
+Two details that are easy to get wrong:
+
+- The 302 itself carries `Access-Control-Allow-Origin`. A cross-origin fetch
+  runs the CORS check against *every* response in a redirect chain, not only
+  the final one, so without the header Element Web fails at the apex and never
+  reaches ext-mail (which does send it). The middleware is listed before the
+  redirect so it wraps it.
+- **`/.well-known/matrix/server` is deliberately left to 404.** Serving it here
+  would make federation discovery depend on the home uplink. A 404 makes a
+  remote server fall through to the `_matrix-fed._tcp` SRV record instead, so
+  federation keeps resolving from DNS alone.
+
+Verified from outside: apex serves a **verified** `CN=phonkd.net` Let's Encrypt
+cert (traefik obtained it over the existing cloudflare DNS-01 resolver, since
+this router is the first to claim the bare apex); GET returns 302 to
+`https://matrix.phonkd.net/.well-known/matrix/client` carrying the CORS header;
+following it yields `{"m.homeserver":{"base_url":"https://matrix.phonkd.net"}}`;
+`/.well-known/matrix/server` returns 404. federationtester still reports
+`FederationOK: true` with `WellKnown: No .well-known found` — which is the
+intended outcome, not a defect. grafana, matrix, mail and cal all unaffected.
+
+**Phase 1 and the whole discovery story are done.** The only manual step left
+is Phase 2's bridge logins.
