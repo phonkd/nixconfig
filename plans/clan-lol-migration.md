@@ -171,9 +171,44 @@ precisely the thing clan's wireguard service does not implement.
 
 The nearest thing clan has to real P2P is `p2p-ssh-iroh` (priority 3000), which
 does NAT-traversed connections via iroh — but it is marked experimental in its own
-README and only exposes a machine's **SSH**, not a general network. And `zerotier`,
-the only VPN clan calls "fully integrated", defaults to relaying through clan's own
-TCP relay at `65.21.12.51:4443` and mandates exactly one controller.
+README and only exposes a machine's **SSH**, not a general network.
+
+### What about zerotier, then?
+
+ZeroTier is the one clan calls "fully integrated", and unlike the wireguard
+service it **is** a genuine mesh: the normal data path is direct UDP with NAT
+traversal, peer to peer. If the choice were "clan wireguard vs headscale", the
+answer would be easy; "clan zerotier vs headscale" is a real comparison. Three
+things decide it, and none is the TCP relay:
+
+- **Peer discovery still bootstraps off ZeroTier Inc's global root servers.** The
+  string `planet` appears **zero times** in clan's zerotier module — clan never
+  replaces the roots baked into the binary. The `moon` role (max 4, optional,
+  needs `stableEndpoints`) *supplements* them; clan's own README describes moons
+  as relay nodes and links `docs.zerotier.com/roots`. Today headscale + the
+  embedded DERP in `modules/homelab/apps/headscale.nix` is fully self-hosted —
+  nothing in the path touches a third party. Adopting zerotier reintroduces one
+  for discovery.
+- **The TCP fallback relay is hardcoded to clan's own infrastructure.**
+  `services.zerotierone.localConf.settings.tcpFallbackRelay = "65.21.12.51/4443"`
+  is set unconditionally in `perMachine` — no option, not even `mkDefault`, so
+  overriding it needs `lib.mkForce` in your own module. In fairness this is a
+  *fallback* for UDP-blocked networks, not the normal path, and the comment
+  explains why it exists at all: *"The official zerotier tcp relay no longer
+  works"* (ZeroTierOne issue #2202). But it does mean that on any network where
+  UDP is blocked, traffic relays through a box clan operates.
+- **Exactly one controller**, enforced: `constraints.roles.controller.minMachines
+  = 1` and `maxMachines = 1`.
+
+There is also no equivalent of MagicDNS, of Tailscale SSH, or of headscale's ACL
+policy — those would all have to be rebuilt or dropped. And the module is already
+churning: `main` and `26.05` differ, with the controller's network settings
+becoming a user-facing option (`clan.core.zerotier.networks.<instance>.settings`)
+on main.
+
+Net: zerotier is a legitimate mesh and a defensible choice for a *greenfield*
+clan. Here it would mean retiring a working, fully self-hosted control plane and
+relay for one that is neither, to gain CLI integration this repo does not need.
 
 Re-checked at the time of writing: `clanServices/` on `main` is
 `admin borgbackup certificates coredns data-mesher dm-dns dyndns emergency-access
