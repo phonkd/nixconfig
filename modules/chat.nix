@@ -76,13 +76,42 @@
       discordDefault = name: discordOpts.${name}.default or { };
       discordBlock = name: overrides: lib.recursiveUpdate (discordDefault name) overrides;
 
-      # The two well-known documents. Both are served from matrix.phonkd.net
-      # rather than the apex: the apex A record points at the *home* IP and
-      # serves no valid cert there, so federation discovery falls through to
-      # SRV. Harmless here, and correct if anything ever redirects.
+      # The two well-known documents, which only count when served from the
+      # apex: a remote server fetches them from <server_name>, never from the
+      # delegated host. The SRV record does not replace them -- on that route
+      # the target must present a cert for the *server_name* -- which is why
+      # the apex resolves here and gets its own ACME cert.
       wellKnownServer = builtins.toJSON { "m.server" = "${matrixHost}:443"; };
       wellKnownClient = builtins.toJSON {
         "m.homeserver".base_url = "https://${matrixHost}";
+      };
+
+      matrixLocations = {
+        "/_matrix" = {
+          proxyPass = "http://127.0.0.1:8008";
+          # Matrix media uploads are the large bodies here; nginx's
+          # 1m default rejects most of them.
+          extraConfig = "client_max_body_size 100M;";
+        };
+        "/_synapse/admin" = {
+          proxyPass = "http://127.0.0.1:8008";
+          extraConfig = "client_max_body_size 100M;";
+        };
+        "= /.well-known/matrix/server".extraConfig = ''
+          add_header Content-Type application/json;
+          add_header Access-Control-Allow-Origin *;
+          return 200 '${wellKnownServer}';
+        '';
+        "= /.well-known/matrix/client".extraConfig = ''
+          add_header Content-Type application/json;
+          add_header Access-Control-Allow-Origin *;
+          return 200 '${wellKnownClient}';
+        '';
+      };
+
+      matrixVhost = {
+        forceSSL = true;
+        locations = matrixLocations;
       };
     in
     {
@@ -104,7 +133,18 @@
             ]
             (_: {
               sopsFile = chatSecrets;
-            });
+            })
+          // {
+            # Not a chat secret: the Cloudflare token traefik already uses,
+            # borrowed for the apex certificate's DNS-01 challenge (see the
+            # acme block below). Encrypted to the one shared age key this
+            # host holds, so it needs no re-encryption. Its own name so it
+            # cannot collide with traefik's if a host ever has both modules.
+            chat_cf_dns_token = {
+              sopsFile = ./homelab/apps/traefik/traefik-secret.txt;
+              format = "binary";
+            };
+          };
 
         # Synapse refuses these three as nix-store values: the module carries
         # mkRemovedOptionModule entries telling you to use extraConfigFiles
@@ -364,41 +404,45 @@
         security.acme.acceptTerms = true;
         security.acme.defaults.email = "bhonk123@gmail.com";
 
+        # The apex certificate cannot come from HTTP-01: phonkd.net resolves
+        # to the *home* IP, so that challenge would be served by traefik at
+        # home and never by this box. DNS-01 does not care where the A record
+        # points, which is what lets the apex keep pointing at home.
+        security.acme.certs.${serverName} = {
+          dnsProvider = "cloudflare";
+          # The sops file is already an env file (CF_DNS_API_TOKEN=...),
+          # which is exactly what lego wants here.
+          environmentFile = config.sops.secrets.chat_cf_dns_token.path;
+          group = "nginx";
+          # Ask the zone's AUTHORITATIVE nameservers, not a recursive one.
+          # lego queries the challenge name *before* creating the TXT record,
+          # and phonkd.net's SOA minimum is 1800s, so a recursive resolver
+          # caches that NXDOMAIN for 30 minutes while lego gives up after ~2.
+          # This took out all 14 names in the home.phonkd.net migration --
+          # see the long note in modules/homelab/apps/traefik/traefik.nix.
+          dnsResolver = "chin.ns.cloudflare.com:53";
+        };
+
         services.nginx = {
           enable = true;
           recommendedProxySettings = true;
           recommendedTlsSettings = true;
           recommendedGzipSettings = true;
 
-          virtualHosts.${matrixHost} = {
-            forceSSL = true;
-            enableACME = true;
-
-            locations."/_matrix" = {
-              proxyPass = "http://127.0.0.1:8008";
-              # Matrix media uploads are the large bodies here; nginx's
-              # 1m default rejects most of them.
-              extraConfig = "client_max_body_size 100M;";
-            };
-            locations."/_synapse/admin" = {
-              proxyPass = "http://127.0.0.1:8008";
-              extraConfig = "client_max_body_size 100M;";
-            };
-
-            locations."= /.well-known/matrix/server".extraConfig = ''
-              add_header Content-Type application/json;
-              add_header Access-Control-Allow-Origin *;
-              return 200 '${wellKnownServer}';
-            '';
-            locations."= /.well-known/matrix/client".extraConfig = ''
-              add_header Content-Type application/json;
-              add_header Access-Control-Allow-Origin *;
-              return 200 '${wellKnownClient}';
-            '';
+          virtualHosts = {
+            # Clients talk to this name, and it resolves here, so HTTP-01 works.
+            ${matrixHost} = matrixVhost // { enableACME = true; };
+            # Nobody browses to the apex on this box -- it resolves to the
+            # home IP. This vhost exists for the SRV route alone: a remote
+            # server connects to matrixHost:443 but sends SNI/Host of the
+            # server_name, and must be shown a cert for *that* name. Its
+            # certificate comes from the DNS-01 block above, not from here.
+            ${serverName} = matrixVhost // { useACMEHost = serverName; };
           };
         };
 
-        # Federation rides 443 via the SRV record, so 8448 stays shut.
+        # Federation rides 443 via the apex well-known document, with the
+        # _matrix-fed._tcp SRV as a second route, so 8448 stays shut.
         # The Hetzner *cloud* firewall is separate from this one -- the
         # headscale rollout was bitten by exactly that
         # (plans/headscale-mesh.md); open 80/443 there too or ACME silently
