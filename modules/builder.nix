@@ -58,6 +58,12 @@ let
 
     mailserver
 
+    # Matrix homeserver + the mautrix bridges (gated on "chat-server").
+    # No host wears that tag yet, so this is inert everywhere: verified by
+    # evaluating observability with and without it and getting the same
+    # system derivation. See plans/matrix-bridges.md.
+    chat-server
+
     # Reverse-proxy stack (gated on hostHasTag "reverse-proxy").
     homelab-traefik
     homelab-dashboard
