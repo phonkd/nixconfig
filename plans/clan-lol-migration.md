@@ -138,6 +138,52 @@ This is the part that kills the middle ask, so it is worth stating precisely.
 - `clan.core.networking.*` has exactly four options — `targetHost`, `buildHost`,
   `forwardAgent`, `internalListenAddresses`. It is not a VPN abstraction.
 
+### "But unstable has a mesh WireGuard service"
+
+It has a `wireguard` service, and its README opens with *"a WireGuard-based VPN
+**mesh** network"* and lists *"Full mesh connectivity between all machines"* under
+Features. That wording does not survive contact with the source.
+
+- **`main` and `26.05` are byte-identical** here — `clanServices/wireguard/default.nix`
+  `diff`s clean between the two branches (812 lines). Unstable has nothing 26.05
+  doesn't.
+- **It is a star, not a mesh.** In `roles.peer`, the WireGuard `peers` list is
+  built from `roles.controller.machines` only — the literal comment in the source
+  is `# Connect to all controllers`. A peer never gets a WireGuard peer entry for
+  another peer. Only `roles.controller` peers with everything
+  (`allOtherControllers ++ allPeers`). The README's own Connectivity section
+  admits it: *"All traffic between peers flows through controllers"*, which is why
+  controllers need IPv6 forwarding. "Full mesh" means full *reachability*, not
+  full *peering*.
+- **There is no NAT traversal.** The only relevant machinery is
+  `persistentKeepalive = 25` — plain WireGuard hole-punch maintenance. No STUN, no
+  relay, no endpoint discovery, no roaming. `endpoint` is a static config string,
+  and only controllers have one (*"Controllers must have a publicly accessible
+  endpoint"*).
+
+For this homelab that is a hard no. The only host with a public endpoint is
+`observability` in Hetzner, so it would be the sole controller — meaning
+**201↔203 traffic, two VMs in the same house, would hairpin through Hetzner**, as
+would every closure push to `205-builder`. Today those are direct P2P WireGuard
+sessions; `plans/headscale-mesh.md` records direct P2P verified across
+home↔Hetzner at 30 ms. Tailscale's NAT traversal (with DERP only as *fallback*) is
+precisely the thing clan's wireguard service does not implement.
+
+The nearest thing clan has to real P2P is `p2p-ssh-iroh` (priority 3000), which
+does NAT-traversed connections via iroh — but it is marked experimental in its own
+README and only exposes a machine's **SSH**, not a general network. And `zerotier`,
+the only VPN clan calls "fully integrated", defaults to relaying through clan's own
+TCP relay at `65.21.12.51:4443` and mandates exactly one controller.
+
+Re-checked at the time of writing: `clanServices/` on `main` is
+`admin borgbackup certificates coredns data-mesher dm-dns dyndns emergency-access
+garage hello-world importer installer internet kde localbackup matrix-synapse
+monitoring mycelium ncps p2p-ssh-iroh packages pki sshd syncthing tor
+trusted-nix-caches users wifi wireguard yggdrasil zerotier` — still no
+`tailscale`, still no `headscale`.
+
+### What clan does offer instead
+
 What clan *does* have is a network-priority system driven by service **exports**
 (`manifest.exports.out = [ "networking" "peer" ]`, `networking.priority`,
 `peer.hosts`). Shipped priorities: `p2p-ssh-iroh` 3000, `internet` 2000,
