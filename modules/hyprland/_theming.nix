@@ -3,9 +3,8 @@
 #
 # _home.nix wraps this whole file in `lib.mkIf scope.themingEnabled`, so
 # setting noughty.hyprland.wallpaperDir = null leaves a perfectly usable
-# static-colour session. That gate is the reason the seeding of monitors.conf,
-# workspaces.conf and groupbar-mode.conf lives here too rather than beside the
-# compositor: it always has, and moving it would change which hosts get it.
+# static-colour session -- which is also why monitors.conf/workspaces.conf/
+# groupbar-mode.conf seeding lives here rather than beside the compositor.
 #
 # The machinery this consumes -- templates, the matugen config, the rotation
 # script, the GTK helpers -- is in _matugen.nix.
@@ -43,12 +42,8 @@ in
   xdg.configFile."matugen/config.toml".source =
     (pkgs.formats.toml { }).generate "matugen-config.toml" matugenConfig;
 
-  # The "matugen" theme named above. Named colours only -- every
-  # literal comes from the file matugen rewrites, imported by
-  # absolute path because this theme is a store symlink and a
-  # relative import would resolve next to it in /nix/store.
-  # $XDG_DATA_HOME/rofi/themes is one of rofi's own theme
-  # directories, which is how `@theme "matugen"` finds it.
+  # The "matugen" theme named above: named colours only, imported by absolute
+  # path since this theme is itself a store symlink.
   xdg.dataFile."rofi/themes/matugen.rasi".text = ''
     @import "${generated.rofi}"
 
@@ -174,15 +169,11 @@ in
     textbox { text-color: @foreground; }
   '';
 
-  # GTK: HM keeps ownership of gtk.css (it writes that file itself
-  # for GTK4 whenever a theme is set), and these imports point it at
-  # the colours matugen owns. `lines` merges, so this appends to
-  # anything another module has put in extraCss.
-  #
-  # The import is unconditional because gtk.css is user-wide, but the
-  # *target* is session-scoped -- see clearGtkColors above. Outside a
-  # Hyprland session the imported file is empty and this is a no-op,
-  # which is what used to keep the colours out of Plasma.
+  # GTK: HM keeps ownership of gtk.css, and these imports point it at the
+  # colours matugen owns (`lines` merges, so this appends to any other
+  # module's extraCss). Unconditional import, session-scoped target -- see
+  # clearGtkColors below: outside a Hyprland session the imported file is
+  # empty and this is a no-op.
   gtk.gtk3.extraCss = ''
     @import url("file://${generated.gtk3}");
   '';
@@ -190,12 +181,10 @@ in
     @import url("file://${generated.gtk4}");
   '';
 
-  # Empties the GTK colour files when the Hyprland session ends, so
-  # the declared GTK theme is what applies outside it -- this is what
-  # used to leave Plasma's own theme alone. Nothing to do on start:
-  # the wallpaper timer refills them moments later. RemainAfterExit is
-  # what makes ExecStop run at session teardown rather than
-  # immediately after ExecStart returns.
+  # Empties the GTK colour files when the Hyprland session ends, so the
+  # declared GTK theme applies outside it. Nothing to do on start: the
+  # wallpaper timer refills them moments later. RemainAfterExit is what
+  # makes ExecStop run at session teardown rather than right after ExecStart.
   systemd.user.services.hyprland-gtk-colors = {
     Unit = {
       Description = "Scope the GTK colour scheme and wallpaper colours to the Hyprland session";
@@ -213,8 +202,6 @@ in
     Install.WantedBy = [ "hyprland-session.target" ];
   };
 
-  # The wallpaper daemon. Bound to hyprland-session.target, so it
-  # comes up with the session and not before it.
   systemd.user.services.awww-daemon = {
     Unit = {
       Description = "awww (swww) wallpaper daemon";
@@ -222,10 +209,8 @@ in
       After = [ "hyprland-session.target" ];
     };
     Service = {
-      # Not oneshot: this is the daemon that holds the layer-shell
-      # surface. `--no-cache` because the wallpaper is chosen fresh
-      # on every rotation and a restored cached one would briefly
-      # contradict the colours on screen.
+      # `--no-cache`: a restored cached wallpaper would briefly contradict
+      # the freshly-chosen colours on screen.
       ExecStart = "${pkgs.awww}/bin/awww-daemon --no-cache";
       Restart = "on-failure";
       RestartSec = 2;
@@ -249,10 +234,8 @@ in
   systemd.user.timers.hyprland-wallpaper = {
     Unit.Description = "Rotate the wallpaper (and the colour scheme with it)";
     Timer = {
-      # A couple of seconds after the session comes up, then every
-      # interval. AccuracySec keeps it from being coalesced into a
-      # ragged schedule; Persistent is deliberately absent, since a
-      # missed rotation while logged out is not worth catching up.
+      # Persistent deliberately absent: a missed rotation while logged out
+      # isn't worth catching up.
       OnActiveSec = 3;
       OnUnitActiveSec = wallpaperInterval;
       AccuracySec = "5s";
@@ -260,19 +243,10 @@ in
     Install.WantedBy = [ "hyprland-session.target" ];
   };
 
-  # nwg-displays' two files, seeded empty for exactly the reason the
-  # colour files below are seeded: `extraConfig` `source`s them, and
-  # Hyprland calls a missing `source` a config error. nwg-displays
-  # does create them itself, but only when it is first run, which on
-  # a fresh host is strictly after the first login that has to parse
-  # this config.
-  #
-  # Empty is the right seed rather than a copy of the fallback
-  # `monitor=` rule: an empty file says "the GUI has not been used
-  # here", which leaves `monitor=,preferred,auto,<scale>` in the
-  # generated config as the thing actually in charge. As with the
-  # colours, an existing file is never touched -- the GUI's output
-  # is user state and an activation must not clobber it.
+  # nwg-displays' two files, seeded empty for the same reason the colour
+  # files are: `extraConfig` `source`s them, and Hyprland calls a missing
+  # `source` a config error, but nwg-displays only creates them on first
+  # run. An existing file is never touched -- it's user state.
   home.activation.hyprlandDisplays = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [ -z "''${DRY_RUN:-}" ]; then
       for f in ${lib.escapeShellArgs [ monitorsConf workspacesConf ]}; do
@@ -285,25 +259,17 @@ in
     fi
   '';
 
-  # Seed every generated file, so the very first Hyprland login --
-  # before the timer has ever fired -- finds them present. Without
-  # this, Hyprland reports a config error for the missing `source`
-  # and rofi refuses its theme. (The bar is the one consumer that
-  # copes on its own -- see the fallback palette in shell.qml.)
-  #
-  # Only ever creates what is missing: a real rotation's output must
-  # never be clobbered by an activation. Uses matugen itself rather
-  # than a checked-in palette, so the seed is a genuine scheme --
-  # and falls back to writing empty files if no wallpaper is
-  # readable yet, which is enough for every consumer to parse.
+  # Seed every generated file, so the very first Hyprland login -- before
+  # the timer has ever fired -- finds them present; otherwise Hyprland
+  # errors on the missing `source` and rofi refuses its theme. Only ever
+  # creates what is missing (a real rotation's output must never be
+  # clobbered), and uses matugen itself for a genuine scheme, falling back
+  # to empty files if no wallpaper is readable yet.
   home.activation.hyprlandColors = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [ -z "''${DRY_RUN:-}" ]; then
-      # The groupbar mode file is `source`d too, so it has the same
-      # must-exist-or-it-is-a-config-error property as the colour
-      # files -- but it is user state, not matugen output, so it is
-      # seeded on its own terms: written once with Hyprland's own
-      # default (tabbed), and never touched again. The toggle keybind
-      # owns it from then on.
+      # The groupbar mode file is `source`d too but is user state, not
+      # matugen output: seeded once with Hyprland's default (tabbed), then
+      # owned by the toggle keybind.
       if [ ! -e ${lib.escapeShellArg groupbarMode} ]; then
         verboseEcho "Seeding the Hyprland groupbar mode (tabbed)"
         $DRY_RUN_CMD ${pkgs.coreutils}/bin/mkdir -p \
@@ -333,58 +299,44 @@ in
           | ${pkgs.coreutils}/bin/tr -d '\0')"
 
         if [ -n "$seed" ]; then
-          # post_hooks would try to reload a compositor that is not
-          # running during activation, so they are tolerated failing;
-          # matugen itself still writes every template.
+          # post_hooks would try to reload a compositor not running during
+          # activation, so they're tolerated failing; matugen itself still
+          # writes every template.
           ${pkgs.matugen}/bin/matugen --quiet --source-color-index 0 \
             --type ${lib.escapeShellArg colorScheme} \
             --mode ${lib.escapeShellArg colorMode} \
             image "$seed" < /dev/null || true
         fi
 
-        # Whatever matugen did or did not manage, guarantee the files
-        # exist -- an absent one is a startup error for its consumer,
-        # an empty one is not.
+        # Guarantee every file exists -- an absent one is a startup error
+        # for its consumer, an empty one is not.
         for f in ${lib.escapeShellArgs (lib.attrValues generated)}; do
           [ -e "$f" ] || ${pkgs.coreutils}/bin/touch "$f"
         done
 
-        # ...except the GTK pair, which must start out EMPTY. gtk.css
-        # is user-wide, so a seeded-with-colours file would recolour
-        # GTK apps from the next login onwards, before Hyprland had
-        # ever been used -- which on the KDE hosts meant recolouring
-        # the Plasma session. They are filled in by
-        # the first wallpaper rotation inside a Hyprland session and
-        # emptied again when it ends (see clearGtkColors).
+        # ...except the GTK pair, which must start out EMPTY: gtk.css is
+        # user-wide, so a seeded-with-colours file would recolour GTK apps
+        # before Hyprland had ever been used. Filled by the first wallpaper
+        # rotation inside a session, emptied again when it ends (see
+        # clearGtkColors in _matugen.nix).
         ${pkgs.coreutils}/bin/truncate -s 0 \
           ${lib.escapeShellArgs [ generated.gtk3 generated.gtk4 ]} || true
       fi
     fi
   '';
 
-  # Load hy3 into an ALREADY-RUNNING session.
+  # Load hy3 into an ALREADY-RUNNING session. `exec-once` covers a fresh
+  # login only -- it does not re-run on `hyprctl reload` -- so rebuilding
+  # while logged in lands a config where `general:layout = hy3` is accepted
+  # (unregistered layout, not an error) but every `hy3:` bind is rejected
+  # with "Invalid dispatcher" and dropped, until the next logout/login.
   #
-  # `exec-once` covers a fresh login and nothing else -- it does not
-  # re-run on `hyprctl reload`, by design. So rebuilding while logged
-  # into Hyprland lands the new config in a session where the plugin
-  # was never loaded: Home Manager's own onChange reload re-parses it,
-  # `general:layout = hy3` is accepted (an unregistered layout is not
-  # an error), and every `hy3:` bind is rejected with "Invalid
-  # dispatcher" and dropped. The visible result is a config-error
-  # banner plus dead alt-keys until the next logout/login, which is a
-  # miserable way to find out.
-  #
-  # This closes that gap: load the plugin, then reload so the binds
-  # register. Both are safe to repeat -- a second load is refused with
-  # "Cannot load a plugin twice!" and exit 0, leaving the one
-  # instance alone.
-  #
-  # Runs after `writeBoundary`, i.e. after linkGeneration has already
-  # fired Home Manager's onChange reload, so the ordering is
-  # load-then-reload and the binds land. The XDG_RUNTIME_DIR dance and
-  # the instance loop are lifted from HM's own reloadConfig: an
-  # activation has no session environment to inherit, and there may be
-  # more than one compositor running.
+  # Runs after `writeBoundary` (i.e. after HM's own onChange reload has
+  # fired), so the ordering is load-then-reload and the binds land. Both
+  # steps are safe to repeat -- a second load is refused with "Cannot load a
+  # plugin twice!" and exit 0. XDG_RUNTIME_DIR dance and instance loop
+  # lifted from HM's own reloadConfig: an activation has no session
+  # environment to inherit, and there may be more than one compositor running.
   home.activation.hyprlandHy3Plugin = lib.mkIf hy3 (
     lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if [ -z "''${DRY_RUN:-}" ]; then

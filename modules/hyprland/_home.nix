@@ -1,14 +1,8 @@
-# Hyprland, Home Manager half: the actual session. Self-gates on osConfig, so
-# it is inert if it is ever imported on a host without the tag.
+# Hyprland, Home Manager half: the actual session. Self-gates on osConfig,
+# so it is inert if imported on a host without the tag.
 #
-# This file does nothing but assemble. The shared scope is built once and
-# handed to every section, which is what lets the sections stay ordinary
-# attrsets of Home Manager options instead of functions of each other.
-#
-# The merge below is flat where the old single-file module had one enormous
-# attrset followed by the theming block. That is the same thing: the three
-# eager sections share no top-level option between them, so merging them as
-# three list entries and merging them as one attrset produce the same config.
+# The shared scope is built once and handed to every section, so each stays
+# an ordinary attrset of Home Manager options.
 #
 # modules/hyprland.nix carries the design notes and a map of this directory.
 { self, inputs }:
@@ -36,10 +30,9 @@ let
   section = path: import path { inherit config lib pkgs scope; };
 in
 {
-  # Unconditional, like every other import here: the module only declares
-  # options, and all of its config hangs off `programs.caelestia.enable` in
-  # _shell.nix, which is itself inside `lib.mkIf enabled`. A host without the
-  # hyprland tag therefore gets the options and none of the shell.
+  # Unconditional: the module only declares options, and all of its config
+  # hangs off `programs.caelestia.enable` in _shell.nix, itself inside
+  # `lib.mkIf enabled` -- so a host without the tag gets no shell.
   imports = [ inputs.caelestia.homeManagerModules.default ];
 
   config = lib.mkIf scope.enabled (
