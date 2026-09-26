@@ -136,6 +136,23 @@
         "type": "github"
       }
     },
+    "claude-codex": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1786243721,
+        "narHash": "sha256-ymjZYT8cvdksgw5f2RH9QVyetRcPvW/QQRvAoEg1rRk=",
+        "owner": "fcakyon",
+        "repo": "claude-code-with-codex",
+        "rev": "2c34184e910e9de2e302f16b6d8f9c0e68c91a48",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fcakyon",
+        "ref": "v0.3.1",
+        "repo": "claude-code-with-codex",
+        "type": "github"
+      }
+    },
     "deploy-rs": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -1467,6 +1484,7 @@
       "inputs": {
         "caelestia": "caelestia",
         "claude-code-nix": "claude-code-nix",
+        "claude-codex": "claude-codex",
         "deploy-rs": "deploy-rs",
         "flake-parts": "flake-parts",
         "hermes-agent": "hermes-agent",

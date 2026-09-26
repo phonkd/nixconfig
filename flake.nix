@@ -132,6 +132,17 @@
       url = "github:gfhdhytghd/viewflow/767739c1037eab84e7b5ba235056ec6b09b0e692";
       flake = false;
     };
+    # claude-codex: local Anthropic-API router that lets the ordinary `claude`
+    # CLI run inference on the ChatGPT/Codex subscription instead of the
+    # Anthropic one (modules/claude-codex.nix). Source-only -- upstream ships
+    # no flake -- so it's built with rustPlatform off its own Cargo.lock.
+    # Pinned to a tag, not a branch: the proxy tracks two private wire
+    # protocols (Anthropic Messages in, the Codex Responses backend out), and
+    # an unattended bump is how you find out one of them moved.
+    claude-codex = {
+      url = "github:fcakyon/claude-code-with-codex/v0.3.1";
+      flake = false;
+    };
     # slop-trove: personal-data embedding/search platform (own repo, "the thing").
     slop-trove = {
       url = "github:phonkd/slop-trove";

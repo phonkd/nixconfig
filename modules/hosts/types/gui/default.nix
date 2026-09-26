@@ -23,6 +23,9 @@
         # secretspec + Bitwarden CLI, pointed at Vaultwarden. On `gui` not
         # `desktop-nixos-specific` so the Mac gets it too.
         self.homeModules.secretspec
+        # `claude-codex`: Claude Code on the ChatGPT subscription. Here for the
+        # same reason -- both platforms have `claude` and `codex` on PATH.
+        self.homeModules.claude-codex
       ];
       home.packages = with pkgs; [
         android-tools
