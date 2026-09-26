@@ -861,3 +861,26 @@ working form at `lib/registry.nix:326`:
     deploy ext-mail --ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv"
 
 (The same comment calls the alias `deploy mail`, which does not exist.)
+
+### Federation confirmed green (2026-09-26, later)
+
+The second SRV was added after all — `_matrix._tcp.phonkd.net SRV 10 0 443
+matrix.phonkd.net`, alongside the `_matrix-fed._tcp` one — and ext-mail was
+rebuilt. federationtester now reports:
+
+    FederationOK: true
+    SRV targets:  matrix.phonkd.net.:443
+    157.180.27.152:443  AllChecks=true ValidCert=true MatchingName=true Ed25519=true
+
+So both the modern (`_matrix-fed._tcp`) and deprecated (`_matrix._tcp`) lookups
+resolve, which covers old servers and greens the tester. Caveat 1 above is
+closed; caveat 2 (client autodiscovery reads the apex, which is home) still
+stands by design.
+
+Re-verified at the same time: client API and federation endpoints 200,
+`mail.` 200, `cal.` 302, ports 25/465/993 open, and synapse plus all three
+bridges `active` with **0 restarts**.
+
+**Phase 1 is done.** What is left is Phase 2's bridge logins (the QR scans and
+the Discord token decision, inherently manual) and Phase 3 (backups, growth
+control, Element web).
