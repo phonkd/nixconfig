@@ -717,3 +717,26 @@ the file.
   forgetting. Synapse major upgrades run schema migrations on start — watch the
   journal (it lands in Loki via the `observability-sender` tag) on the first boot
   after a bump.
+
+## Bootstrap fact not captured in git
+
+`ext-mail` could not decrypt `global-secrets/secret.yaml` or
+`homelab/secrets/chat.yaml`. Both are encrypted to the single fleet-shared
+recipient `age1jsnyg…`, and that host's `/home/phonkd/.config/sops/age/keys.txt`
+held only a mail-specific key (`age1y5wx…`, the recipient of `mail-secret.yaml`).
+Its ssh-derived age key (`age19qhp…`) is not a recipient of anything. So every
+rebuild died in the `setupSecrets` activation snippet with
+`Error getting data key: 0 successful groups required, got 0`.
+
+**This is also why `ext-mail` never enrolled in the headscale mesh** — the only
+secret it takes from the global file is `tailnet.nix`'s `headscale_authkey`, so
+it could never read the pre-auth key. That had been recorded as an unexplained
+oddity; it was this all along.
+
+Resolved by hand on the host: the shared key was appended to that `keys.txt`.
+**That edit lives on the box, not in this repo** — a rebuilt or replaced
+`ext-mail` needs it done again, and nothing in the flake will remind you. The
+alternative considered was adding `age19qhp…` as a second recipient in
+`.sops.yaml` and `sops updatekeys`-ing both files, which keeps the fleet-wide key
+off the most internet-exposed host; not taken, but it remains the better shape if
+that key is ever rotated.
