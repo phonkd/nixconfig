@@ -43,6 +43,7 @@
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
         self.homeModules.gaming
+        self.homeModules.chat
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
         self.homeModules.zed-editor

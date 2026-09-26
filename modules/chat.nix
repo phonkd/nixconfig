@@ -11,10 +11,9 @@
 #
 # See plans/matrix-bridges.md for the why, the port map and the landmines.
 #
-# NOTHING HERE IS LIVE YET: no host carries the "chat-server" tag, so the
-# whole server half sits behind `mkIf false`. Tagging a host is what turns
-# it on -- and the secrets listed in plans/matrix-bridges.md ("Secrets")
-# have to exist first, or Synapse and all three bridges fail to start.
+# Live on ext-mail, which carries the "chat-server" tag. The secrets listed
+# in plans/matrix-bridges.md ("Secrets") must exist or Synapse and all three
+# bridges fail to start.
 {
   self,
   inputs,

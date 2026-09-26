@@ -33,8 +33,7 @@ let
     # IMPORTANT: only import each function module via ONE path. Function
     # modules can't be deduplicated (Nix function equality is always
     # false), so importing the same one via multiple paths creates
-    # duplicate definitions of unique options. `nixosModules.base` is
-    # just a wrapper for system-minimal -- skip it here.
+    # duplicate definitions of unique options.
     system-minimal
     phonkds-options # declares `phonkds.modules.*` type everywhere
 
@@ -58,10 +57,7 @@ let
 
     mailserver
 
-    # Matrix homeserver + the mautrix bridges (gated on "chat-server").
-    # No host wears that tag yet, so this is inert everywhere: verified by
-    # evaluating observability with and without it and getting the same
-    # system derivation. See plans/matrix-bridges.md.
+    # Matrix homeserver + the mautrix bridges (gated on "chat-server" — ext-mail).
     chat-server
 
     # Reverse-proxy stack (gated on hostHasTag "reverse-proxy").
