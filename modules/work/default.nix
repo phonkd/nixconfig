@@ -267,8 +267,14 @@
         # flip the switch on `nixosModules.proxy` (which alwaysImport already
         # carries and which self-gates on this option). See the note in
         # `homeModules.work` for why the proxy hangs off the platform modules
-        # rather than off `work` itself, and modules/proxy/nixos.nix for why the Linux
-        # half went system-wide.
+        # rather than off `work` itself.
+        #
+        # What this gets is an opt-in HTTP/SOCKS proxy on 127.0.0.1:2080 --
+        # `noughty.proxy.transparent` (the tun that captured every socket) is
+        # off by request, so the homelab rides tailscaled and anything that
+        # ignores `$http_proxy` goes direct. modules/proxy/nixos.nix has the
+        # why; the README next to it has what the tun cost to get working,
+        # should it ever be wanted again.
         noughty.proxy.enable = true;
 
         home-manager.users.${config.noughty.user.name}.imports = [

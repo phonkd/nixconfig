@@ -123,9 +123,11 @@
     desktop = "hyprland";
     # "work" is back. It was dropped once (work had moved to the Mac) and is
     # re-added deliberately: see plans/work-setup-on-nixos.md, which built the
-    # Linux half of modules/work/ for this host and now also makes sing-box a
-    # system-wide proxy here. The tag is still the whole opt-in -- everything
-    # it reaches self-gates on it, so removing it again is the rollback.
+    # Linux half of modules/work/ for this host and also brings up sing-box
+    # here as an HTTP/SOCKS proxy on 127.0.0.1:2080 (opt-in -- the tun that
+    # briefly made it system-wide is off again). The tag is still the whole
+    # opt-in -- everything it reaches self-gates on it, so removing it again is
+    # the rollback.
     #
     # Know what it re-arms: the bedag ssh config ends in a `Host *` catch-all
     # whose ProxyCommand is socat into the SOCKS listener, and it applies to

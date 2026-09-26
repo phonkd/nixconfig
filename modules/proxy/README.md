@@ -5,7 +5,24 @@ Two halves that share nothing but the package:
 - `darwin.nix` — unprivileged launchd agent, mixed inbound on
   `127.0.0.1:2080`, app-layer only. Apps reach it via `http_proxy`, the macOS
   system proxy setting, or ssh `ProxyCommand`.
-- `nixos.nix` — root system service with a tun device, capturing everything.
+- `nixos.nix` — root system service, same mixed inbound, plus a tun device and
+  an in-process tailscale node that are **both off by default**.
+
+Both platforms are app-layer today. The Linux tun was built, debugged through
+the four traps below and confirmed working, then turned back off by request:
+an opt-in HTTP/SOCKS proxy is what is wanted, and the tun is a great deal of
+machinery — and a great many ways to take the laptop off the network — in
+exchange for catching the things that ignore `$http_proxy`. Nothing was
+deleted; `noughty.proxy.transparent = true` brings it back, and the traps are
+kept below precisely so a second attempt does not re-pay for them.
+
+The homelab is deliberately *not* routed through sing-box on either platform.
+`no_proxy` carries `.phonkd.net` and `100.64.0.0/10`, so it goes to tailscaled
+over the headscale mesh directly — one fewer thing whose failure takes the
+homelab down. `noughty.proxy.tailscaleOutbound` (sing-box's own userspace
+tsnet node) exists for the tun arrangement, where the tailnet *has* to re-enter
+sing-box; it is inert without the tun, and switching it on alone would register
+a second `z14-singbox` node on the mesh and then route nothing to it.
 
 They were one file with platform branches until the Linux side grew a tun,
 three traffic classes and a secret. The resemblance was superficial and it made

@@ -1,21 +1,42 @@
 { ... }:
 
-# sing-box as the system-wide proxy on NixOS. Gated on `noughty.proxy.enable`,
-# which `nixosModules.work` sets from the "work" host tag -- today that means
-# z14 and nothing else. See plans/work-setup-on-nixos.md, which also carries
-# the history of how this was got working; the comments here are limited to
-# what you need to change it safely.
+# sing-box on NixOS: an HTTP + SOCKS proxy on 127.0.0.1:2080, run as a root
+# systemd service. Gated on `noughty.proxy.enable`, which `nixosModules.work`
+# sets from the "work" host tag -- today that means z14 and nothing else. See
+# plans/work-setup-on-nixos.md, which also carries the history of how this was
+# got working; the comments here are limited to what you need to change it
+# safely.
+#
+# APP-LAYER BY DEFAULT. `transparent` -- the tun inbound with `auto_route`,
+# which is what made this a system-wide proxy capturing every socket -- is OFF,
+# and so is the in-process tailscale endpoint. Only traffic that opts in comes
+# through: anything honouring $http_proxy, plus the work ssh catch-all, which
+# dials the SOCKS half by hand through socat. Both mechanisms are still
+# implemented and both default off; the traps they cost to find are in the
+# README, and turning either back on is a one-line change at its option.
+#
+# "System service" is a SEPARATE axis from "system-wide proxy", and only the
+# second was given up. Root still earns its keep without the tun:
+# `environment.sessionVariables` reaches every login session and every
+# graphical app greetd starts, where home-manager's session variables reach
+# only its own shells.
 #
 # This shares nothing with the macOS half (modules/proxy/darwin.nix) beyond the
 # package. They looked similar once and the similarity was misleading: the Mac
 # runs an unprivileged launchd agent with one inbound and one routing concern,
-# this runs as root with a tun device, three traffic classes and a secret.
+# this one keeps the tun, the extra traffic class and the secret available even
+# while they are switched off.
 #
-# THREE traffic classes, once `transparent` is on:
+# TWO traffic classes as configured today:
 #
-#   homelab (100.64.0.0/10, *.ts.net, *.phonkd.net) -> tailnet
-#   bedag   (the work config's own domain/ip rules) -> SOCKS ssh tunnels
-#   everything else                                 -> direct
+#   bedag (the work config's own domain/ip rules) -> SOCKS ssh tunnels
+#   everything else                               -> direct
+#
+# The homelab is a third class that deliberately never reaches sing-box at all:
+# `no_proxy` below carries `.phonkd.net` and 100.64.0.0/10, so those go
+# straight to tailscaled over the headscale mesh. `transparent` +
+# `tailscaleOutbound` would pull it back in here (homelab -> sing-box's own
+# tsnet node), which is the arrangement the README and the plan describe.
 #
 # THREE config files, merged by sing-box and split by who may read them:
 #
@@ -25,7 +46,9 @@
 #      rules picking between them. Private repo, referenced by path, never
 #      restated here.
 #   3. /run/secrets/rendered/singbox-tailscale.json -- the tailscale endpoint,
-#      rendered by sops at activation because it carries a pre-auth key.
+#      rendered by sops at activation because it carries a pre-auth key. Only
+#      written, and only passed to sing-box, under `tailscaleOutbound.enable`,
+#      so today it does not exist.
 #
 # That split is what keeps this repo publishable: nothing secret is ever a
 # store path.
@@ -214,7 +237,7 @@
     in
     {
       options.noughty.proxy = {
-        enable = lib.mkEnableOption "the sing-box system proxy (bedag work tunnels)";
+        enable = lib.mkEnableOption "the sing-box HTTP/SOCKS proxy (bedag work tunnels)";
 
         additionalConfigFile = lib.mkOption {
           type = lib.types.str;
@@ -266,11 +289,23 @@
 
         transparent = lib.mkOption {
           type = lib.types.bool;
-          default = true;
+          default = false;
           description = ''
             Capture every socket via a tun inbound, rather than only what
             honours `$http_proxy`. This is the difference between a system-wide
             proxy and an opt-in one.
+
+            **Off by request.** It was on and working -- four traps deep, see
+            the README -- and was turned back off because an opt-in HTTP/SOCKS
+            proxy is what is actually wanted here. The tun is a great deal of
+            machinery, and a great many ways to take the laptop off the
+            network, in exchange for catching the handful of things that ignore
+            `$http_proxy`. Nothing is deleted, so it is one line to try again.
+
+            Everything gated on this goes with it: the tun inbound, the `sniff`
+            rule the work config's domain rules need underneath it, the
+            `bootstrapProcessNames` carve-out, the tailnet bypass rule, and
+            `CAP_NET_ADMIN` on the unit.
 
             `auto_route` rewrites the default route, so a bad change here takes
             the machine off the network; rollback is the previous generation
@@ -365,12 +400,18 @@
               traffic to it, instead of carving the tailnet out of the tun and
               leaving it to tailscaled.
 
-              Off: it only carries traffic under the tun (`no_proxy` keeps the
-              tailnet out of the `$http_proxy` path), and it registers a
-              *second* node on the mesh -- tsnet is a separate identity from
-              the host's tailscaled, so headscale gains an entry beside `z14`.
-              Whether it registers at all is still unobserved. The alternative
-              that avoids the second node is a `direct` outbound with
+              Off, and **requires `transparent`** to be worth anything: it can
+              only carry traffic the tun captures, because `no_proxy` keeps the
+              tailnet out of the `$http_proxy` path. Switched on by itself it
+              would register a *second* node on the mesh -- tsnet is a separate
+              identity from the host's tailscaled, so headscale would gain an
+              entry beside `z14` -- and then route nothing to it. Whether it
+              registers at all is still unobserved.
+
+              Headscale is therefore not "part of sing-box" here: the homelab
+              rides tailscaled directly, which is one fewer thing that can take
+              it down. The alternative that avoids the second node, if this is
+              ever revisited, is a `direct` outbound with
               `bind_interface = "tailscale0"`: no key needed, but sing-box then
               depends on tailscaled being up.
             '';
@@ -466,7 +507,7 @@
         };
 
         systemd.services.sing-box = {
-          description = "sing-box (system proxy: bedag tunnels + tailnet)";
+          description = "sing-box (HTTP/SOCKS proxy on 2080: bedag work tunnels)";
           after = [ "network.target" ];
           wantedBy = [ "multi-user.target" ];
 
@@ -515,10 +556,15 @@
           };
         };
 
-        # The point of the exercise: these reach every login session and every
-        # graphical app greetd starts, where home-manager's session variables
-        # reached only its own shells. Uppercase spellings because plenty of
-        # tooling reads only those.
+        # With `transparent` off these are no longer a convenience, they ARE
+        # the proxy: nothing is captured, so anything that does not read them
+        # (or dial 2080 itself, as the work ssh catch-all does through socat)
+        # simply goes direct. Which is the point -- opt-in was the ask.
+        #
+        # Still system-wide rather than home-manager's: they reach every login
+        # session and every graphical app greetd starts, where
+        # `home.sessionVariables` reaches only hm's own shells. Uppercase
+        # spellings because plenty of tooling reads only those.
         #
         # NB systemd *system* units do not source /etc/set-environment, so
         # nix-daemon stays unproxied -- on purpose, so builds do not start
@@ -526,9 +572,11 @@
         environment.sessionVariables =
           let
             url = "http://localhost:${toString cfg.listenPort}";
-            # Keeps homelab traffic out of the HTTP proxy path. Under the tun
-            # these packets are captured and routed anyway, so this just avoids
-            # a pointless extra hop for clients that read the variable.
+            # Keeps homelab traffic out of the HTTP proxy path, so it goes to
+            # tailscaled over the mesh rather than through sing-box. This is
+            # what makes the homelab independent of the proxy's health. (Under
+            # the tun those packets were captured and routed regardless, and
+            # this only saved a pointless extra hop.)
             bypass = "localhost,127.0.0.1,.phonkd.net,100.64.0.0/10";
           in
           {

@@ -423,8 +423,9 @@ Leads for a next attempt, in order:
       the breakage was invisible, and plausibly part of the cause.
 - [ ] Try `strict_route = true`. It was set false to avoid a fight with
       `tailscale0`; that may simply have been the wrong trade.
-- [ ] Try `stack = "gvisor"` instead of `"system"`.
-- [ ] Only ever at a console, and **the acceptance test is `curl -4` against an
+- [x] Try `stack = "gvisor"` instead of `"system"`. **This was it** — see the
+      next section.
+- [x] Only ever at a console, and **the acceptance test is `curl -4` against an
       IPv4-only host**. `curl` against a dual-stack host proves nothing — that
       is precisely what hid this for three rounds.
 
@@ -435,6 +436,61 @@ what those checks can see. Config validation is not connectivity validation.
 For anything touching the datapath the acceptance test has to be a real
 packet to a real destination, chosen so it cannot succeed by accident — which
 here means IPv4-only.
+
+### Attempt 4 worked — and transparent mode is off anyway, by request
+
+The leads above were followed and the first one landed. `stack = "gvisor"`
+(now a `tunStack` option) fixed the IPv4 black hole outright: a tun-routed
+`curl` established to an IPv4-only bedag gateway from `172.19.0.1`. The next
+failure was `wiki.bedag.ch` timing out as `outbound/direct[direct]` with the
+tunnels up, and it took two goes to name:
+
+- A `{ action = "sniff" }` rule is genuinely required under a tun. The work
+  config matches almost entirely on `domain_suffix`; an `$http_proxy` client
+  hands sing-box `CONNECT wiki.bedag.ch:443`, while a tun client resolves the
+  name itself and sing-box sees only `159.144.24.33`.
+- But adding that rule changed nothing, because **sing-box merges `--config`
+  files in order of their FILE PATH, not command-line order** — measured by
+  moving one byte-identical file and changing nothing else:
+  `/home/…/.claude/x.json` → `match[0]`, `/home/…/zz-x.json` → `match[18]`
+  (18 being the number of rules in the work config). From `/nix/store` the
+  generated config always sorted *after* the work config, so `sniff` ran only
+  once every domain rule had been evaluated against a bare IP and skipped.
+  Fixed by installing it to `/etc/sing-box/config.json` — `/etc` < `/home` <
+  `/nix` < `/run`.
+
+With those two, transparent mode worked. **It is off again regardless**, and
+this time not because anything broke:
+
+    noughty.proxy.transparent = false   ← the option default now
+
+The ask is an opt-in HTTP/SOCKS proxy on `127.0.0.1:2080`, not a system-wide
+one. The tun buys capture of whatever ignores `$http_proxy`, and costs a tun
+device, an `auto_route` rewrite of the default route, the sniff rule, a
+`process_name` carve-out so ssh can still bootstrap the very tunnels it
+proxies through, `CAP_NET_ADMIN`, and a standing way to take the laptop off
+the network on a bad change. Not worth it here.
+
+`tailscaleOutbound.enable` stays **false** alongside it, and that is now
+structural rather than a preference: the endpoint can only carry traffic the
+tun captures, because `no_proxy` keeps the tailnet out of the `$http_proxy`
+path. Switched on alone it would register a second `z14-singbox` node on the
+mesh and then route nothing to it. So headscale is *not* part of sing-box —
+the homelab rides tailscaled directly, which also decouples homelab
+reachability from proxy health. (The **Risks / rollout** section below lists
+"the homelab now depends on sing-box" as the most likely way this bites; it no
+longer does.)
+
+Unchanged by this: sing-box is still a **system** service with system-wide
+proxy env vars. That is a separate axis from the tun and only the tun was
+given up — `environment.sessionVariables` still reaches greetd-started
+graphical apps that home-manager's shells never touch.
+
+Nothing was deleted. The tun, the sniff rule, the process carve-out and the
+tailscale endpoint all remain in `modules/proxy/nixos.nix` behind their
+options, and the four traps are written up in `modules/proxy/README.md`, so a
+fifth attempt starts where the fourth finished instead of re-paying for it.
+The two leads never tried: a v6 address on the tun, and `strict_route = true`.
 
 ### Transparent mode — the original write-up
 
