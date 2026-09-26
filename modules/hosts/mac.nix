@@ -28,59 +28,53 @@
           };
         }
         {
-          # Syncthing as a launchd user agent (nix-darwin has no syncthing
-          # module; home-manager runs it under launchd on macOS). GUI on
-          # http://127.0.0.1:8384 — pair with 201-mono there, same as the
-          # servers do (they only `enable`, no declarative devices/folders).
+          # Syncthing as a launchd user agent (nix-darwin has no module for
+          # it). GUI on 127.0.0.1:8384, paired with 201-mono like the servers.
           services.syncthing.enable = true;
         }
         {
+          # sing-box now carries ONLY the bedag work setup
+          # (modules/proxy/darwin.nix). Everything HOMELAB rides the
+          # headscale tailnet instead: ssh/deploy (Tailscale SSH by
+          # identity), observability, SMB, and homelab web (`.w.phonkd.net`
+          # -> 201's tailnet IP via the Mac's scoped dnsmasq, modules/dns.nix).
+          # Spotify-via-home was the last non-work sing-box rule and retired
+          # the WireGuard outbound entirely.
+          #
+          # Finder SMB to 203 is direct over the tailnet: Finder > Cmd+K >
+          # smb://100.64.0.3 (203's samba `hosts allow` includes
+          # 100.64.0.0/10, see 203-media.nix).
           targets.darwin = {
             copyApps.enable = false;
             linkApps.enable = true;
           };
-          # sing-box now carries ONLY the bedag work setup — see modules/proxy/darwin.nix.
-          # Everything HOMELAB rides the headscale tailnet: hosts for ssh/deploy
-          # (Tailscale SSH by identity), observability, SMB, AND homelab web
-          # (`.w.phonkd.net` resolves to 201's tailnet IP 100.64.0.5 via the Mac's
-          # scoped dnsmasq in modules/dns.nix, reaching traefik over the mesh).
-          # Spotify-via-home was the last non-work rule and is gone too, which
-          # retired the WireGuard outbound. Non-enrolled LAN boxes (Proxmox
-          # 192.168.3.47) are reached by ssh-jump through 203 — below.
-          # Finder SMB to 203 is now direct over the tailnet — no local forward:
-          #   Finder > Cmd+K > smb://100.64.0.3
-          # (203's samba `hosts allow` includes 100.64.0.0/10; see 203-media.nix.)
-          # (day-to-day, observability is reached over the tailnet via the
-          # `observability` alias below, and `deploy observability` targets
-          # 100.64.0.4; see lib/registry.nix. Its non-tailnet break-glass
-          # blocks are further down.)
-          # ext-mail — same Hetzner :5432 + id_rsa. NB: 10.0.0.2 is the Hetzner
-          # private range, and sing-box no longer has any tunnel outbound at all,
-          # so this fixes the port/key but the connection only works from a
-          # network that can already route there.
+          # 10.0.0.2 is the Hetzner private range (ext-mail's other
+          # port/key pair); sing-box has no tunnel outbound anymore, so this
+          # only works from a network that can already route there.
           programs.ssh.matchBlocks."10.0.0.2" = {
             port = 5432;
             identityFile = "~/.ssh/id_rsa";
             identitiesOnly = true;
           };
-          # 205-builder distributed-build account, now over the tailnet (matches
-          # nix.buildMachines.hostName = 100.64.0.2). nix.buildMachines passes the
-          # key explicitly so offload works without this block; it's for manual
-          # `ssh nixremote@100.64.0.2`. Scoped to `user nixremote` so the phonkd
-          # login is untouched. (Tailscale SSH would authorise nixremote by
-          # identity anyway; the key is the regular-sshd fallback.)
+          # 205-builder distributed-build account, over the tailnet
+          # (matches nix.buildMachines.hostName = 100.64.0.2). buildMachines
+          # passes the key explicitly so offload works without this block;
+          # it's for manual `ssh nixremote@100.64.0.2`. Scoped to `user
+          # nixremote` so the phonkd login is untouched (Tailscale SSH would
+          # authorise nixremote by identity anyway; this key is the
+          # regular-sshd fallback).
           programs.ssh.matchBlocks."205-builder-nixremote" = {
             match = "host 100.64.0.2 user nixremote";
             identityFile = "/Users/phonkd/.ssh/nixremote_ed25519";
             identitiesOnly = true;
           };
 
-          # --- Tailnet (headscale mesh) -------------------------------------
-          # Reach every enrolled homelab host by name over the tailnet, direct
-          # (proxyCommand none defeats the bedag `Host *` SOCKS catch-all, which
-          # otherwise routes even tailnet IPs through sing-box). These render
-          # before that catch-all, so they win. Tailscale SSH authorises by
-          # identity — no port/key/known_hosts to manage.
+          # --- Tailnet (headscale mesh) --------------------------------
+          # Every enrolled homelab host, direct: proxyCommand none defeats
+          # the bedag `Host *` SOCKS catch-all (which would otherwise route
+          # even tailnet IPs through sing-box) because these blocks render
+          # above it. Tailscale SSH authorises by identity -- no
+          # port/key/known_hosts to manage.
           programs.ssh.matchBlocks."201-mono" = {
             hostname = "100.64.0.5";
             user = "phonkd";
@@ -101,50 +95,45 @@
             user = "phonkd";
             proxyCommand = "none";
           };
-          # obs is reached over the tailnet like every other host now:
-          # `ssh observability`/`obs` and `deploy observability` (100.64.0.4).
-          # The metrics/log data plane rides the tailnet too since
-          # plans/retire-wg-obs.md — wg-obs is gone entirely.
+          # Reached like every other host now: `ssh observability`/`obs`,
+          # `deploy observability` (100.64.0.4). Metrics/logs ride the
+          # tailnet too since plans/retire-wg-obs.md retired wg-obs.
           programs.ssh.matchBlocks."observability" = {
             host = "observability obs";
             hostname = "100.64.0.4";
             user = "phonkd";
             proxyCommand = "none";
           };
-          # ext-mail was missing from this list, which made `ssh ext-mail` fail
-          # as "Connection closed by UNKNOWN port 65535" — the bedag `Host *`
-          # socat SOCKS catch-all swallowing it, exactly as it does for obs's
-          # public IP without the break-glass block below. Misleading symptom
-          # for what is only a missing alias.
+          # Without this alias `ssh ext-mail` failed as "Connection closed
+          # by UNKNOWN port 65535" -- the bedag `Host *` SOCKS catch-all
+          # swallowing it (same as obs's public IP below), a misleading
+          # symptom for a missing alias.
           #
-          # Over the tailnet it needs neither :5432 nor id_ed25519_priv: it is
-          # an enrolled node with Tailscale SSH live, so it authorises by
-          # identity like every other host (verified: `ssh 100.64.0.19`). The
-          # port and key in lib/registry.nix / the nixconfig-ops runbook are
-          # for the OFF-tailnet deploy path only, which is deliberate and
-          # unaffected by this alias — `deploy.hostname` there is the public
-          # IP, so deploys do not come through here.
+          # Over the tailnet it needs neither :5432 nor id_ed25519_priv: an
+          # enrolled node with Tailscale SSH live authorises by identity like
+          # every other host (verified: `ssh 100.64.0.19`). The port/key in
+          # lib/registry.nix / nixconfig-ops are for the OFF-tailnet deploy
+          # path only (`deploy.hostname` there is the public IP) and are
+          # unaffected by this alias.
           programs.ssh.matchBlocks."ext-mail" = {
             hostname = "100.64.0.19";
             user = "phonkd";
             proxyCommand = "none";
           };
 
-          # --- obs break-glass (tailnet is DOWN) ----------------------------
-          # When the mesh is broken the `observability` alias above is useless,
-          # so keep the two non-tailnet routes to obs's real sshd (:5432)
-          # spelled out. Without a block here these addresses fall through to
-          # the bedag `Host *` socat SOCKS catch-all (work repo, imported via
-          # modules/work/external.nix) and die with a misleading
-          # "peer might not be a socks4 server" / "Connection closed by UNKNOWN
-          # port 65535" — hence proxyCommand none. The catch-all also forces
-          # `IdentityFile ~/.ssh/id_ed25519` globally, which obs rejects; the
-          # key it accepts is id_ed25519_priv, and first-match-wins in
-          # ssh_config only works because these render above the catch-all.
-          # The wg-obs route that used to be here is gone with the tunnel
-          # (plans/retire-wg-obs.md). obs's public IP is now the only
-          # break-glass path, which is no loss: it works from any network,
-          # whereas the tunnel route only worked from home.
+          # --- obs break-glass (tailnet is DOWN) ------------------------
+          # When the mesh is down the `observability` alias is useless, so
+          # keep obs's real sshd (:5432) reachable directly. Without a block
+          # here this falls through to the bedag `Host *` SOCKS catch-all
+          # (modules/work/external.nix) and dies with a misleading "peer
+          # might not be a socks4 server" / "Connection closed by UNKNOWN
+          # port 65535" -- hence proxyCommand none. The catch-all also forces
+          # `IdentityFile ~/.ssh/id_ed25519` globally, which obs rejects; it
+          # wants id_ed25519_priv, and first-match-wins only works because
+          # this renders above the catch-all. The wg-obs route is gone with
+          # the tunnel (plans/retire-wg-obs.md) -- the public IP is now the
+          # only break-glass path, which is no loss: it works from any
+          # network, the tunnel only worked from home.
           programs.ssh.matchBlocks."obs-rescue-public" = {
             host = "obs-rescue-public 89.167.83.90";
             hostname = "89.167.83.90";
@@ -160,8 +149,8 @@
             host = "100.64.0.*";
             proxyCommand = "none";
           };
-          # Non-enrolled LAN boxes (Proxmox 192.168.3.47, etc.) are reached by
-          # ssh-jump through 203 over the tailnet — no sing-box, no subnet
+          # Non-enrolled LAN boxes (Proxmox 192.168.3.47, etc.) reached by
+          # ssh-jump through 203 over the tailnet -- no sing-box, no subnet
           # router. Verified: Mac -> 203(tailnet) -> Proxmox authenticates.
           programs.ssh.matchBlocks."homelab-lan-jump" = {
             host = "192.168.1.* 192.168.3.*";
@@ -176,13 +165,12 @@
       system.stateVersion = 6;
       nix.settings.experimental-features = "nix-command flakes";
 
-      # --- Offload x86_64-linux builds to the 205-builder VM -------------
-      # The Mac can't build Linux natively, so point it at 205-builder for
-      # x86_64-linux derivations (NixOS configs, ISOs, amd64 OCI images...).
-      # The nixremote private key is delivered by sops-nix (homeManagerModules)
-      # to /Users/phonkd/.ssh/nixremote_ed25519. The nix-daemon (root) reads it
+      # --- Offload x86_64-linux builds to the 205-builder VM -----------
+      # The Mac can't build Linux natively. The nixremote private key comes
+      # from sops-nix (homeManagerModules) to
+      # /Users/phonkd/.ssh/nixremote_ed25519; nix-daemon (root) reads it
       # there. Seed the builder's host key once after first deploy (over the
-      # tailnet now — Tailscale SSH accepts it by identity):
+      # tailnet, Tailscale SSH accepts it by identity):
       #   sudo -H ssh -i /Users/phonkd/.ssh/nixremote_ed25519 nixremote@100.64.0.2 true
       nix.distributedBuilds = true;
       nix.settings.builders-use-substitutes = true;
@@ -205,9 +193,10 @@
             "kvm"
           ];
         }
-        # aarch64-linux on the same box via qemu-user binfmt. See the matching
-        # entry in modules/hosts/types/server/builder.nix for why it is a
-        # second entry with reduced features rather than a wider `systems` list.
+        # aarch64-linux on the same box via qemu-user binfmt; see the
+        # matching entry in modules/hosts/types/server/builder.nix for why
+        # this is a second entry with reduced features rather than a wider
+        # `systems` list.
         {
           hostName = "100.64.0.2";
           sshUser = "nixremote";

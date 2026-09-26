@@ -25,15 +25,11 @@
             {
               imports = [ self.homeModules.base ];
               home.username = lib.mkForce "nix-on-droid";
-              # home.packages = with pkgs; [
-              #   openssh
-              # ];
-              #home.stateVersion = lib.mkForce "24.05";
               programs.zellij = {
                enable = true;
                enableZshIntegration = true;
-               attachExistingSession = true;  # reattach if session exists
-               exitShellOnExit = true;        # exit zsh when you exit zellij
+               attachExistingSession = true;
+               exitShellOnExit = true;
                extraConfig = ''
                 default_shell "zsh"
                 show_startup_tips false
@@ -45,7 +41,6 @@
 
             };
             user.shell = pkgs.zsh;
-            #nixpkgs.config.allowUnfree = true;
 
           environment.packages = with pkgs; [
             openssh

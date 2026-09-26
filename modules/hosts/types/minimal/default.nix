@@ -18,7 +18,6 @@
         enableNixpkgsReleaseCheck = true;
       };
       nixpkgs.config.allowUnfree = true;
-      #home.homeDirectory = if pkgs.stdenv.isDarwin then "/Users/phonkd" else "/home/phonkd";
       programs.git = {
         enable = true;
         settings = {
@@ -96,7 +95,6 @@
     users.users.phonkd = {
       isNormalUser = true;
       description = "phonkd";
-      #extraGroups = [ "wheel" ];
       group = "phonkd";
       shell = pkgs.zsh;
     };

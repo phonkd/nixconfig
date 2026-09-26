@@ -4,11 +4,10 @@
   ...
 }:
 {
-  # Cross-platform GUI base. NOTE: the sing-box `proxy` HM module is
-  # deliberately NOT here -- it's Mac-only (work VPN + Spotify) and is
-  # imported from gui-darwin. NixOS desktops reach the homelab over the
-  # headscale tailnet (modules/tailnet.nix) instead, so forcing http_proxy
-  # at localhost:2080 there just pointed at a dead SOCKS port.
+  # Cross-platform GUI base. The sing-box `proxy` HM module is deliberately
+  # NOT here -- Mac-only (work VPN + Spotify), imported from gui-darwin.
+  # NixOS desktops reach the homelab over the headscale tailnet
+  # (modules/tailnet.nix) instead.
   flake.homeModules.gui =
     {
       config,
@@ -21,8 +20,8 @@
         self.homeModules.base
         self.homeModules.terminal
         self.homeModules.desktop
-        # secretspec + the Bitwarden CLI, pointed at our Vaultwarden. Lives on
-        # `gui` rather than `desktop-nixos-specific` so the Mac gets it too.
+        # secretspec + Bitwarden CLI, pointed at Vaultwarden. On `gui` not
+        # `desktop-nixos-specific` so the Mac gets it too.
         self.homeModules.secretspec
       ];
       home.packages = with pkgs; [
@@ -54,10 +53,10 @@
         pkgs.distrobox-tui
       ];
     };
-  # NixOS-side GUI: gated on host.is.nixosDesktop (desktop set AND linux).
-  # No `imports` needed -- system-minimal lives in alwaysImport directly.
-  # (Function modules can't be deduplicated by Nix, so multiple import
-  # paths to system-minimal would produce duplicate option definitions.)
+  # Gated on host.is.nixosDesktop. No `imports` needed -- system-minimal
+  # lives in alwaysImport directly (function modules can't be deduped by
+  # Nix, so multiple import paths would produce duplicate option
+  # definitions).
   flake.nixosModules.gui =
     {
       config,
@@ -71,9 +70,8 @@
       ];
     };
 
-  # Darwin-side GUI: gated on host.is.darwinDesktop. Wires Home Manager
-  # with the cross-platform `gui` HM module (not gui-nixos, which carries
-  # Linux-only bits).
+  # Gated on host.is.darwinDesktop. Wires HM with the cross-platform `gui`
+  # module (not gui-nixos, which carries Linux-only bits).
   flake.darwinModules.gui-darwin =
     {
       config,
@@ -84,22 +82,21 @@
     lib.mkIf config.noughty.host.is.darwinDesktop {
       home-manager.users.${config.noughty.user.name}.imports = [
         self.homeModules.gui
-        # sing-box SOCKS proxy: Mac-only, and now work-only (the bedag setup).
-        # NixOS desktops don't import this -- they ride the tailnet.
+        # sing-box SOCKS proxy: Mac-only, work-only now. NixOS desktops ride
+        # the tailnet instead.
         self.homeModules.proxy
-        # Spotlight-launchable nix apps. Reads ~/Applications/Home Manager Apps
-        # (the linkApps output) and writes a trampoline .app per bundle into
-        # ~/Applications/Home Manager Trampolines, on the boot volume where
-        # Spotlight will actually index it. Requires linkApps to stay enabled
-        # -- mac.nix sets it, and it is this module's *input*, not a rival to
-        # it. The nix-darwin half is in modules/builder.nix.
+        # Spotlight-launchable nix apps: reads ~/Applications/Home Manager
+        # Apps (linkApps output) and writes a trampoline .app per bundle
+        # into ~/Applications/Home Manager Trampolines on the boot volume,
+        # where Spotlight indexes it. Requires linkApps (set in mac.nix) --
+        # this module consumes it, not a rival. The nix-darwin half is in
+        # modules/builder.nix.
         inputs.mac-app-util.homeManagerModules.default
         {
-          # cava on macOS: portaudio can only read *input* devices, so system
-          # audio is captured through the BlackHole loopback driver (cask
-          # below). One-time setup after switching: Audio MIDI Setup > "+" >
-          # Create Multi-Output Device (built-in speakers + BlackHole 2ch),
-          # then select it as the sound output device.
+          # cava on macOS: portaudio only reads *input* devices, so system
+          # audio is captured via the BlackHole loopback driver (cask
+          # below). One-time setup: Audio MIDI Setup > + > Multi-Output
+          # Device (built-in speakers + BlackHole 2ch), select it as output.
           programs.cava = {
             enable = true;
             settings = {
@@ -112,15 +109,11 @@
           };
         }
         {
-          # Xcode itself can't be a nix package (proprietary, ~20 GB, and
-          # Apple gates the download behind an Apple ID login). `xcodes` is
-          # the installer CLI: `xcodes install --latest` authenticates,
-          # downloads, unxips and drops it in /Applications, and can hold
-          # several versions side by side. aria2 is optional but xcodes uses
-          # it for a much faster parallel download when present.
-          #
-          # Needed here because the yubioath-flutter Spotlight build shells
-          # out to xcodebuild -- Command Line Tools alone are not enough.
+          # Xcode can't be a nix package (proprietary, ~20 GB, Apple-ID
+          # gated). xcodes installs it (`xcodes install --latest`); aria2
+          # speeds its download. Needed here because yubioath-flutter's
+          # Spotlight build shells out to xcodebuild -- Command Line Tools
+          # alone aren't enough.
           home.packages = [
             pkgs.xcodes
             pkgs.aria2
@@ -133,12 +126,10 @@
         "firefox"
         "android-platform-tools"
         "obsidian"
-        # Client for the self-hosted AFFiNE on 201 (plans/affine.md). A cask,
-        # not the nixpkgs `affine` in modules/desktop.nix: HM links apps as
-        # store symlinks under ~/Applications/Home Manager Apps, which
-        # Spotlight will not index, so a nix-installed GUI app is invisible in
-        # the Applications view on Tahoe. The cask also tracks 0.27.3, the
-        # version the server actually runs -- nixpkgs is on 0.26.6.
+        # Client for the self-hosted AFFiNE on 201 (plans/affine.md). A
+        # cask, not nixpkgs' `affine`: HM's store-symlink apps aren't
+        # Spotlight-indexed on Tahoe. Also tracks 0.27.3, the version the
+        # server runs (nixpkgs is on 0.26.6).
         "affine"
         "spotify"
         "claude-code@latest"
@@ -154,31 +145,29 @@
         "clipbook"
         "betterdisplay"
         "shottr"
-        # No yubico-authenticator cask on purpose. The app in use is a local
-        # build of yubioath-flutter carrying a macOS 26 Spotlight / App Intents
-        # patch (find accounts from Spotlight, copy a code without opening the
-        # app), which the upstream cask does not have -- and both want
-        # /Applications/Yubico Authenticator.app, same bundle id.
+        # No yubico-authenticator cask: a local yubioath-flutter build with
+        # a macOS 26 Spotlight / App Intents patch (find accounts from
+        # Spotlight, copy a code without opening the app) replaces it --
+        # same bundle id, both want /Applications/Yubico Authenticator.app.
+        # Can't be nix-managed either: nixpkgs' yubioath-flutter is
+        # x86_64/aarch64-linux only, and the macOS build shells out to
+        # xcodebuild.
         #
-        # It can't be nix-managed either: nixpkgs' yubioath-flutter is
-        # x86_64-linux/aarch64-linux only, and the macOS build shells out to
-        # xcodebuild, which nix has no sandboxed way to provide.
-        #
-        # To (re)install: with Xcode 26+ selected, from the yubioath-flutter
-        # checkout run ./build-helper.sh then `flutter build macos`, and copy
-        # "build/macos/Build/Products/Release/Yubico Authenticator.app" into
+        # To (re)install: with Xcode 26+, from the yubioath-flutter checkout
+        # run ./build-helper.sh then `flutter build macos`, copy
+        # "build/macos/Build/Products/Release/Yubico Authenticator.app" to
         # /Applications. See that repo's doc/MacOS_Spotlight.adoc.
         "caffeine"
         "linearmouse"
         "blackhole-2ch"
-        # Signed/notarized kitty. The nixpkgs kitty is ad-hoc signed and can't
-        # hold a TCC Microphone grant, which cava (reading BlackHole, an input
-        # device) needs. Run cava from this build and the mic permission sticks.
+        # Signed/notarized kitty: the nixpkgs build is ad-hoc signed and
+        # can't hold a TCC Microphone grant, which cava (reading BlackHole)
+        # needs.
         "kitty"
-        # Handy — offline on-device whisper STT (push-to-talk dictation).
-        # A signed, self-contained app captures the mic in-process, so it holds
-        # a TCC Microphone grant. The old DIY whisper.cpp+Hammerspoon rig failed
-        # because macOS TCC won't extend a mic grant to spawned nix CLI helpers.
+        # Handy: offline on-device whisper STT (push-to-talk dictation).
+        # Signed and self-contained, so it holds a TCC Microphone grant --
+        # the old DIY whisper.cpp+Hammerspoon rig failed because TCC won't
+        # extend a mic grant to spawned nix CLI helpers.
         "handy"
         "tidal"
         "tailscale"
