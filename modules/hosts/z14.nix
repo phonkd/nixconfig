@@ -98,15 +98,6 @@
         "context.modules" = [ { name = "libpipewire-module-raop-discover"; } ];
       };
 
-      # Alt+M controls easyeffects_sink volume (pre-effects) rather than the
-      # output device: this host's preset boosts bass as a function of level,
-      # so a pre-effects knob works as a tone control. Measured: 100%->50%
-      # takes the chain's bass/mid ratio from 3.4 to 6.2. Host-scoped because
-      # it's a tuning judgement about this preset, not a capability.
-      # Needs the PipeWire node rule in modules/desktop.nix to reach the chain
-      # at all.
-      noughty.hyprland.loudnessKnob = true;
-
       # DisplayLink dock. Off by default (modules/work/default.nix) because
       # pkgs.displaylink is requireFile and needs the installer already in
       # the store -- fetched here via the option's own nix-prefetch-url, hash

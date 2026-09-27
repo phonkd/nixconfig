@@ -14,9 +14,7 @@ let
   inherit (scope)
     annotate
     dispatch
-    eeVolume
     kitty
-    loudnessKnob
     mod
     moveWindowDispatch
     groupBinds
@@ -112,16 +110,6 @@ in
     # Device volume: the output as a whole.
     "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
     "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-  ]
-  # Loudness: `easyeffects_sink`, BEFORE the effects, vs. the device binds
-  # above which are after them -- changes how the speakers *sound* rather
-  # than how loud they are. Does not move the OSD (which follows the
-  # default sink). Opt-in (noughty.hyprland.loudnessKnob): see ee-volume.nix.
-  ++ lib.optionals loudnessKnob [
-    "${mod}, M, exec, ${eeVolume} up"
-    "${mod} SHIFT, M, exec, ${eeVolume} down"
-  ]
-  ++ [
     ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
     ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
     "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"

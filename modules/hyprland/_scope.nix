@@ -28,7 +28,6 @@ rec {
   colorMode = cfg.colorMode or "dark";
   colorScheme = cfg.colorScheme or "scheme-tonal-spot";
   scale = cfg.scale or "1";
-  loudnessKnob = cfg.loudnessKnob or false;
 
   layout = cfg.layout or "dwindle";
   hy3 = layout == "hy3";
@@ -228,9 +227,8 @@ rec {
   zen = "${self.packages.${pkgs.system}.zen-browser}/bin/zen";
   kitty = "${config.programs.kitty.package}/bin/kitty";
 
-  # perSystem packages rather than inlined `writeShellScript`s, so both are
+  # A perSystem package rather than an inlined `writeShellScript`, so it is
   # runnable by hand (`nix run .#hypr-sink-switcher`) without a session.
-  eeVolume = "${self.packages.${pkgs.system}.hypr-ee-volume}/bin/hypr-ee-volume";
   sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
 
   # -- Screenshots: capture, then annotate -------------------------------

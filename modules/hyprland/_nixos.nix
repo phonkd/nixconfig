@@ -36,26 +36,6 @@ in
       description = "Seconds between wallpaper (and colour scheme) changes.";
     };
 
-    loudnessKnob = lib.mkOption {
-      type = lib.types.bool;
-      # Opt-in per host: only worth anything where the EasyEffects preset
-      # lifts bass as a function of LEVEL (z14's does -- multiband band0 in
-      # "Boosting"). Elsewhere it would silently attenuate under the real
-      # volume key with no OSD. See ee-volume.nix.
-      #
-      # Needs the `monitor.channel-volumes` node rule in modules/desktop.nix
-      # too, or the bind moves a volume nothing in the graph listens to --
-      # not set for every desktop for that reason.
-      default = false;
-      description = ''
-        Bind Alt+M / Alt+Shift+M to the volume of `easyeffects_sink` -- the
-        node upstream of the EasyEffects chain, so it drives a level-driven
-        preset's bass lift instead of just making things quieter. Also
-        enables the PipeWire rule that makes that sink's volume reach the
-        chain. Only useful on hosts whose output preset is tuned for it.
-      '';
-    };
-
     scale = lib.mkOption {
       type = lib.types.str;
       # Not "auto": Hyprland's auto-scaling picks a fractional factor from

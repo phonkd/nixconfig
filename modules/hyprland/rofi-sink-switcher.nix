@@ -5,10 +5,9 @@
 # (three Sonos units and 203-media's shairport), via
 # `libpipewire-module-raop-discover` in modules/hosts/z14.nix.
 #
-# Packaged as a perSystem package like ee-volume.nix, for the same reasons:
-# too much logic for a bind line, worth running by hand
-# (`nix run .#hypr-sink-switcher`). import-tree picks this file up on its
-# own; modules/hyprland.nix only names the package.
+# Packaged as a perSystem package: too much logic for a bind line, worth
+# running by hand (`nix run .#hypr-sink-switcher`). import-tree picks this
+# file up on its own; modules/hyprland.nix only names the package.
 #
 # Setting the default is the whole job -- NOT chasing every stream with
 # `pactl move-sink-input`, which would be wrong here: EasyEffects

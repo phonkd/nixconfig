@@ -44,8 +44,8 @@
 # The leading underscore is load-bearing: flake.nix imports modules/ with
 # import-tree, which ignores any path containing `/_` -- without it every one
 # of those files would be auto-imported as a flake-parts module and fail.
-# ee-volume.nix and rofi-sink-switcher.nix have no underscore because they
-# ARE flake-parts modules, defining perSystem packages.
+# rofi-sink-switcher.nix has no underscore because it IS a flake-parts
+# module, defining a perSystem package.
 {
   self,
   inputs,
