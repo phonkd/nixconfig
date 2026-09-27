@@ -144,8 +144,11 @@
       flake = false;
     };
     # slop-trove: personal-data embedding/search platform (own repo, "the thing").
+    # TEMPORARILY on discord-dce-ingest for the DiscordChatExporter ingester
+    # 204's sources.discord now needs. Flip back to the bare URL once
+    # phonkd/slop-trove#2 merges -- nothing else here wants the branch.
     slop-trove = {
-      url = "github:phonkd/slop-trove";
+      url = "github:phonkd/slop-trove/discord-dce-ingest";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

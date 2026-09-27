@@ -64,6 +64,13 @@
       sops.secrets."hermes-discord-home" = {
         owner = "hermes";
       };
+      # Deliberately NO secret for the Discord *user* token slop-trove's
+      # exporter wants. Unlike hermes-discord above (a bot token, needed every
+      # boot) that one is a full account credential used by hand a few times a
+      # year, so it's handed over per run instead of stored:
+      #   sudo slop-trove-discord-export --reingest
+      # which prompts for it, stages it 0400 under /run for the unit's
+      # LoadCredential, and has ExecStopPost shred it however the run ends.
       # GITHUB_TOKEN (fine-grained PAT): gh CLI only -- the Copilot API
       # rejects PATs of any kind regardless of granted permissions.
       sops.secrets."hermes-github" = {
@@ -346,9 +353,26 @@
         embedding.model = "bge-m3";
         embedding.dim = 1024;
         mcp.port = 9120;
+        # DCE dump, not the GDPR package: Discord's own export carries only
+        # the messages phonkd *sent* (no author field -- there's nothing to
+        # disambiguate), so every chunk read as a monologue and "what did X
+        # tell me about Y" could never hit. The parser auto-detects the
+        # layout, so switching sources is just this path. The old package
+        # stays at exports/discord: the no-token fallback, and the only copy
+        # of anything DCE can't reach any more (deleted accounts, channels
+        # since left). See plans/slop-trove-discord-both-sides.md.
         sources.discord = {
           enable = true;
-          path = "/var/lib/slop-trove/exports/discord";
+          path = "/var/lib/slop-trove/exports/discord-dce";
+          # Installs `slop-trove-discord-export` plus the oneshot it starts.
+          # No timer and no tokenFile -- see the sops note above.
+          export = {
+            enable = true;
+            # DMs and group DMs only. "all" adds every readable guild
+            # channel: far more volume, mostly public chatter that isn't
+            # personal history. Revisit once a DM run shows its real cost.
+            scope = "dm";
+          };
         };
         sources.claude = {
           enable = true;

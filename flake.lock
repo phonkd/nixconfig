@@ -1577,15 +1577,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1784755841,
-        "narHash": "sha256-qUDs37Trc0hTw+Afs+8XAADg/gHVkQSJWRqP4PZ8KJQ=",
+        "lastModified": 1790500136,
+        "narHash": "sha256-uTPfMiOYFqHX8yWPy85m2/AgHX3pYSkDCIdIEnuqx/A=",
         "owner": "phonkd",
         "repo": "slop-trove",
-        "rev": "b68b58feaee036bdf9f215f15c9a00b5ad75b830",
+        "rev": "5ec6e67a35e18e5ee270a8d6c36e04afa82dabb5",
         "type": "github"
       },
       "original": {
         "owner": "phonkd",
+        "ref": "discord-dce-ingest",
         "repo": "slop-trove",
         "type": "github"
       }
