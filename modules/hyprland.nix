@@ -1,5 +1,5 @@
 # Hyprland: the *only* session on every NixOS desktop tagged "hyprland" in
-# lib/registry.nix (blac, g14, z14). modules/desktop.nix's greetd/tuigreet
+# lib/registry.nix (blac, z14). modules/desktop.nix's greetd/tuigreet
 # branch gives it the login-screen entry; dropping the host tag leaves the
 # host with no session at all.
 #

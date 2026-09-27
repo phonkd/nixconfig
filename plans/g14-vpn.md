@@ -1,6 +1,11 @@
 # g14 VPN — ProtonVPN for public wifi + opt-in tailnet exit node
 
-**Repo(s):** nixconfig   **Status:** in-progress
+**Repo(s):** nixconfig   **Status:** retired (2026-09-27) — g14 itself is gone
+from the registry (`modules/hosts/g14/` deleted). Both mechanisms survive it and
+are still live: ProtonVPN ships to every NixOS desktop from the `nixosDesktop`
+baseline, and the exit-node opt-in is keyed on the `laptops` list in
+`modules/tailnet.nix`, which now holds z14 alone. Read what follows as the
+design record for those two, with "g14" meaning "the Linux laptop".
 
 ## Goal
 

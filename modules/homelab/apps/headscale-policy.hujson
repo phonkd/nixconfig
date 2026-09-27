@@ -52,7 +52,7 @@
   // accept_ra = 2 to take it -- as a forwarding host, the default of 1 means
   // "accept RAs if forwarding is disabled", i.e. nothing. See the comment in
   // modules/hosts/201-mono.nix. Both halves of the exit node are now real:
-  // measured from g14 over the exit node, v6 egress 2a02:168:b066:… and v4
+  // measured from a laptop over the exit node, v6 egress 2a02:168:b066:… and v4
   // egress 85.195.231.133, example.com 200 over v6 in 0.18 s.
   //
   // Do NOT add an `unreachable ::/0` on 201 as a "fast fail" mitigation. It was

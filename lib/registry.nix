@@ -62,46 +62,11 @@
       ];
   };
 
-  g14 = {
-    kind = "computer";
-    platform = "x86_64-linux";
-    formFactor = "laptop";
-    desktop = "hyprland";
-    tags = [
-      "gigaplayer-client"
-      # The only session -- see the note on blac's tag.
-      "hyprland"
-    ];
-    username = "phonkd";
-
-    gpu = {
-      vendors = [ "nvidia" ];
-    };
-
-    extraModules =
-      { self, inputs }:
-      [
-        /etc/nixos/hardware-configuration.nix
-        self.nixosModules.g14
-        # Offload x86_64-linux builds to 205-builder, same as every homelab VM
-        # (via oldblac-vm); without it the laptop compiles every host's
-        # closure itself. Supplies the nixremote key via sops, pins 205's
-        # host key, and targets 205 over the tailnet (100.64.0.2) so offload
-        # works from anywhere -- the old LAN address let an off-LAN `deploy`
-        # silently fall back to compiling locally when the builder didn't
-        # answer.
-        self.nixosModules.builder-client
-        # Hyprland -- see the note on blac's entry.
-        self.nixosModules.hyprland
-      ];
-  };
-
-  # The ASUS Zenbook 14 UM3406GA. Same *role* as g14 -- gigaplayer/build-offload
-  # client, no deploy.hostname (laptops are deploy clients, not targets) --
-  # different hardware: Radeon 840M iGPU, no dGPU, no ROG firmware, no
-  # fingerprint reader. See plans/z14-zenbook.md.
+  # The ASUS Zenbook 14 UM3406GA -- the only Linux laptop, gigaplayer/
+  # build-offload client, no deploy.hostname (laptops are deploy clients, not
+  # targets). Radeon 840M iGPU, no dGPU. See plans/z14-zenbook.md.
   #
-  # Hyprland is the only session, as on blac/g14. `desktop` must stay
+  # Hyprland is the only session, as on blac. `desktop` must stay
   # non-null: it drives noughty.host.is.nixosDesktop (desktop baseline +
   # modules/hyprland/) and selects the greetd/tuigreet login screen in
   # modules/desktop.nix.
@@ -150,11 +115,14 @@
       [
         /etc/nixos/hardware-configuration.nix
         self.nixosModules.z14
-        # Offload x86_64-linux builds to 205-builder over the tailnet, as g14
-        # does -- without it the laptop compiles every host's closure itself.
-        # Supplies the nixremote key via sops and pins 205's host key.
+        # Offload x86_64-linux builds to 205-builder over the tailnet --
+        # without it the laptop compiles every host's closure itself.
+        # Supplies the nixremote key via sops, pins 205's host key, and
+        # targets 205 at 100.64.0.2 so offload works off-LAN too (a LAN
+        # address let an off-LAN `deploy` silently fall back to compiling
+        # locally when the builder didn't answer).
         self.nixosModules.builder-client
-        # Hyprland -- the session, same as blac/g14.
+        # Hyprland -- the session, same as blac.
         self.nixosModules.hyprland
       ];
   };

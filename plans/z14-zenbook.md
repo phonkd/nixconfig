@@ -77,11 +77,15 @@ preset, the cpufreq-boost tmpfiles hack — is wrong here and is not carried ove
 
 ## Open decisions
 
-- **g14 stays in the registry.** The old laptop is still a live tailnet node
-  (`g14`, 100.64.0.9, last seen 4 days ago) while this machine is currently
-  enrolled beside it as `g14-irpwhkmw`, so its config is not dead weight yet.
-  If the GA401 is gone for good, deleting the entry plus
-  `modules/hosts/g14/` is the follow-up — say so and it is a two-minute change.
+- ~~**g14 stays in the registry.**~~ **Resolved 2026-09-27: g14 is gone.** The
+  GA401 is out of the fleet, so the registry stanza, `modules/hosts/g14/` and
+  the two `scripts/goodix-521d-*` files were deleted and every cross-reference
+  re-pointed at z14 (`modules/tailnet.nix`'s `laptops` list is the one that was
+  load-bearing rather than a comment). z14 is now the only Linux laptop; the
+  laptops are z14 and the MacBook. Stale headscale nodes (`g14` 100.64.0.9, the
+  collision-suffixed `g14-irpwhkmw`) are coordinator-DB state, not repo state —
+  delete them with `headscale nodes delete` on the observability host if they
+  are still listed.
 - **Battery charge limit not carried.** g14 gets `hardware.asus.battery` via the
   ga401 profile, but its `chargeUpto` default is 100, i.e. a no-op. Skipped
   rather than reimplementing an upstream module for nothing; easy to add if a

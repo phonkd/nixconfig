@@ -8,8 +8,17 @@ hand-built on the peer) is built and running. Phase 3 (the atlas/desktop-drag
 launcher, and with it any pointer/keyboard crossover) remains deferred — this
 path is **view-only**. See the bring-up log for what it looks like and the
 hybrid-GPU fix that was required.
-**g14 is the Linux end of every pairing**; the Windows end can be blac *or* z14,
+**g14 was the Linux end of every pairing**; the Windows end can be blac *or* z14,
 both of which are dual-boot.
+
+> **Stranded 2026-09-27.** g14 left the fleet, and it was the only host that
+> could hold the Linux end: the gate in `modules/viewflow.nix` is `hyprland` +
+> NVIDIA, which now matches blac alone — and blac is the *other* half of the
+> pair. z14 is AMD and cannot present (see "Why NVIDIA-only" below), so there is
+> no pairing left to make. The packages still build and the module still ships
+> to blac; nothing was deleted. Either pair blac-NixOS against a future NVIDIA
+> Linux box, or drop `modules/viewflow.nix`, its `viewflow` line in
+> `modules/builder.nix` and the `viewflow` input in `flake.nix`.
 
 ## Goal
 

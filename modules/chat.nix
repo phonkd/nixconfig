@@ -460,7 +460,7 @@
 
   # ── client half ───────────────────────────────────────────────────────
   # Imported from flake.homeModules.gui-nixos (modules/hosts/types/gui),
-  # which is the list blac, g14 and z14 already pull. The Mac takes an
+  # which is the list blac and z14 already pull. The Mac takes an
   # `element` cask in gui-darwin instead -- HM links apps as store symlinks
   # that Spotlight will not index, so a nix-installed GUI app is
   # unlaunchable on Tahoe (the same reason affine and discord are casks).

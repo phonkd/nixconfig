@@ -2,8 +2,9 @@
 # modules/homelab/apps/headscale.nix). Enrols every server and NixOS desktop, with
 # Tailscale SSH replacing per-host sshd/known_hosts management (real sshd stays as
 # off-tailnet break-glass). Headless enrolment via a sops pre-auth key. Also wires the
-# exit-node opt-in: 201-mono advertises an exit node; g14/z14 may use one at runtime.
-# See plans/g14-vpn.md, plans/headscale-mesh.md.
+# exit-node opt-in: 201-mono advertises an exit node; z14 may use one at runtime.
+# See plans/g14-vpn.md (written for the retired g14, mechanism unchanged),
+# plans/headscale-mesh.md.
 #
 # Wired into modules/builder.nix alwaysImport; `deploy` a host to enrol it.
 { ... }:
@@ -12,8 +13,8 @@
     { config, lib, ... }:
     let
       # Hosts allowed to use an exit node and drive tailscale without sudo.
+      # A list, not `host.name == "z14"`, so a second laptop is one line.
       laptops = [
-        "g14"
         "z14"
       ];
     in
@@ -31,7 +32,7 @@
         ];
 
         # Exit-node capability (plans/g14-vpn.md). Nothing here routes traffic: 201 only
-        # advertises itself as an exit node; g14/z14 are only allowed to select one.
+        # advertises itself as an exit node; the laptops are only allowed to select one.
         # Selection is a runtime act (`tailscale set --exit-node=201-mono`, `--exit-node=`
         # to stop, or the trayscale applet in modules/desktop.nix) and persists across
         # reboots (ExitNodeID) until turned off — nix never sets it. Enrolment is

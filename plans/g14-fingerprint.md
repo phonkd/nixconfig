@@ -1,12 +1,20 @@
 # g14 fingerprint (Goodix 27c6:521d)
 
-**Repo(s):** nixconfig   **Status:** closed — won't work, disabled deliberately
+**Repo(s):** nixconfig   **Status:** closed — won't work, disabled deliberately;
+the hardware left the fleet on 2026-09-27
 
 _Conclusion (2026-08-10):_ The driver works. The **sensor is too small to
-authenticate with**, and no software change fixes that. `services.fprintd` is
-left `enable = false` in `modules/hosts/g14.nix`; the driver graft, the patch
-and the provisioning script all stay in place so re-enabling is one boolean if
-a non-minutiae matcher ever appears.
+authenticate with**, and no software change fixes that. `services.fprintd` was
+left `enable = false` in `modules/hosts/g14/g14.nix`; the driver graft, the
+patch and the provisioning script stayed in place so re-enabling would have been
+one boolean if a non-minutiae matcher ever appeared.
+
+_Since 2026-09-27_ the g14 host is removed and all four artefacts this document
+cites — `modules/hosts/g14/g14.nix`, `goodixtls-52xd-press-capture.patch`,
+`scripts/goodix-521d-provision.sh`, `scripts/goodix-521d-minutiae-check.c` —
+are deleted. They are recoverable from git history (`git log --diff-filter=D
+--stat -- modules/hosts/g14`); this write-up is kept because the *conclusion*,
+not the code, is what stops anyone paying for this twice.
 
 ## What was built, and it does work
 

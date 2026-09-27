@@ -118,7 +118,7 @@
     # the package is built with uv2nix against the upstream-pinned
     # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
     hermes-agent.url = "github:NousResearch/hermes-agent";
-    # viewflow -- cross-device window sharing (g14 <-> blac-on-Windows). See
+    # viewflow -- cross-device window sharing (Hyprland <-> Windows peer). See
     # plans/viewflow.md and modules/viewflow.nix. `flake = false`: upstream
     # has no flake.nix, no releases, no tags.
     #

@@ -1,5 +1,12 @@
-# viewflow -- cross-device window sharing between g14 (Hyprland) and blac.
-# See plans/viewflow.md for the full design and pairing decision.
+# viewflow -- cross-device window sharing between a Hyprland host and a
+# Windows peer. See plans/viewflow.md for the full design and pairing decision.
+#
+# STRANDED since g14 was retired: g14 was the Linux end of every pairing, and
+# the gate below (hyprland tag AND NVIDIA) now matches blac alone -- which is
+# also the Windows end of the pair, so there is no second machine left to pair
+# with. Kept rather than deleted because the packages still build and blac is
+# dual-boot; drop this file plus the `viewflow` line in modules/builder.nix if
+# it stays unused.
 #
 # Ships *packages on PATH*, not a service: pairing uses a per-session ephemeral
 # CA (7-day leaf certs), so there's no sops secret and nothing for a systemd
@@ -233,7 +240,7 @@ in
 
   # Self-gating, so it is safe to sit in builder.nix's alwaysImport list.
   #
-  # `hyprland` tag AND hasNvidia == blac and g14, and nothing else. The tag
+  # `hyprland` tag AND hasNvidia == blac, and nothing else. The tag
   # matters beyond taste: the *source* role talks Hyprland IPC and needs a
   # capture plugin in the running compositor. z14 has the tag but is AMD, so
   # the GPU half of the gate is what keeps a CUDA closure off a laptop that
@@ -258,7 +265,7 @@ in
       # firewall filters `tailscale0` like any other interface, and a blocked
       # QUIC handshake is silent rather than an error. Opened on all interfaces
       # rather than scoped to one, since the LAN interface name differs per
-      # host (wlp2s0 on g14, enp9s0 on blac); exposure is one UDP port on the
+      # host (enp9s0 on blac, wlp2s0 on a laptop); exposure is one UDP port on the
       # home LAN, behind mTLS (a peer without a cert signed by the session's
       # pair CA gets nowhere). Narrow with
       # `networking.firewall.interfaces.<name>.allowedUDPPorts` if this ever

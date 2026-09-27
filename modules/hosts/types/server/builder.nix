@@ -24,7 +24,7 @@
       nix.settings.builders-use-substitutes = true;
 
       # Tailnet IP, not the LAN 192.168.3.205 this used to carry: homelab VMs
-      # share a LAN with 205 so either worked for them, but g14 is a roaming
+      # share a LAN with 205 so either worked for them, but z14 is a roaming
       # laptop and off-LAN the LAN IP is simply unreachable -- nix waits,
       # gives up, and builds the whole closure on the laptop instead. The Mac
       # already did it this way (modules/hosts/mac.nix).

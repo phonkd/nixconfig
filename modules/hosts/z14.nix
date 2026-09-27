@@ -1,7 +1,8 @@
 # Host-specific NixOS config for z14 (ASUS Zenbook 14 UM3406GA), generated via
 # lib/registry.nix / modules/builder.nix. Deliberately short: this laptop
-# briefly ran g14's config as a stopgap but shares almost no hardware with it
-# (Radeon 840M iGPU vs g14's NVIDIA dGPU) -- see plans/z14-zenbook.md.
+# briefly ran the retired g14 (Zephyrus GA401) config as a stopgap but shares
+# almost no hardware with it (Radeon 840M iGPU vs that machine's NVIDIA dGPU)
+# -- see plans/z14-zenbook.md.
 #
 # No nixos-hardware profile exists for the UM3406; verified by eval that the
 # generic settings it would add (fstrim, enableRedistributableFirmware,
@@ -76,7 +77,7 @@
       # itself -- see plans/auto-brightness-z14.md.
       hardware.sensor.iio.enable = true;
 
-      # AirPlay audio *out* (carried over from g14): z14 is the sender,
+      # AirPlay audio *out* (carried over from g14, now retired): z14 is the sender,
       # turning reachable AirPlay/Sonos receivers into PipeWire sinks. Needs
       # three things PipeWire doesn't do alone: avahi (module-raop-discover
       # browses mDNS via avahi's client lib; publish stays off, this only
@@ -101,8 +102,7 @@
       # output device: this host's preset boosts bass as a function of level,
       # so a pre-effects knob works as a tone control. Measured: 100%->50%
       # takes the chain's bass/mid ratio from 3.4 to 6.2. Host-scoped because
-      # it's a tuning judgement about this preset, not a capability -- g14
-      # shares the same preset band but hasn't been listened to with this on.
+      # it's a tuning judgement about this preset, not a capability.
       # Needs the PipeWire node rule in modules/desktop.nix to reach the chain
       # at all.
       noughty.hyprland.loudnessKnob = true;

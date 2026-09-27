@@ -11,7 +11,7 @@
 #       Print the PR body as markdown: software whose version changed
 #       (paperless-ngx 2.14.1 -> 2.15.0), then the flake inputs that moved.
 #
-# blac and g14 import /etc/nixos/hardware-configuration.nix, so they cannot
+# blac and z14 import /etc/nixos/hardware-configuration.nix, so they cannot
 # evaluate on a CI runner; they end up in "failed" and the report names them.
 set -euo pipefail
 
