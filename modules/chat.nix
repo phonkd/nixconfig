@@ -471,6 +471,32 @@
   flake.homeModules.chat =
     { pkgs, ... }:
     {
-      home.packages = [ pkgs.element-desktop ];
+      # Electron picks its safe-storage backend by sniffing
+      # XDG_CURRENT_DESKTOP, which here reads "Hyprland" -- a value Chromium
+      # maps to no backend at all. It then falls back to "basic", and Element
+      # refuses to open its database ("Your system has an unsupported
+      # keyring"). Nothing is actually missing: gnome-keyring owns
+      # org.freedesktop.secrets on every host that takes this module
+      # (modules/desktop.nix). So name the backend rather than let the sniff
+      # decide. Linux-only flag on a Linux-only module -- the Mac takes the
+      # element cask, per the header.
+      #
+      # Wrapped rather than `.override { commandLineArgs = ...; }`, which is
+      # upstream's hook for exactly this: overriding rebuilds Element from
+      # source -- 1.1 GiB of pnpm/electron build inputs, no cache hit -- on
+      # every laptop at every nixpkgs bump, to add one flag. The desktop entry
+      # Execs a bare `element-desktop`, a PATH lookup, so the launcher and the
+      # shell both land on the wrapper.
+      home.packages = [
+        (pkgs.symlinkJoin {
+          name = "element-desktop-libsecret";
+          paths = [ pkgs.element-desktop ];
+          nativeBuildInputs = [ pkgs.makeWrapper ];
+          postBuild = ''
+            wrapProgram $out/bin/element-desktop \
+              --add-flags "--password-store=gnome-libsecret"
+          '';
+        })
+      ];
     };
 }
