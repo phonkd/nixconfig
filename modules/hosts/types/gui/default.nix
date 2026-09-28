@@ -26,6 +26,7 @@
         # `claude-codex`: Claude Code on the ChatGPT subscription. Here for the
         # same reason -- both platforms have `claude` and `codex` on PATH.
         self.homeModules.claude-codex
+        self.homeModules.driftwm-sel
       ];
       home.packages = with pkgs; [
         android-tools
@@ -44,6 +45,8 @@
       imports = [
         self.homeModules.desktop-nixos-specific
         self.homeModules.gui
+        self.homeModules.linux-gui-session
+        self.homeModules.hyprland-session
         self.homeModules.gaming
         self.homeModules.chat
         inputs.nix-index-database.homeModules.default
@@ -67,10 +70,42 @@
       lib,
       ...
     }:
-    lib.mkIf config.noughty.host.is.nixosDesktop {
-      home-manager.users.phonkd.imports = [
-        self.homeModules.gui-nixos
-      ];
+    {
+      options.noughty.gui = {
+        wallpaperDir = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = "/home/phonkd/Downloads/Walls";
+          description = ''
+            Directory of wallpapers, searched recursively. Each rotation picks
+            one at random and re-derives the desktop colour scheme. Null disables
+            wallpaper rotation and wallpaper-derived theming.
+          '';
+        };
+
+        wallpaperInterval = lib.mkOption {
+          type = lib.types.ints.positive;
+          default = 300;
+          description = "Seconds between wallpaper and colour-scheme changes.";
+        };
+
+        colorMode = lib.mkOption {
+          type = lib.types.enum [ "dark" "light" ];
+          default = "dark";
+          description = "Material You colour mode derived from the wallpaper.";
+        };
+
+        colorScheme = lib.mkOption {
+          type = lib.types.str;
+          default = "scheme-tonal-spot";
+          description = "Matugen scheme algorithm used for the Linux GUI session.";
+        };
+      };
+
+      config = lib.mkIf config.noughty.host.is.nixosDesktop {
+        home-manager.users.phonkd.imports = [
+          self.homeModules.gui-nixos
+        ];
+      };
     };
 
   # Gated on host.is.darwinDesktop. Wires HM with the cross-platform `gui`

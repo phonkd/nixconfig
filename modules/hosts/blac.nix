@@ -28,7 +28,7 @@
       networking.hostName = "blac";
 
       # OLED screen: burn-in mitigation is the rotating wallpaper, Hyprland's
-      # default via `noughty.hyprland.wallpaperDir` (modules/hyprland/).
+      # default via `noughty.gui.wallpaperDir` (the shared Linux GUI session).
       networking.enableIPv6 = false;
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 

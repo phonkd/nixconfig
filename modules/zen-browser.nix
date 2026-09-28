@@ -2,7 +2,7 @@
 #
 # A perSystem package rather than a bare `inputs.zen-browser...default`:
 # modules/desktop.nix installs it into the user profile and
-# modules/hyprland/_scope.nix builds an absolute store path for the SUPER-B
+# modules/gui-session/_scope.nix builds an absolute store path for the SUPER-B
 # launcher -- both must be the *same* derivation, or tuning one leaves the
 # other (the one that actually launches) stock.
 #
@@ -70,7 +70,7 @@
           // Touchpad, which does not use the MSD model at all: GTK pan
           // gestures go to APZ, which does its own pixel-precise panning and
           // fling. Both already default on under MOZ_ENABLE_WAYLAND (set in
-          // modules/hyprland/_compositor.nix); pinned here so the touchpad and
+          // modules/hyprland.nix); pinned here so the touchpad and
           // the wheel are described in one place.
           defaultPref("apz.gtk.pangesture.enabled", true);
           defaultPref("apz.gtk.kinetic_scroll.enabled", true);

@@ -1,8 +1,8 @@
-# Wallpaper rotation + wallpaper-derived colours, and the activation scripts
+# Shared wallpaper rotation, derived colours, and activation scripts.
 # that seed the files everything else `source`s.
 #
 # _home.nix wraps this whole file in `lib.mkIf scope.themingEnabled`, so
-# setting noughty.hyprland.wallpaperDir = null leaves a perfectly usable
+# setting noughty.gui.wallpaperDir = null leaves a perfectly usable
 # static-colour session -- which is also why monitors.conf/workspaces.conf/
 # groupbar-mode.conf seeding lives here rather than beside the compositor.
 #
@@ -30,6 +30,7 @@ let
     generated
     groupbarMode
     hy3
+    hyprlandEnabled
     hy3Plugin
     hyprctl
     monitorsConf
@@ -181,14 +182,14 @@ in
     @import url("file://${generated.gtk4}");
   '';
 
-  # Empties the GTK colour files when the Hyprland session ends, so the
+  # Empties the GTK colour files when the graphical session ends, so the
   # declared GTK theme applies outside it. Nothing to do on start: the
   # wallpaper timer refills them moments later. RemainAfterExit is what
   # makes ExecStop run at session teardown rather than right after ExecStart.
-  systemd.user.services.hyprland-gtk-colors = {
+  systemd.user.services.gui-gtk-colors = {
     Unit = {
-      Description = "Scope the GTK colour scheme and wallpaper colours to the Hyprland session";
-      PartOf = [ "hyprland-session.target" ];
+      Description = "Scope GTK wallpaper colours to the graphical session";
+      PartOf = [ "graphical-session.target" ];
     };
     Service = {
       Type = "oneshot";
@@ -199,14 +200,13 @@ in
         "${setColorScheme declaredColorScheme}"
       ];
     };
-    Install.WantedBy = [ "hyprland-session.target" ];
+    Install.WantedBy = [ "graphical-session.target" ];
   };
 
   systemd.user.services.awww-daemon = {
     Unit = {
       Description = "awww (swww) wallpaper daemon";
-      PartOf = [ "hyprland-session.target" ];
-      After = [ "hyprland-session.target" ];
+      PartOf = [ "graphical-session.target" ];
     };
     Service = {
       # `--no-cache`: a restored cached wallpaper would briefly contradict
@@ -215,13 +215,13 @@ in
       Restart = "on-failure";
       RestartSec = 2;
     };
-    Install.WantedBy = [ "hyprland-session.target" ];
+    Install.WantedBy = [ "graphical-session.target" ];
   };
 
-  systemd.user.services.hyprland-wallpaper = {
+  systemd.user.services.gui-wallpaper = {
     Unit = {
       Description = "Pick a wallpaper and re-derive the colour scheme from it";
-      PartOf = [ "hyprland-session.target" ];
+      PartOf = [ "graphical-session.target" ];
       After = [ "awww-daemon.service" ];
       Requires = [ "awww-daemon.service" ];
     };
@@ -231,7 +231,7 @@ in
     };
   };
 
-  systemd.user.timers.hyprland-wallpaper = {
+  systemd.user.timers.gui-wallpaper = {
     Unit.Description = "Rotate the wallpaper (and the colour scheme with it)";
     Timer = {
       # Persistent deliberately absent: a missed rotation while logged out
@@ -240,14 +240,14 @@ in
       OnUnitActiveSec = wallpaperInterval;
       AccuracySec = "5s";
     };
-    Install.WantedBy = [ "hyprland-session.target" ];
+    Install.WantedBy = [ "graphical-session.target" ];
   };
 
   # nwg-displays' two files, seeded empty for the same reason the colour
   # files are: `extraConfig` `source`s them, and Hyprland calls a missing
   # `source` a config error, but nwg-displays only creates them on first
   # run. An existing file is never touched -- it's user state.
-  home.activation.hyprlandDisplays = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.hyprlandDisplays = lib.mkIf hyprlandEnabled (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [ -z "''${DRY_RUN:-}" ]; then
       for f in ${lib.escapeShellArgs [ monitorsConf workspacesConf ]}; do
         if [ ! -e "$f" ]; then
@@ -257,7 +257,7 @@ in
         fi
       done
     fi
-  '';
+  '');
 
   # Seed every generated file, so the very first Hyprland login -- before
   # the timer has ever fired -- finds them present; otherwise Hyprland
@@ -265,19 +265,19 @@ in
   # creates what is missing (a real rotation's output must never be
   # clobbered), and uses matugen itself for a genuine scheme, falling back
   # to empty files if no wallpaper is readable yet.
-  home.activation.hyprlandColors = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.guiColors = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if [ -z "''${DRY_RUN:-}" ]; then
       # The groupbar mode file is `source`d too but is user state, not
       # matugen output: seeded once with Hyprland's default (tabbed), then
       # owned by the toggle keybind.
-      if [ ! -e ${lib.escapeShellArg groupbarMode} ]; then
+      ${lib.optionalString hyprlandEnabled ''if [ ! -e ${lib.escapeShellArg groupbarMode} ]; then
         verboseEcho "Seeding the Hyprland groupbar mode (tabbed)"
         $DRY_RUN_CMD ${pkgs.coreutils}/bin/mkdir -p \
           "$(${pkgs.coreutils}/bin/dirname ${lib.escapeShellArg groupbarMode})"
         $DRY_RUN_CMD ${pkgs.coreutils}/bin/printf \
           'group {\n    groupbar {\n        stacked = 0\n    }\n}\n' \
           > ${lib.escapeShellArg groupbarMode}
-      fi
+      fi''}
 
       seeded=0
       for f in ${lib.escapeShellArgs (lib.attrValues generated)}; do
@@ -337,7 +337,7 @@ in
   # plugin twice!" and exit 0. XDG_RUNTIME_DIR dance and instance loop
   # lifted from HM's own reloadConfig: an activation has no session
   # environment to inherit, and there may be more than one compositor running.
-  home.activation.hyprlandHy3Plugin = lib.mkIf hy3 (
+  home.activation.hyprlandHy3Plugin = lib.mkIf (hyprlandEnabled && hy3) (
     lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       if [ -z "''${DRY_RUN:-}" ]; then
         XDG_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(${pkgs.coreutils}/bin/id -u)}"

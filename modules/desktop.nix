@@ -43,10 +43,6 @@
         # Visual disk-usage analyzer -- "squirreldisk" is dead weight in nixpkgs
         # (unfree, marked broken, dropped from unstable); maintained stand-in.
         qdirstat
-        # AFFiNE desktop client for the self-hosted server on 201 (plans/affine.md).
-        # Linux-only: on the Mac, HM apps are store symlinks that Spotlight can't
-        # index and so can't launch -- the Mac gets the homebrew cask instead.
-        affine
         # Latest Claude Code from the claude-code-nix flake, not the lagging
         # nixpkgs claude-code (see the input comment in flake.nix).
         inputs.claude-code-nix.packages.${pkgs.system}.default
@@ -91,7 +87,7 @@
       # XDG portal's `org.freedesktop.appearance color-scheme` -- exactly this
       # dconf key. Unset means libadwaita loads its light stylesheet, so
       # card/sidebar/dialog bg colors stay white on an otherwise dark window --
-      # "some apps are in light mode". Also read by modules/hyprland/_matugen.nix
+      # "some apps are in light mode". Also read by modules/gui-session/_matugen.nix
       # as `declaredColorScheme` and restored when the session stops.
       dconf.settings."org/gnome/desktop/interface".color-scheme =
         lib.mkDefault "prefer-dark";
@@ -221,7 +217,7 @@
       users.users.phonkd.packages = with pkgs; [
         # Zen Browser (Firefox fork) via modules/zen-browser.nix rather than the
         # zen-browser-flake input directly: that's where the smooth-scrolling
-        # prefs live, and the SUPER-B launcher in modules/hyprland/_scope.nix
+        # prefs live, and the SUPER-B launcher in modules/hyprland.nix
         # has to get the same build.
         self.packages.${pkgs.system}.zen-browser
         gst_all_1.gstreamer
@@ -272,8 +268,35 @@
         pulseaudio
         roomeqwizard
         warehouse
+        rofi-rbw-wayland
+        dnsmasq
       ];
-      services.flatpak.enable = true;
+      virtualisation.libvirtd.enable = true;
+      programs.virt-manager.enable = true;
+      networking.firewall.trustedInterfaces = [ "virbr0" ];
+      services.flatpak = {
+        enable = true;
+        # nixos-26.05's AFFiNE 0.26.6 falls back to email magic-link auth
+        # against the self-hosted 0.27.x server. Track FlatPark's current
+        # repack of the upstream client instead; Flathub supplies its runtime.
+        remotes = [
+          {
+            name = "flatpark";
+            location = "https://dl.flatpark.org/flatpark.flatpakrepo";
+          }
+          {
+            name = "flathub";
+            location = "https://dl.flathub.org/repo/flathub.flatpakrepo";
+          }
+        ];
+        packages = [
+          {
+            appId = "pro.affine.AFFiNE";
+            origin = "flatpark";
+          }
+        ];
+        update.auto.enable = true;
+      };
       xdg.portal.enable = true;
       services.pulseaudio.enable = false;
       security.rtkit.enable = true;
