@@ -1,4 +1,4 @@
-# Hyprland, Home Manager half: the actual session. Self-gates on osConfig,
+# Shared Linux GUI session, with compositor-specific pieces gated by host tags.
 # so it is inert if imported on a host without the tag.
 #
 # The shared scope is built once and handed to every section, so each stays
@@ -37,11 +37,10 @@ in
 
   config = lib.mkIf scope.enabled (
     lib.mkMerge [
-      (section ./_compositor.nix)
       (section ./_shell.nix)
       (section ./_session.nix)
 
-      # Split out so that setting noughty.hyprland.wallpaperDir = null leaves a
+      # Split out so that setting noughty.gui.wallpaperDir = null leaves a
       # perfectly usable static-colour session.
       (lib.mkIf scope.themingEnabled (
         import ./_theming.nix {

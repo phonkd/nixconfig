@@ -1,4 +1,4 @@
-# Audio output switcher for the Hyprland session, on alt-0.
+# Audio output switcher for compositor keybindings.
 #
 # A rofi menu of the PipeWire sinks; picking one makes it the default output.
 # On z14, four of the six sinks are AirPlay (`raop_sink.*`) targets on the LAN

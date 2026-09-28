@@ -36,7 +36,7 @@
           port = 8006;
           traefik = {
             enable = true;
-            domain = "oldblac.int.phonkd.net";
+            domain = "oldblac.home.phonkd.net";
             scheme = "https";
             transport = "insecureTransport";
             ipfilter = true;

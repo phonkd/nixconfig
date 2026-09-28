@@ -56,6 +56,9 @@
           "205-builder"
           "observability"
           "obs"
+          # Local VMs and forwarded services must never cross the work proxy.
+          "localhost"
+          "127.0.0.1"
           # Non-enrolled LAN boxes (Proxmox et al) and forge access, which have
           # no business crossing a work proxy either.
           "192.168.1.*"

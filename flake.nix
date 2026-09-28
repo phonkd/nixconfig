@@ -85,6 +85,7 @@
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-flatpak.url = "github:gmodena/nix-flatpak/v0.7.0";
     kubectl-aliases = {
       url = "github:phonkd/kubectl-aliases";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -151,6 +152,7 @@
       url = "github:phonkd/slop-trove/discord-dce-ingest";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    driftwm.url = "github:malbiruk/driftwm";
   };
 
   outputs =

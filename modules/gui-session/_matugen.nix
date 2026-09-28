@@ -1,4 +1,4 @@
-# The colour machinery: the matugen templates, the two GTK helper scripts, the
+# Shared colour machinery: matugen templates, GTK helpers, and rotation.
 # matugen config they are named from, and the wallpaper rotation script itself.
 #
 # Nothing outside _theming.nix reads this file, so if the two ever want to be
@@ -18,6 +18,7 @@ let
     colorScheme
     generated
     hy3
+    hyprlandEnabled
     wallpaperDir
     ;
 in
@@ -258,7 +259,7 @@ rec {
   # GTK3 apps re-read their CSS when XSETTINGS changes, which is what this
   # toggle provokes -- GTK has no documented "reload your css" command.
   # GTK4/libadwaita apps ignore it and keep their colours until restarted.
-  gtkNudge = pkgs.writeShellScript "hyprland-gtk-nudge" ''
+  gtkNudge = pkgs.writeShellScript "gui-gtk-nudge" ''
     set -u
     gs=${pkgs.glib}/bin/gsettings
     key="org.gnome.desktop.interface gtk-theme"
@@ -275,7 +276,7 @@ rec {
   # what's left is whatever theme modules/desktop.nix declared. An unclean
   # exit (crash, power pull) leaves the files populated; recover by emptying
   # them by hand, or starting and cleanly leaving Hyprland once.
-  clearGtkColors = pkgs.writeShellScript "hyprland-clear-gtk-colors" ''
+  clearGtkColors = pkgs.writeShellScript "gui-clear-gtk-colors" ''
     set -u
     for f in ${lib.escapeShellArgs [ generated.gtk3 generated.gtk4 ]}; do
       : > "$f" 2>/dev/null || true
@@ -297,7 +298,7 @@ rec {
       or "prefer-dark";
   setColorScheme =
     value:
-    pkgs.writeShellScript "hyprland-color-scheme-${value}" ''
+    pkgs.writeShellScript "gui-color-scheme-${value}" ''
       set -u
       ${pkgs.dconf}/bin/dconf write /org/gnome/desktop/interface/color-scheme \
         ${lib.escapeShellArg "'${value}'"} 2>/dev/null || true
@@ -310,15 +311,6 @@ rec {
         input_path = "${caelestiaTemplate}";
         output_path = generated.caelestia;
         # No post_hook: the shell's own FileView watches this file.
-      };
-      hyprland = {
-        input_path = "${hyprTemplate}";
-        output_path = generated.hypr;
-        post_hook = "hyprctl reload || true";
-      };
-      hyprlock = {
-        input_path = "${hyprlockTemplate}";
-        output_path = generated.hyprlock;
       };
       rofi = {
         input_path = "${rofiTemplate}";
@@ -333,6 +325,17 @@ rec {
         output_path = generated.gtk4;
         post_hook = "${gtkNudge}";
       };
+    }
+    // lib.optionalAttrs hyprlandEnabled {
+      hyprland = {
+        input_path = "${hyprTemplate}";
+        output_path = generated.hypr;
+        post_hook = "hyprctl reload || true";
+      };
+      hyprlock = {
+        input_path = "${hyprlockTemplate}";
+        output_path = generated.hyprlock;
+      };
     };
   };
 
@@ -340,15 +343,9 @@ rec {
   # binary is an absolute store path: a systemd user unit inherits no PATH
   # worth relying on. hyprctl is the exception -- invoked from matugen's
   # post_hook, which runs under a shell, so it's put on PATH explicitly below.
-  rotate = pkgs.writeShellScript "hyprland-wallpaper-rotate" ''
+  rotate = pkgs.writeShellScript "gui-wallpaper-rotate" ''
     set -u
-    export PATH=${
-      lib.makeBinPath [
-        pkgs.hyprland
-        pkgs.glib
-        pkgs.coreutils
-      ]
-    }:"''${PATH:-}"
+    export PATH=${lib.makeBinPath ([ pkgs.glib pkgs.coreutils ] ++ lib.optional hyprlandEnabled pkgs.hyprland)}:"''${PATH:-}"
 
     dir=${lib.escapeShellArg (toString wallpaperDir)}
     [ -d "$dir" ] || { echo "wallpaper dir $dir does not exist" >&2; exit 0; }

@@ -1,4 +1,4 @@
-# Shared `let` (as a `rec` attrset) for the Home Manager half, minus the
+# Shared `let` (as a `rec` attrset) for the Linux GUI session, minus the
 # colour machinery in _matugen.nix. _home.nix imports it once and hands the
 # result to every section as `scope`; each section `inherit`s only the names
 # it uses.
@@ -17,16 +17,18 @@
 }:
 rec {
   hostTags = osConfig.noughty.host.tags or [ ];
-  enabled = osConfig == null || builtins.elem "hyprland" hostTags;
+  enabled = osConfig == null || osConfig.noughty.host.is.nixosDesktop;
+  hyprlandEnabled = osConfig == null || builtins.elem "hyprland" hostTags;
 
   cursorName = "Bibata-Modern-Classic";
   cursorSize = 24;
 
   cfg = osConfig.noughty.hyprland or { };
-  wallpaperDir = cfg.wallpaperDir or null;
-  wallpaperInterval = cfg.wallpaperInterval or 300;
-  colorMode = cfg.colorMode or "dark";
-  colorScheme = cfg.colorScheme or "scheme-tonal-spot";
+  guiCfg = osConfig.noughty.gui or { };
+  wallpaperDir = guiCfg.wallpaperDir or null;
+  wallpaperInterval = guiCfg.wallpaperInterval or 300;
+  colorMode = guiCfg.colorMode or "dark";
+  colorScheme = guiCfg.colorScheme or "scheme-tonal-spot";
   scale = cfg.scale or "1";
   loudnessKnob = cfg.loudnessKnob or false;
 
@@ -293,11 +295,13 @@ rec {
     # Under stateHome, not configHome: Caelestia's utils/Paths.qml resolves
     # `state` to $XDG_STATE_HOME/caelestia.
     caelestia = "${config.xdg.stateHome}/caelestia/scheme.json";
-    hypr = "${cfgHome}/hypr/colors.conf";
-    hyprlock = "${cfgHome}/hypr/hyprlock-colors.conf";
     rofi = "${cfgHome}/rofi/colors.rasi";
     gtk3 = "${cfgHome}/gtk-3.0/colors.css";
     gtk4 = "${cfgHome}/gtk-4.0/colors.css";
+  }
+  // lib.optionalAttrs hyprlandEnabled {
+    hypr = "${cfgHome}/hypr/colors.conf";
+    hyprlock = "${cfgHome}/hypr/hyprlock-colors.conf";
   };
 
   # Deliberately not in `generated` above: that's matugen's output, rewritten

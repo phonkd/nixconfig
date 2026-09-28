@@ -1,4 +1,4 @@
-# The loudness knob for the laptop speakers, on Alt+M -- the *pre-effects*
+# Optional pre-effects loudness helper used by the Hyprland keymap.
 # volume, distinct from the device volume on Super+M. See LOUDNESS.md in the
 # laptop-speakers repo for the full decision record.
 #

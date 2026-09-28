@@ -156,6 +156,9 @@
         self.nixosModules.builder-client
         # Hyprland -- the session, same as blac/g14.
         self.nixosModules.hyprland
+        inputs.driftwm.nixosModules.default
+        self.nixosModules.driftwm-sel
+        self.nixosModules.niri-sel
       ];
   };
 

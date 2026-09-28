@@ -201,7 +201,7 @@
       #    since a systemd *user* unit doesn't inherit the login shell's env.
       # 2. A unit bound to hyprland-session.target (not
       #    graphical-session.target), same as everything under
-      #    modules/hyprland/.
+      #    modules/hyprland.nix.
       #
       # Deliberately NOT added: upstream's udev rule + "video" group.
       # wluma's Backlight::new tries a direct sysfs write first and only

@@ -157,6 +157,7 @@ let
         { system.configurationRevision = self.rev or self.dirtyRev or null; }
       ]
       ++ hmNixosBase
+      ++ [ inputs.nix-flatpak.nixosModules.nix-flatpak ]
       ++ alwaysImport
       ++ (extraOf entry);
     };

@@ -1,4 +1,4 @@
-# The shell: Caelestia, a whole desktop rather than a bar, so most of this
+# The shared shell: Caelestia, a whole desktop rather than a bar.
 # file hands its extra halves back to things the rest of the session already
 # runs. plans/caelestia-shell.md records what it insists on owning; the one
 # thing it won't give up is notifications (see _session.nix, mako off).
@@ -17,9 +17,9 @@
 
     systemd = {
       enable = true;
-      # Not the module default (graphical-session.target, reached by any
-      # session) -- that used to drop this shell onto the Plasma panel too.
-      target = "hyprland-session.target";
+      # Shared by every NixOS GUI compositor. DriftWM and Home Manager's
+      # Hyprland integration both drive this standard session target.
+      target = "graphical-session.target";
     };
 
     settings = {
@@ -31,7 +31,7 @@
 
       appearance.transparency = {
         # Off by default upstream. Blur comes from the layerrules on the
-        # caelestia-* namespaces in _compositor.nix.
+        # caelestia-* namespaces in modules/hyprland.nix.
         enabled = true;
         base = 0.6;
         layers = 0.2;
