@@ -59,7 +59,10 @@
         # (no real privilege granted: phonkd is already in wheel).
         extraSetFlags =
           if config.noughty.host.name == "201-mono" then
-            [ "--advertise-exit-node" ]
+            [
+              "--advertise-exit-node"
+              "--advertise-routes=192.168.3.0/24"
+            ]
           else if lib.elem config.noughty.host.name laptops then
             [ "--operator=phonkd" ]
           else
