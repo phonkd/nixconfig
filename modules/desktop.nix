@@ -92,6 +92,18 @@
       dconf.settings."org/gnome/desktop/interface".color-scheme =
         lib.mkDefault "prefer-dark";
 
+      # rofi-rbw wraps rbw for its own runtime, but that does not put the rbw
+      # CLI on the interactive shell's PATH. Manage rbw here as well so its
+      # account/server config exists before rofi-rbw first starts, and so the
+      # CLI remains available for login, sync, and troubleshooting.
+      programs.rbw = {
+        enable = true;
+        settings = {
+          email = "enst18.12@gmail.com";
+          base_url = "https://vw.w.phonkd.net";
+        };
+      };
+
       programs.thunderbird.enable = true;
     };
   flake.nixosModules.desktop =
