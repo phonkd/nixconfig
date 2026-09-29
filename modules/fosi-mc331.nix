@@ -19,12 +19,19 @@
       let
         python = pkgs.python3.withPackages (ps: [ ps.pyusb ]);
 
-        # No args -> the community Android app's payload verbatim, the only
-        # thing confirmed to work: it carries the *stock* -68 dB threshold, so
-        # it's the flags byte, not the threshold, that turns the gate off.
-        # Arguments pass through for experiments: `fosi-mc331-fix -90` for a
-        # threshold, `--flags 0x00` for the other reading of that byte.
+        # The flags byte is what turns the gate's hard cut-off off; the
+        # threshold still governs how hard it leans on quiet material. At the
+        # factory -68 dB (what the Android app sends, and what this used to
+        # send) the bottom of the volume range is attenuated badly and one step
+        # up jumps ~5x, because the suppressor sits *after* the volume control.
+        # -90 leaves it out of the way.
+        threshold = "-90.0";
+
+        # Arguments pass straight through, so `fosi-mc331-fix -68` goes back to
+        # the app's exact payload and `--flags 0x00` tries the other reading of
+        # that byte, both without a rebuild.
         fosi-mc331-fix = pkgs.writeShellScriptBin "fosi-mc331-fix" ''
+          if [ $# -eq 0 ]; then set -- ${threshold}; fi
           exec ${python}/bin/python3 ${./fosi-mc331-fix.py} "$@"
         '';
       in
