@@ -89,10 +89,12 @@
       "gigaplayer-client"
       "hyprland"
       "work"
-      # fosi-mc331 lived here during the DSP noise-gate fix (solved; see
-      # plans/fosi-mc331-noise-gate.md) -- removed since the amp shouldn't
-      # depend on a laptop being awake. modules/fosi-mc331.nix stays dormant;
-      # adding this tag to the box cabled to the amp is the entire deployment.
+      # Re-sends the MC331's DSP noise-gate fix whenever the amp powers on or
+      # its input selector moves. Back on z14 as the interim home: the amp is
+      # cabled here, and a laptop that is sometimes asleep still beats no fix
+      # at all. Moves to the dedicated mini PC when that exists -- it is the
+      # same one-tag change there. See plans/fosi-mc331-noise-gate.md.
+      "fosi-mc331"
     ];
     username = "phonkd";
 
