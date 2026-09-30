@@ -19,6 +19,18 @@
       "dst": ["*:*"],
     },
   ],
+  // 204-agent is a home-LAN peer relay for z14 <-> 205-builder when their
+  // direct UDP path fails. These /32s match the current Headscale addresses;
+  // update z14's entry if it is re-enrolled with a new address.
+  "grants": [
+    {
+      "src": ["100.64.0.17/32", "100.64.0.2/32"],
+      "dst": ["100.64.0.1/32"],
+      "app": {
+        "tailscale.com/cap/relay": [],
+      },
+    },
+  ],
   // Exit nodes advertised by our own nodes are approved automatically, so the
   // approval is version-controlled here rather than surviving only as
   // out-of-band `headscale nodes approve-routes` state in the coordinator DB.
