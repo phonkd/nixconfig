@@ -59,7 +59,11 @@ deploy --list         # show deployable hosts
   203 aborted and magic-rolled back; observability stopped its units and never
   reached "start units", leaving headscale/grafana/loki/mimir/alloy down. So
   when `git diff` on the lock/inputs touches tailscale, deploy over a
-  non-tailnet path: `deploy 203 --hostname 192.168.1.203`,
+  non-tailnet path. To check whether nixpkgs moved since a host was deployed,
+  resolve root's input — `jq '.nodes[.nodes.root.inputs.nixpkgs].locked.rev'` —
+  never `.nodes.nixpkgs`, which is some transitive input's copy (that mistake
+  let a systemd bump go out over the tailnet on 2026-09-30):
+  `deploy 203 --hostname 192.168.1.203`,
   `deploy observability --hostname 89.167.83.90` (obs's public IP — the
   `obs-rescue-public` block in `mac.nix` matches it and supplies port 5432, the
   key and `ProxyCommand none`). Any other unrecognised flag is forwarded to
@@ -83,11 +87,13 @@ deploy --list         # show deployable hosts
   deploy, check `ssh 201-mono systemctl is-active traefik dnsmasq` immediately;
   the fix is to redeploy the same ref over the non-tailnet path, which starts
   them all.
-- **Git flake semantics — commit first.** `deploy 201` reads the flake at
-  `~/git/nixconfig` = the *committed* HEAD; **uncommitted working-tree changes
-  are NOT deployed**. Commit (to `main`, per the repo's workflow) before
-  deploying, or pass a branch you've committed to. Set `NIXCONFIG_DIR` to point
-  at a different checkout.
+- **Git flake semantics — commit first.** `deploy 201` reads the flake from the
+  `~/git/nixconfig` working tree: *untracked* files are invisible, but
+  **uncommitted edits to tracked files ARE deployed**, and the host then reports
+  `<rev>-dirty` as its configuration revision (seen on 205, 2026-09-30, from an
+  uncommitted plan edit). Commit (to `main`, per the repo's workflow) before
+  deploying so what ships is what's recorded, or pass a branch you've committed
+  to. Set `NIXCONFIG_DIR` to point at a different checkout.
 - **Before the wrapper is installed** (fresh Mac, or you just added it and
   haven't rebuilt the Mac yet): `nix run ~/git/nixconfig#deploy -- 201`.
 
