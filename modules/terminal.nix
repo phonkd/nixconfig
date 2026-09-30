@@ -60,6 +60,11 @@
           # drive the terminal.
           allow_remote_control = "socket-only";
           listen_on = "unix:/tmp/kitty-{kitty_pid}";
+        } // lib.optionalAttrs pkgs.stdenv.isLinux {
+          # Hyprland halves scroll deltas; keep kitty's previous wheel and
+          # touchpad scroll distance on Linux. The Mac keeps kitty defaults.
+          wheel_scroll_multiplier = 10.0;
+          touch_scroll_multiplier = 2.0;
         };
         keybindings = {
           "cmd+left" = "send_text all \\x01";

@@ -62,10 +62,9 @@
           defaultPref("general.smoothScroll.currentVelocityWeighting", "1.0");
           defaultPref("general.smoothScroll.stopDecelerationWeighting", "1.0");
 
-          // How far one wheel tick travels, as a percentage of stock. The
-          // softer springs make a tick feel shorter, so it gets more ground to
-          // cover. First knob to reach for if the feel is off.
-          defaultPref("mousewheel.default.delta_multiplier_y", 200);
+          // Compensate for Hyprland's 0.5 mouse-wheel scroll factor so Zen
+          // keeps its previous effective wheel distance and smooth motion.
+          defaultPref("mousewheel.default.delta_multiplier_y", 400);
 
           // Touchpad, which does not use the MSD model at all: GTK pan
           // gestures go to APZ, which does its own pixel-precise panning and
@@ -74,6 +73,8 @@
           // the wheel are described in one place.
           defaultPref("apz.gtk.pangesture.enabled", true);
           defaultPref("apz.gtk.kinetic_scroll.enabled", true);
+          // Hyprland also halves touchpad deltas; restore Zen's old pan distance.
+          defaultPref("apz.gtk.pangesture.pixel_delta_mode_multiplier", "80.0");
           // Rubber-band at the ends of a page. Stock default is off on Linux.
           defaultPref("apz.overscroll.enabled", true);
         '';
