@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — Phase 1: `205-builder` live on clan-core, `204-agent` next
+**Repo(s):** nixconfig   **Status:** in-progress — Phase 1: 205, 204, 203 on clan-core; ext-mail next
 
 ## Why
 
@@ -64,7 +64,9 @@ clan deploy also carries the systemd bump — deploy each one off-tailnet
       `running`. 204 already had the nixpkgs bump, so this is the clean
       measurement: **clan's entire closure change is `gen: ∅ → ε`** —
       `/etc/hostid` — and activation restarted no system service.
-- [ ] `203-media` — unblocked by `d6e27fe`. It was blocked because
+- [x] `203-media` (`a286cff`, over `192.168.3.203`): generation 123, confirmed,
+      no failed units, every workload active; closure diff `gen: ∅ → ε`,
+      same as 204. It had been blocked because
       `prowlarr-config.service` failed on every activation, which made every
       deploy report failure and roll back. Cause: the nixpkgs bump took
       Prowlarr 2.5.2 → 2.6.5, and 2.6.3 requires a non-empty Allowed Hosts
