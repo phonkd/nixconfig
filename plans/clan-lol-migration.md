@@ -60,10 +60,22 @@ Done in the first commit:
 clan deploy also carries the systemd bump — deploy each one off-tailnet
 (`nixconfig-ops` has why):
 
-- [ ] `204-agent` — one service; `--hostname 192.168.3.204`
-- [ ] `203-media` — policy routing; `--hostname 192.168.1.203`
+- [x] `204-agent` (`cf8a5d3`, over `192.168.3.204`): generation 77, confirmed,
+      `running`. 204 already had the nixpkgs bump, so this is the clean
+      measurement: **clan's entire closure change is `gen: ∅ → ε`** —
+      `/etc/hostid` — and activation restarted no system service.
+- [ ] `203-media` — **blocked.** `prowlarr-config.service` now fails on every
+      activation (curl exit 22 on the host-config PUT), so every deploy to 203
+      reports failure and deploy-rs rolls the boot profile back. Not clan:
+      nixflix moved in `2a3f5e3` and `11774fcb` ("send allowedHosts in the
+      arr host config payload") changed exactly that request; sonarr, radarr
+      and lidarr accept it, prowlarr doesn't. Pin nixflix back or fix it
+      upstream first. From z14, deploy over `192.168.3.203` (201's subnet
+      route) — `192.168.1.203` gets `Permission denied (publickey)` here.
 - [ ] `ext-mail` — deploys over its public IP already
-- [ ] `observability` — the headscale coordinator; `--hostname 89.167.83.90`
+- [ ] `observability` — the headscale coordinator; `--hostname 89.167.83.90`,
+      and from z14 also `--ssh-opts "-o ProxyCommand=none -p 5432 -i
+      $HOME/.ssh/id_ed25519_priv -o IdentitiesOnly=no"`
 - [ ] `201-mono` — fronts everything, so last among servers;
       `--hostname 192.168.3.201`, then check `systemctl is-active traefik dnsmasq`
 - [ ] `z14`, `blac` — local `nixos-rebuild`; their `extraModules` import
@@ -88,6 +100,11 @@ all four `sops.templates` blocks keep working with **no consumer edits**.
    machine. Start by registering the shared key's public half for each
    machine (`clan secrets machines add`) — no key distribution changes — then
    move hosts to their own keys once the store is proven.
+   **Do not derive machine keys from ssh host keys yet:** 204 and 205 present
+   the identical ed25519 host key (cloned VM image), so ssh-derived age keys
+   would let each decrypt the other's secrets. Clan's default — a fresh age
+   key per machine — sidesteps this; regenerating the cloned host keys is
+   worth doing regardless.
 3. `clan secrets import-sops --group admins --machine … <file>` for
    `global-secrets/secret.yaml` and the three per-app files.
 4. Drop bare `sops.secrets.<name> = { };` declarations; keep the ~10 that set

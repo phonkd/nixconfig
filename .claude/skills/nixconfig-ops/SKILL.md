@@ -86,7 +86,13 @@ deploy --list         # show deployable hosts
   `inactive` — everything behind the reverse proxy was down. After any failed
   deploy, check `ssh 201-mono systemctl is-active traefik dnsmasq` immediately;
   the fix is to redeploy the same ref over the non-tailnet path, which starts
-  them all.
+  them all. **Check the workloads by name, not `systemctl is-system-running`**:
+  units a failed activation *stopped* aren't *failed*, so it still says
+  `running`. On 2026-09-30 a tailnet deploy of a nixpkgs bump left observability
+  (headscale, grafana, loki, mimir, alloy) and 203 (jellyfin, every *arr,
+  ollama, ocis, samba) fully stopped while both reported `running` — and with
+  headscale down, the embedded DERP was too, so tailnet paths without a direct
+  route (z14 → 203) went dead with it.
 - **Git flake semantics — commit first.** `deploy 201` reads the flake from the
   `~/git/nixconfig` working tree: *untracked* files are invisible, but
   **uncommitted edits to tracked files ARE deployed**, and the host then reports
