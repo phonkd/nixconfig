@@ -164,6 +164,10 @@
               {
                 type = "wireguard";
                 tag = "proton-reddit";
+                # z14's active uplink has MTU 1400. sing-box defaults to
+                # 1408 before WireGuard/UDP overhead, causing sendmmsg:
+                # message too long. Leave room for encapsulation.
+                mtu = 1280;
                 address = [
                   "10.2.0.2/32"
                   "2a07:b944::2:2/128"

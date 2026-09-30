@@ -37,5 +37,8 @@ The WireGuard configuration is `/home/phonkd/Downloads/wg-CH-640.conf`.
 - A bad endpoint can break matched domains. Verify the WireGuard handshake and
   egress before relying on the route; the direct fallback for other domains
   remains available.
+- The first z14 activation exposed an MTU mismatch: its uplink is 1400 while
+  sing-box's default WireGuard MTU is 1408 before encapsulation. Set the endpoint
+  MTU to 1280 and retest live traffic.
 - z14 is not a deploy-rs node. Apply with a local `nixos-rebuild switch --flake
   ~/git/nixconfig#z14 --impure` after review of the generated config.
