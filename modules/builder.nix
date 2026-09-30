@@ -142,9 +142,9 @@ let
 
   extraOf = entry: if entry ? extraModules then entry.extraModules { inherit self inputs; } else [ ];
 
-  # Hosts built by clan-core instead of nixosSystem. The migration in
+  # Hosts built by clan-core instead of nixosSystem/darwinSystem. The migration in
   # plans/clan-lol-migration.md moves them over one at a time; both paths get
-  # the identical module list from nixosModulesFor.
+  # the identical module list (nixosModulesFor / darwinModulesFor).
   clanHosts = [
     "205-builder"
     "204-agent"
@@ -152,6 +152,10 @@ let
     "ext-mail"
     "observability"
     "201-mono"
+    # Local rebuilds (nixos-rebuild / darwin-rebuild), not deploy-rs nodes.
+    "z14"
+    "blac"
+    "Eliss-MacBook-Pro"
   ];
   isClan = name: lib.elem name clanHosts;
 
@@ -189,29 +193,51 @@ let
     clan.core.enableRecommendedDefaults = false;
   };
 
+  darwinModulesFor =
+    name: entry:
+    [
+      ../lib/noughty
+      (noughtyHostModule name entry)
+      # Builder owns nixpkgs.hostPlatform so individual modules don't.
+      { nixpkgs.hostPlatform = entry.platform; }
+    ]
+    ++ hmDarwinBase
+    ++ alwaysImportDarwin
+    ++ (extraOf entry);
+
   mkDarwin =
     name: entry:
     inputs.nix-darwin.lib.darwinSystem {
       specialArgs = { inherit inputs self; };
-      modules = [
-        ../lib/noughty
-        (noughtyHostModule name entry)
-        # Builder owns nixpkgs.hostPlatform so individual modules don't.
-        { nixpkgs.hostPlatform = entry.platform; }
-      ]
-      ++ hmDarwinBase
-      ++ alwaysImportDarwin
-      ++ (extraOf entry);
+      modules = darwinModulesFor name entry;
     };
+
+  # clan sets networking.hostName = mkDefault <name> on every machine. The NixOS
+  # hosts all set it explicitly, so that loses; the Mac never did, and on
+  # nix-darwin the option drives `scutil --set HostName` -- so hand it back.
+  mkClanDarwin = name: entry: {
+    imports = darwinModulesFor name entry;
+    clan.core.enableRecommendedDefaults = false;
+    networking.hostName = lib.mkOverride 900 null;
+  };
 
   nixosEntries = lib.filterAttrs (_: e: !isDarwin e) registry;
   darwinEntries = lib.filterAttrs (_: e: isDarwin e) registry;
   clanEntries = lib.filterAttrs (n: _: isClan n) nixosEntries;
   plainEntries = lib.filterAttrs (n: _: !isClan n) nixosEntries;
+  clanDarwinEntries = lib.filterAttrs (n: _: isClan n) darwinEntries;
+  plainDarwinEntries = lib.filterAttrs (n: _: !isClan n) darwinEntries;
+
+  inventoryOf = e: {
+    tags = e.tags or [ ];
+    # root login is disabled everywhere; clan sudo's from phonkd like deploy-rs.
+    deploy.targetHost = if e ? deploy.hostname then "phonkd@${e.deploy.hostname}" else null;
+  };
 in
 {
-  # clan emits flake.nixosConfigurations for its machines; the two sets merge
-  # because the names never overlap. deploy-rs reads the merged set unchanged.
+  # clan emits flake.{nixos,darwin}Configurations for its machines; they merge
+  # with the builder's because the names never overlap. deploy-rs reads the
+  # merged nixosConfigurations unchanged.
   clan = {
     meta.name = "phonkd";
     # clan adds `self` and `clan-core` on its own.
@@ -220,14 +246,13 @@ in
     # per-host allowUnfreePredicate blocks). Also avoids clan looking up a
     # riscv64-linux perSystem that `systems` doesn't define.
     pkgsForSystem = _: null;
-    machines = lib.mapAttrs mkClanMachine clanEntries;
-    inventory.machines = lib.mapAttrs (_: e: {
-      tags = e.tags or [ ];
-      # root login is disabled everywhere; clan sudo's from phonkd like deploy-rs.
-      deploy.targetHost = if e ? deploy.hostname then "phonkd@${e.deploy.hostname}" else null;
-    }) clanEntries;
+    machines =
+      lib.mapAttrs mkClanMachine clanEntries // lib.mapAttrs mkClanDarwin clanDarwinEntries;
+    inventory.machines =
+      lib.mapAttrs (_: inventoryOf) clanEntries
+      // lib.mapAttrs (_: e: inventoryOf e // { machineClass = "darwin"; }) clanDarwinEntries;
   };
 
   flake.nixosConfigurations = lib.mapAttrs mkNixos plainEntries;
-  flake.darwinConfigurations = lib.mapAttrs mkDarwin darwinEntries;
+  flake.darwinConfigurations = lib.mapAttrs mkDarwin plainDarwinEntries;
 }
