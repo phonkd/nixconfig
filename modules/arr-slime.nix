@@ -293,6 +293,14 @@
 
             prowlarr = {
               enable = true;
+              # Prowlarr >= 2.6.3 rejects the host-config PUT (HTTP 400, "Allowed
+              # Hosts is required when 'Authentication Required' is not 'Enabled'")
+              # and nixflix has no option for it -- so prowlarr-config failed every
+              # activation. 0.0.0.0 passes the validator and is ASP.NET Core's
+              # any-host wildcard: nothing gets restricted, and nixflix's own calls
+              # to http://0.0.0.0:9696 keep working. Radarr >= 6.4.4 and Sonarr
+              # >= 4.0.20 carry the same rule; add this there when they arrive.
+              settings.server.allowedHosts = "0.0.0.0";
               config = {
                 apiKey._secret = "/run/secrets/prowlarr-api-key";
                 hostConfig = {
