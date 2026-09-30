@@ -149,6 +149,7 @@ let
     "205-builder"
     "204-agent"
     "203-media"
+    "ext-mail"
   ];
   isClan = name: lib.elem name clanHosts;
 
