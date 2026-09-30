@@ -183,43 +183,31 @@ rec {
   cfgHome = config.xdg.configHome;
 
   # Inherited from modules/kde.nix (itself AeroSpace's Option-key layout,
-  # Option spelled Alt). `mod` is the window-management modifier; the
-  # workspace keys are the one exception and sit on SUPER unconditionally
-  # (see workspaceKeys below).
+  # Option spelled Alt). `mod` is the window-management modifier, including
+  # the workspace keys below.
   #
   # On Linux, Alt+<letter> also reaches Qt/GTK menu bars, and a compositor
   # bind wins over the focused app.
   mod = "ALT";
 
-  # The number row, 1..9, on SUPER rather than `mod` -- the one part of the
-  # keymap that doesn't follow the knob above. The scheme this replaced put
-  # workspaces on three keyboard rows (123/QWE/ASD) under Alt, which cost the
-  # number row's Alt bindings the screenshot keys wanted (Alt+Shift+1/2/3
-  # collided with send-to-workspace). Moving workspaces to SUPER frees Alt's
-  # digits outright.
-  #
-  # Spelled `code:` rather than `1`..`9`: every key here also carries a SHIFT
-  # bind (send-to-workspace), and on this ch/de_nodeadkeys keyboard Shift+1
-  # emits `plus` -- a dead send-to-workspace key would fail silently.
-  # `code:` matches the physical key and is immune to that and to any later
-  # layout change. Values are the X11 keycodes for AE01..AE09 (evdev code +
-  # 8), read off xkb's keycodes/evdev table.
+  # Three groups of letter keys: QWE = 1..3, ASD = 4..6, UIO = 7..9.
+  # This leaves Alt+Shift+1/2/3 available for the screenshot bindings.
   workspaceKeys = [
-    "code:10"
-    "code:11"
-    "code:12"
-    "code:13"
-    "code:14"
-    "code:15"
-    "code:16"
-    "code:17"
-    "code:18"
+    "Q"
+    "W"
+    "E"
+    "A"
+    "S"
+    "D"
+    "U"
+    "I"
+    "O"
   ];
 
   workspaceBinds = lib.flatten (
     lib.imap1 (i: key: [
-      "SUPER, ${key}, workspace, ${toString i}"
-      "SUPER SHIFT, ${key}, ${dispatch "movetoworkspace"}, ${toString i}"
+      "${mod}, ${key}, workspace, ${toString i}"
+      "${mod} SHIFT, ${key}, ${dispatch "movetoworkspace"}, ${toString i}"
     ]) workspaceKeys
   );
 
@@ -280,11 +268,8 @@ rec {
     "env GRIMBLAST_EDITOR=${sattyEdit} DEFAULT_TMP_EDITOR_DIR=\"$XDG_RUNTIME_DIR\""
     + " ${pkgs.grimblast}/bin/grimblast --freeze edit ${target}";
 
-  # nwg-displays: the arrange-your-monitors GUI. It persists by writing
-  # Hyprland config, so it owns its own files (hyprland.conf here is a
-  # read-only store symlink) and this config `source`s them by absolute
-  # path. It creates both files itself if missing, picking the paths up from
-  # $XDG_CONFIG_HOME/hypr.
+  # Mutable Hyprland state: Monique writes monitors.conf, including workspace
+  # assignments. The former workspaces.conf is retained for migration/backup.
   monitorsConf = "${cfgHome}/hypr/monitors.conf";
   workspacesConf = "${cfgHome}/hypr/workspaces.conf";
 

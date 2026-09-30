@@ -4,6 +4,7 @@
   lib,
   pkgs,
   scope,
+  monique,
 }:
 let
   inherit (scope)
@@ -68,7 +69,7 @@ in
   ]) ++ lib.optionals scope.hyprlandEnabled (with pkgs; [
     # These integrate directly with Hyprland IPC/configuration.
     grimblast
-    nwg-displays
+    monique
     hyprpicker
   ]);
 
@@ -95,6 +96,20 @@ in
     Service = {
       ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --type image --watch ${pkgs.cliphist}/bin/cliphist store";
       Restart = "on-failure";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
+
+  systemd.user.services.moniqued = lib.mkIf scope.hyprlandEnabled {
+    Unit = {
+      Description = "Apply saved monitor profiles on hotplug";
+      PartOf = [ "graphical-session.target" ];
+      After = [ "graphical-session.target" ];
+    };
+    Service = {
+      ExecStart = "${monique}/bin/moniqued";
+      Restart = "on-failure";
+      RestartSec = 2;
     };
     Install.WantedBy = [ "graphical-session.target" ];
   };

@@ -4,9 +4,10 @@ let
   homeModule = { config, lib, pkgs, osConfig ? null, ... }:
     let
       scope = import ./gui-session/_scope.nix { inherit config lib pkgs self inputs osConfig; };
+      monique = inputs.monique.packages.${pkgs.system}.default;
       inherit (scope) annotate cursorName cursorSize dispatch eeVolume generated groupbarMode
         groupBinds hy3 hy3Plugin hyprctl kitty layout layoutSettings loudnessKnob mod
-        monitorsConf moveWindowDispatch scale sinkSwitcher workspaceBinds workspacesConf zen;
+        monitorsConf moveWindowDispatch scale sinkSwitcher workspaceBinds zen;
       # SHORTCUTS: add or change a line in the lists below.
       # Each line is "MODIFIERS, KEY, ACTION, ARGUMENT". For example:
       #   "SUPER SHIFT, T, exec, ${kitty}"
@@ -47,7 +48,7 @@ let
           "SHIFT, Print, exec, ${annotate "area"}"
 
           # Desktop tools.
-          "SUPER, P, exec, ${pkgs.nwg-displays}/bin/nwg-displays -n 9"
+          "SUPER, P, exec, ${monique}/bin/monique"
           "SUPER, C, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a"
           "SUPER, V, exec, ${pkgs.cliphist}/bin/cliphist list | ${pkgs.rofi}/bin/rofi -dmenu | ${pkgs.cliphist}/bin/cliphist decode | ${pkgs.wl-clipboard}/bin/wl-copy"
           "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start gui-wallpaper.service"
@@ -83,7 +84,6 @@ let
           systemd.enable = true; xwayland.enable = true; configType = "hyprlang";
           extraConfig = ''
             source = ${monitorsConf}
-            source = ${workspacesConf}
           '';
           settings = {
             source = [ generated.hypr ] ++ lib.optional (!hy3) groupbarMode;

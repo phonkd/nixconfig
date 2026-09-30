@@ -101,6 +101,7 @@
         settings = {
           email = "enst18.12@gmail.com";
           base_url = "https://vw.w.phonkd.net";
+          pinentry = pkgs.pinentry-gnome3;
         };
       };
 
@@ -207,6 +208,8 @@
       # implementation; the PAM line unlocks it with the password already typed
       # at greetd, rather than prompting a second time.
       services.gnome.gnome-keyring.enable = true;
+      # pinentry-gnome3 uses GCR's Secret Exchange dialog for rbw unlocks.
+      services.dbus.packages = [ pkgs.gcr ];
       security.pam.services.greetd.enableGnomeKeyring = true;
       users.users.phonkd.extraGroups = [
         "dialout"

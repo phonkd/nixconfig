@@ -135,6 +135,7 @@
         gh
         iftop
         gnused
+        zsh-forgit
       ];
       # atuin only records history (with the directory each command ran in);
       # it has no UI of its own here -- see ctrl-d on fzf's Ctrl-R below.

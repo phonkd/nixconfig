@@ -38,7 +38,10 @@ in
   config = lib.mkIf scope.enabled (
     lib.mkMerge [
       (section ./_shell.nix)
-      (section ./_session.nix)
+      (import ./_session.nix {
+        inherit config lib pkgs scope;
+        monique = inputs.monique.packages.${pkgs.system}.default;
+      })
 
       # Split out so that setting noughty.gui.wallpaperDir = null leaves a
       # perfectly usable static-colour session.

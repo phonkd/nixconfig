@@ -37,6 +37,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
+    monique = {
+      url = "github:ToRvaLDz/monique";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # Makes nix-installed .app bundles launchable on the Mac: home-manager's
     # `targets.darwin.linkApps` symlinks bundles into ~/Applications/Home
     # Manager Apps, but that target lives on the /nix volume (mounted
@@ -68,7 +72,9 @@
     # would rebuild all of that against an untested Qt6 -- a second nixpkgs
     # and Qt6 in the closure is the honest cost of borrowing someone else's
     # shell. Build offloads to 205-builder like everything else.
-    caelestia.url = "github:caelestia-dots/shell";
+    # Track the latest tested upstream release; the package's own Nix version
+    # remains hardcoded to 1.0.0 even for the 2.x releases.
+    caelestia.url = "github:caelestia-dots/shell/v2.5.0";
     sops-nix.url = "github:Mic92/sops-nix";
     # deploy-rs: `deploy <host>` builds (offloaded to 205 via nix.buildMachines)
     # and activates a NixOS host with magic rollback. Nodes are generated from
