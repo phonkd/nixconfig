@@ -38,6 +38,16 @@
         # Absolute store paths rather than `runtimeInputs`: `exec` runs under
         # the compositor, not a login shell, and guarantees nothing about PATH.
         text = ''
+          # Also a rofi script mode (the launcher's `audio` mode, Ctrl+2 in
+          # SUPER+D): rofi sets ROFI_RETV and hands back the picked row's
+          # node id as ROFI_INFO. Returning no rows closes rofi.
+          if [ "''${ROFI_RETV:-}" = 1 ]; then
+            if [ -n "''${ROFI_INFO:-}" ]; then
+              ${pkgs.wireplumber}/bin/wpctl set-default "$ROFI_INFO"
+            fi
+            exit 0
+          fi
+
           # Read from the `default` metadata rather than `wpctl status`, whose
           # default marker is a `*` glyph inside a box-drawing tree.
           default_name="$(
@@ -75,6 +85,13 @@
 
           # No sinks means PipeWire is not up yet; an empty rofi is worse than none.
           if [ -z "$menu" ]; then
+            exit 0
+          fi
+
+          if [ -n "''${ROFI_RETV:-}" ]; then
+            printf '\0prompt\x1fOutput\n'
+            printf '%s\n' "$menu" \
+              | ${pkgs.gawk}/bin/awk -F'\t' '{ printf "%s\0info\x1f%s\n", $2, $1 }'
             exit 0
           fi
 

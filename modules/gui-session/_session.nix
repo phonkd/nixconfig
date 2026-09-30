@@ -10,6 +10,8 @@ let
   inherit (scope)
     cursorName
     cursorSize
+    rbwMode
+    sinkSwitcher
     ;
 in
 {
@@ -29,7 +31,14 @@ in
     font = "Inter 13";
     extraConfig = {
       # `modes` is rofi 2.0's spelling (`modi` is the pre-2.0 alias).
-      modes = "combi,drun,run,window";
+      modes = "combi,bitwarden:${rbwMode},audio:${sinkSwitcher},drun,run,window";
+      # Ctrl+<n> jumps to mode <n> from anywhere in the launcher: drun, run,
+      # window and script modes all treat kb-custom-<k> as "switch to mode
+      # index k-1", so kb-custom-2 opens `bitwarden` (index 1), kb-custom-3
+      # `audio`, and Ctrl+0 returns to combi. Alt+<k> stays as rofi's default.
+      kb-custom-1 = "Alt+1,Control+0";
+      kb-custom-2 = "Alt+2,Control+1";
+      kb-custom-3 = "Alt+3,Control+2";
       # combi concatenates each sub-mode's matches in *this* order rather
       # than interleaving them, so an already-running window always sorts
       # above the .desktop entry that would start a second copy.

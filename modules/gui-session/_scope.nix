@@ -222,6 +222,7 @@ rec {
   # runnable by hand (`nix run .#hypr-sink-switcher`) without a session.
   eeVolume = "${self.packages.${pkgs.system}.hypr-ee-volume}/bin/hypr-ee-volume";
   sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
+  rbwMode = "${self.packages.${pkgs.system}.rofi-rbw-mode}/bin/rofi-rbw-mode";
 
   # -- Screenshots: capture, then annotate -------------------------------
   #
