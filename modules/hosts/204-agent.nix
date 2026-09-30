@@ -28,6 +28,8 @@
       ];
       security.sudo.wheelNeedsPassword = false;
       networking.firewall.allowedTCPPorts = [ 22 ];
+      # Underlay traffic for the z14 -> 205-builder Tailscale peer relay.
+      networking.firewall.allowedUDPPorts = [ 40000 ];
       environment.systemPackages = [
         pkgs.claude-code
       ];

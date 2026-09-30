@@ -88,6 +88,8 @@
         extraSetFlags =
           if config.noughty.host.name == "201-mono" then
             [ "--advertise-exit-node" ]
+          else if config.noughty.host.name == "204-agent" then
+            [ "--relay-server-port=40000" ]
           else if lib.elem config.noughty.host.name laptops then
             [ "--operator=phonkd" ]
           else

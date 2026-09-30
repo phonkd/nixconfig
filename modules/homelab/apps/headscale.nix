@@ -22,17 +22,20 @@
 # before any user exists, and a malformed file policy would block startup. The
 # canonical policy is version-controlled next door in headscale-policy.hujson
 # and applied out of band after enrolment (see plans/headscale-mesh.md step 6).
-{ ... }:
+{ inputs, ... }:
 {
   flake.nixosModules.headscale-server =
     {
       lib,
       noughtyLib,
+      pkgs,
       ...
     }:
     lib.mkIf (noughtyLib.hostHasTag "observability-server") {
       services.headscale = {
         enable = true;
+        # 0.29 adds peer-relay capability grants; nixos-26.05 is still 0.28.
+        package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.headscale;
         address = "0.0.0.0";
         port = 443;
         settings = {
