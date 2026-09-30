@@ -64,14 +64,17 @@ clan deploy also carries the systemd bump — deploy each one off-tailnet
       `running`. 204 already had the nixpkgs bump, so this is the clean
       measurement: **clan's entire closure change is `gen: ∅ → ε`** —
       `/etc/hostid` — and activation restarted no system service.
-- [ ] `203-media` — **blocked.** `prowlarr-config.service` now fails on every
-      activation (curl exit 22 on the host-config PUT), so every deploy to 203
-      reports failure and deploy-rs rolls the boot profile back. Not clan:
-      nixflix moved in `2a3f5e3` and `11774fcb` ("send allowedHosts in the
-      arr host config payload") changed exactly that request; sonarr, radarr
-      and lidarr accept it, prowlarr doesn't. Pin nixflix back or fix it
-      upstream first. From z14, deploy over `192.168.3.203` (201's subnet
-      route) — `192.168.1.203` gets `Permission denied (publickey)` here.
+- [ ] `203-media` — unblocked by `d6e27fe`. It was blocked because
+      `prowlarr-config.service` failed on every activation, which made every
+      deploy report failure and roll back. Cause: the nixpkgs bump took
+      Prowlarr 2.5.2 → 2.6.5, and 2.6.3 requires a non-empty Allowed Hosts
+      unless auth is `enabled` (we use `disabledForLocalAddresses`). Not
+      nixflix — the pre-`11774fcb` payload is rejected too, so pinning it
+      back would not have helped. Fix: `settings.server.allowedHosts =
+      "0.0.0.0"` (a wildcard; nothing restricted). Radarr ≥ 6.4.4 and Sonarr
+      ≥ 4.0.20 carry the same rule. From z14, deploy over `192.168.3.203`
+      (201's subnet route) — `192.168.1.203` gets `Permission denied
+      (publickey)` here.
 - [ ] `ext-mail` — deploys over its public IP already
 - [ ] `observability` — the headscale coordinator; `--hostname 89.167.83.90`,
       and from z14 also `--ssh-opts "-o ProxyCommand=none -p 5432 -i
@@ -163,6 +166,10 @@ Gaps found along the way, most useful first:
   controllers.
 - **Per-tag settings on the stable branch**, and **darwin support for
   services** (upstream #5717).
+- Not clan, but found on the way: **nixflix** gives no way to set Allowed
+  Hosts, which Servarr now requires for non-`enabled` auth. An issue and a
+  small patch are drafted (send `0.0.0.0` when auth isn't `enabled` and the
+  app has none), not filed.
 
 ## Risks / rollout
 

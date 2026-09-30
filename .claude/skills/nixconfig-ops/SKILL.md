@@ -93,6 +93,12 @@ deploy --list         # show deployable hosts
   ollama, ocis, samba) fully stopped while both reported `running` — and with
   headscale down, the embedded DERP was too, so tailnet paths without a direct
   route (z14 → 203) went dead with it.
+- **What changed between two generations:** `nix store diff-closures
+  /nix/var/nix/profiles/system-120-link /nix/var/nix/profiles/system-121-link`
+  on the host. Use **absolute** (or `./`) paths — a bare `system-121-link` is
+  parsed as a flake reference, and if stderr is discarded the error reads as
+  "nothing changed". That is how a Prowlarr 2.5.2 → 2.6.5 bump on 203 was
+  missed on 2026-09-30.
 - **Git flake semantics — commit first.** `deploy 201` reads the flake from the
   `~/git/nixconfig` working tree: *untracked* files are invisible, but
   **uncommitted edits to tracked files ARE deployed**, and the host then reports
