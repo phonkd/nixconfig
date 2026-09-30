@@ -11,7 +11,7 @@
 #
 # tlp stays off: it and power-profiles-daemon (enabled in modules/desktop.nix)
 # fight over the same CPU governor.
-{ inputs, ... }:
+{ ... }:
 {
   flake.nixosModules.z14 =
     {
@@ -138,54 +138,6 @@
       systemd.user.services.wireplumber = {
         overrideStrategy = "asDropin";
         environment.ACP_PATHS_DIR = "${acpMixerPaths}";
-      };
-
-      # Local LLM inference on the Radeon 840M. Three choices that each cost
-      # a wrong turn to find:
-      #
-      # 1. Vulkan, not ROCm: rocminfo reports this iGPU as gfx1153, but
-      #    rocmPackages.clr.gpuTargets stops at gfx1151 -- rocBLAS ships no
-      #    code objects for it, so ollama-rocm would need
-      #    HSA_OVERRIDE_GFX_VERSION to masquerade as gfx1102. RADV enumerates
-      #    the device natively ("RADV GFX1153") and its closure is 34 MiB vs
-      #    ollama-rocm's 2.2 GiB.
-      # 2. OLLAMA_IGPU_ENABLE=1: ollama finds the iGPU and deliberately
-      #    discards it by default ("dropping integrated GPU"), silently
-      #    falling back to CPU.
-      # 3. The unstable pin: 26.05 ships ollama 0.32.3, whose registry
-      #    refuses qwen3.8 (HTTP 412) -- that needs 0.32.13, Flash-Next needs
-      #    0.33.1; unstable is on 0.34.0. Drop this override once 26.05
-      #    catches up.
-      #
-      # A 27B fits because RADV exposes the 6 GiB BIOS UMA carve-out plus the
-      # ~12.5 GiB GTT aperture as one 18.5 GiB heap, so a 16.5 GiB q4_K_M 27B
-      # needs no partial offload. GTT pages are ordinary system RAM though
-      # (this host has no swap), and generation stays memory-bandwidth-bound
-      # over shared LPDDR5x either way -- the iGPU earns its keep on prompt
-      # processing, not tokens/s.
-      #
-      # user/group give the module's staticUser branch a real ollama user for
-      # a stable uid (the 17 GiB blob store needs stable ownership across
-      # restarts); the module still sets DynamicUser unconditionally, so
-      # StateDirectory still resolves through /var/lib/private/ollama.
-      #
-      # OLLAMA_CONTEXT_LENGTH=32768: the module's VRAM-derived default lands
-      # on a useless 4096. 32K is free -- measured 3.294 tok/s vs 3.286 tok/s
-      # at 4K -- because KV at 32K (1920 MiB) just pushes ~1.8 GiB of weights
-      # onto the CPU side of the same LPDDR5x bus. KV costs ~60 KiB/token
-      # measured; the 48 Gated DeltaNet layers are a flat ~150 MiB regardless
-      # of context, only the 16 Gated Attention layers scale. 64K needs
-      # 3.75 GiB KV (fits, tight); 128K needs 7.5 GiB and won't fit alongside
-      # a desktop session with no swap.
-      services.ollama = {
-        enable = true;
-        package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.ollama-vulkan;
-        environmentVariables = {
-          OLLAMA_IGPU_ENABLE = "1";
-          OLLAMA_CONTEXT_LENGTH = "32768";
-        };
-        user = "ollama";
-        group = "ollama";
       };
 
       # Auto-brightness consumer (hardware.sensor.iio above only wakes the
