@@ -56,6 +56,15 @@
       '';
     in
     lib.mkIf (config.noughty.host.name == "z14") {
+      # Use Betterbird for mail on this laptop; Owl is its Exchange add-on.
+      home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
+      services.flatpak.packages = [
+        {
+          appId = "eu.betterbird.Betterbird";
+          origin = "flathub";
+        }
+      ];
+
       noughty.proxy.protonReddit.enable = true;
       networking.hostName = "z14";
 
