@@ -1,9 +1,7 @@
 { lib, ... }:
 {
-  options.flake.darwinModules = lib.mkOption {
-    type = lib.types.lazyAttrsOf lib.types.raw;
-    default = {};
-  };
+  # flake.darwinModules is declared by clan-core's flake module (as
+  # lazyAttrsOf deferredModule); declaring it here too is an eval error.
   options.flake.homeModules = lib.mkOption {
     type = lib.types.lazyAttrsOf lib.types.raw;
     default = {};

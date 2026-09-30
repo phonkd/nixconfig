@@ -14,7 +14,7 @@
 }:
 {
   perSystem =
-    { pkgs, ... }:
+    { pkgs, system, ... }:
     let
       sops-secret = pkgs.writeShellApplication {
         name = "sops-secret";
@@ -55,10 +55,12 @@
           yq-go
           openssl
           nixfmt
+          # `clan` -- the clan-core CLI (plans/clan-lol-migration.md).
+          inputs.clan-core.packages.${system}.clan-cli
         ];
 
         shellHook = ''
-          echo "nixconfig devshell — sops-secret, sso-secret, task. See plans/authelia-sso.md."
+          echo "nixconfig devshell — clan, sops-secret, sso-secret, task."
         '';
       };
     };

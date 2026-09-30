@@ -76,6 +76,18 @@
     # remains hardcoded to 1.0.0 even for the 2.x releases.
     caelestia.url = "github:caelestia-dots/shell/v2.5.0";
     sops-nix.url = "github:Mic92/sops-nix";
+    # clan-core builds the hosts listed in modules/builder.nix's `clanHosts`
+    # (plans/clan-lol-migration.md). The 26.05 branch pins nixos-26.05, same as
+    # ours; it lives on git.clan.lol only -- the GitHub mirror has no 26.05.
+    # sops-nix.follows is mandatory: clanCore imports sops-nix itself, and two
+    # sops-nix store paths abort eval with "option sops.* already declared".
+    clan-core = {
+      url = "https://git.clan.lol/clan/clan-core/archive/26.05.tar.gz";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.flake-parts.follows = "flake-parts";
+      inputs.sops-nix.follows = "sops-nix";
+      inputs.nix-darwin.follows = "nix-darwin";
+    };
     # deploy-rs: `deploy <host>` builds (offloaded to 205 via nix.buildMachines)
     # and activates a NixOS host with magic rollback. Nodes are generated from
     # lib/registry.nix in modules/deploy.nix.
@@ -160,6 +172,7 @@
     flake-parts.lib.mkFlake { inherit inputs; } {
       imports = [
         wrapper-modules.flakeModules.default
+        inputs.clan-core.flakeModules.default
         (import-tree ./modules)
       ];
     };

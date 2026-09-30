@@ -2,7 +2,8 @@
 #
 # For each entry in lib/registry.nix this module emits either
 # flake.nixosConfigurations.<name> or flake.darwinConfigurations.<name>,
-# routed by the entry's platform suffix. Each built config gets:
+# routed by the entry's platform suffix -- NixOS hosts in `clanHosts` via a
+# clan-core machine, the rest via nixosSystem directly. Each built config gets:
 #
 #   1. The noughty options module (always)
 #   2. A generated module setting noughty.host.* / noughty.user.* from the
@@ -141,25 +142,45 @@ let
 
   extraOf = entry: if entry ? extraModules then entry.extraModules { inherit self inputs; } else [ ];
 
+  # Hosts built by clan-core instead of nixosSystem. The migration in
+  # plans/clan-lol-migration.md moves them over one at a time; both paths get
+  # the identical module list from nixosModulesFor.
+  clanHosts = [ "205-builder" ];
+  isClan = name: lib.elem name clanHosts;
+
+  nixosModulesFor =
+    name: entry:
+    [
+      ../lib/noughty
+      (noughtyHostModule name entry)
+      # Records the git revision this config was built from -- via
+      # `nixos-version --configuration-revision` and the observability
+      # textfile metric into Mimir, so a merged-but-undeployed host is
+      # visible without ssh. Dirty trees get "<rev>-dirty" (or null).
+      { system.configurationRevision = self.rev or self.dirtyRev or null; }
+    ]
+    ++ hmNixosBase
+    ++ [ inputs.nix-flatpak.nixosModules.nix-flatpak ]
+    ++ alwaysImport
+    ++ (extraOf entry);
+
   mkNixos =
     name: entry:
     inputs.nixpkgs.lib.nixosSystem {
       system = entry.platform;
       specialArgs = { inherit inputs self; };
-      modules = [
-        ../lib/noughty
-        (noughtyHostModule name entry)
-        # Records the git revision this config was built from -- via
-        # `nixos-version --configuration-revision` and the observability
-        # textfile metric into Mimir, so a merged-but-undeployed host is
-        # visible without ssh. Dirty trees get "<rev>-dirty" (or null).
-        { system.configurationRevision = self.rev or self.dirtyRev or null; }
-      ]
-      ++ hmNixosBase
-      ++ [ inputs.nix-flatpak.nixosModules.nix-flatpak ]
-      ++ alwaysImport
-      ++ (extraOf entry);
+      modules = nixosModulesFor name entry;
     };
+
+  # clan passes no `system` to nixosSystem, so the platform goes in as
+  # nixpkgs.hostPlatform. Recommended defaults stay off: they switch the host
+  # to systemd-networkd and default networking.domain to "clan", which makes
+  # targetHost root@<host>.clan -- a name that resolves nowhere here.
+  mkClanMachine = name: entry: {
+    imports = nixosModulesFor name entry;
+    nixpkgs.hostPlatform = entry.platform;
+    clan.core.enableRecommendedDefaults = false;
+  };
 
   mkDarwin =
     name: entry:
@@ -178,8 +199,28 @@ let
 
   nixosEntries = lib.filterAttrs (_: e: !isDarwin e) registry;
   darwinEntries = lib.filterAttrs (_: e: isDarwin e) registry;
+  clanEntries = lib.filterAttrs (n: _: isClan n) nixosEntries;
+  plainEntries = lib.filterAttrs (n: _: !isClan n) nixosEntries;
 in
 {
-  flake.nixosConfigurations = lib.mapAttrs mkNixos nixosEntries;
+  # clan emits flake.nixosConfigurations for its machines; the two sets merge
+  # because the names never overlap. deploy-rs reads the merged set unchanged.
+  clan = {
+    meta.name = "phonkd";
+    # clan adds `self` and `clan-core` on its own.
+    specialArgs = { inherit inputs; };
+    # null => each machine keeps honouring its own nixpkgs.* options (the
+    # per-host allowUnfreePredicate blocks). Also avoids clan looking up a
+    # riscv64-linux perSystem that `systems` doesn't define.
+    pkgsForSystem = _: null;
+    machines = lib.mapAttrs mkClanMachine clanEntries;
+    inventory.machines = lib.mapAttrs (_: e: {
+      tags = e.tags or [ ];
+      # root login is disabled everywhere; clan sudo's from phonkd like deploy-rs.
+      deploy.targetHost = if e ? deploy.hostname then "phonkd@${e.deploy.hostname}" else null;
+    }) clanEntries;
+  };
+
+  flake.nixosConfigurations = lib.mapAttrs mkNixos plainEntries;
   flake.darwinConfigurations = lib.mapAttrs mkDarwin darwinEntries;
 }
