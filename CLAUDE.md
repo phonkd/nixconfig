@@ -5,7 +5,10 @@ Single source of truth for agent guidance in this repo (`AGENTS.md` points here)
 ## Change workflow
 
 Size decides the ceremony. Everything else is identical, and all of it is
-autonomous — don't hand back work you can finish.
+autonomous — don't hand back work you can finish. One exception: **ask first**
+before writing a custom systemd unit or a nixpkgs package override/overlay. An
+existing option often covers it, or the fix belongs upstream as a PR (details in
+the `nixconfig` skill).
 
 **Small to medium** — the everyday case: an option tweak, a version bump, a
 secret, a dashboard entry, a contained edit to one module. Just do it, no plan.

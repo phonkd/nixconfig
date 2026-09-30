@@ -146,6 +146,21 @@ it. Large (new service/module/host, cross-repo, schema, `201-mono`, multi-host):
 - Verify NixOS option names against the real module source, not from memory. Locate
   nixpkgs: `nix eval --raw .#nixosConfigurations."203-media".pkgs.path`, then read
   `<path>/nixos/modules/...`.
+- **Ask before hand-rolling a systemd unit or overriding a package.** This covers a
+  custom `systemd.services.<x>`/`systemd.user.services.<x>` (or timer) written for
+  something a module could run, and any `overrideAttrs`, `override`, overlay, or
+  vendored/copied derivation that patches, bumps, or reworks a nixpkgs package.
+  An option usually already exists (a nixpkgs/home-manager module, an upstream
+  flake's module, a `package`/`extraArgs`/`settings` knob), or the gap belongs
+  upstream as a nixpkgs/home-manager PR rather than as a local fork that rots. So
+  before writing one, stop and ask the user: say what you searched (module source,
+  `inix`, upstream issues/PRs), what you found or didn't find, and the options —
+  use an existing option, upstream a PR (and carry a temporary override until it
+  merges), or go local. Wait for the answer. This is the one standing exception to
+  "don't hand back work you can finish". It doesn't cover setting fields on a unit a
+  module already defines (`systemd.services.<x>.serviceConfig.…`,
+  `after`/`wants`), or the `package = …` option a module provides for swapping
+  packages.
 - **Work always lands on local `main`, and `main` is never pushed.** Several routes,
   all ending in the same place:
   - Working in the normal checkout: commit straight to `main`. No feature branch,

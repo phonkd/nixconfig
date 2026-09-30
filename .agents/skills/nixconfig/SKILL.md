@@ -141,6 +141,21 @@ nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [ "oc
 - Verify NixOS option names against the real module source, not from memory. Locate
   nixpkgs: `nix eval --raw .#nixosConfigurations."203-media".pkgs.path`, then read
   `<path>/nixos/modules/...`.
+- **Ask before hand-rolling a systemd unit or overriding a package.** This covers a
+  custom `systemd.services.<x>`/`systemd.user.services.<x>` (or timer) written for
+  something a module could run, and any `overrideAttrs`, `override`, overlay, or
+  vendored/copied derivation that patches, bumps, or reworks a nixpkgs package.
+  An option usually already exists (a nixpkgs/home-manager module, an upstream
+  flake's module, a `package`/`extraArgs`/`settings` knob), or the gap belongs
+  upstream as a nixpkgs/home-manager PR rather than as a local fork that rots. So
+  before writing one, stop and ask the user: say what you searched (module source,
+  `inix`, upstream issues/PRs), what you found or didn't find, and the options —
+  use an existing option, upstream a PR (and carry a temporary override until it
+  merges), or go local. Wait for the answer. This is the one standing exception to
+  "don't hand back work you can finish". It doesn't cover setting fields on a unit a
+  module already defines (`systemd.services.<x>.serviceConfig.…`,
+  `after`/`wants`), or the `package = …` option a module provides for swapping
+  packages.
 - **Default to committing straight to `main`, but don't push** — no feature branch,
   no PR — since most changes here are small homelab tweaks and PR ceremony is pure
   overhead for a single-user repo. Then apply it yourself: run `deploy <host>`
