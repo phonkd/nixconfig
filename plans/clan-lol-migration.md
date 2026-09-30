@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — Phase 1: 205, 204, 203 on clan-core; ext-mail next
+**Repo(s):** nixconfig   **Status:** in-progress — Phase 1: all six servers on clan-core; z14, blac, Mac committed, awaiting local switch
 
 ## Why
 
@@ -77,19 +77,36 @@ clan deploy also carries the systemd bump — deploy each one off-tailnet
       ≥ 4.0.20 carry the same rule. From z14, deploy over `192.168.3.203`
       (201's subnet route) — `192.168.1.203` gets `Permission denied
       (publickey)` here.
-- [ ] `ext-mail` — deploys over its public IP already
-- [ ] `observability` — the headscale coordinator; `--hostname 89.167.83.90`,
-      and from z14 also `--ssh-opts "-o ProxyCommand=none -p 5432 -i
-      $HOME/.ssh/id_ed25519_priv -o IdentitiesOnly=no"`
-- [ ] `201-mono` — fronts everything, so last among servers;
-      `--hostname 192.168.3.201`, then check `systemctl is-active traefik dnsmasq`
-- [ ] `z14`, `blac` — local `nixos-rebuild`; their `extraModules` import
-      `/etc/nixos/hardware-configuration.nix`, which needs `--impure` as today
-- [ ] `Eliss-MacBook-Pro` — needs `inventory.machines.<n>.machineClass =
-      "darwin"` and `mkDarwin` folded in the same way. Clan's darwin support
-      is `clan machines update` + vars only.
+- [x] `ext-mail` (`b9fa837`, public IP, plus the nixpkgs bump): generation 46,
+      confirmed, no failed units; postfix, dovecot, rspamd, Synapse and all
+      three mautrix bridges active. From z14 it needs
+      `--ssh-opts "-o ProxyCommand=none -p 5432 -i $HOME/.ssh/id_ed25519_priv
+      -o IdentitiesOnly=no"`, same as observability.
+- [x] `observability` (`4dd257a`, `--hostname 89.167.83.90` + those ssh-opts):
+      generation 30, confirmed; headscale, grafana, loki, mimir, alloy active;
+      closure diff `gen: ∅ → ε`.
+- [x] `201-mono` (`d7b7649`, `--hostname 192.168.3.201`, plus the nixpkgs
+      bump): generation 290, confirmed, no failed units; traefik, dnsmasq,
+      authelia, vaultwarden, crowdsec, paperless, syncthing, garage, homepage,
+      alloy all active, and requests through traefik to vw.w, auth.w and
+      home.phonkd.net answer 200. z14 reaches `192.168.3.201` over the home
+      LAN via the router, not the tailnet — so this path only exists while
+      z14 is at home.
+- [ ] `z14`, `blac`, `Eliss-MacBook-Pro` — committed in `5f0d1ad`, **not yet
+      switched**; each is a local rebuild. The Mac's clan machine sets
+      `networking.hostName = mkOverride 900 null`: clan defaults the hostname
+      on every machine, darwin included, and the Mac never set one, so without
+      this nix-darwin would start renaming it via `scutil`.
 
-When every host is on clan: delete `mkNixos` and the `clanHosts` filter.
+When z14, blac and the Mac have switched cleanly: delete `mkNixos`, `mkDarwin`
+and the `clanHosts` filter — until then they are the rollback lever.
+
+**Before Phase 2, check:** z14 and blac import
+`/etc/nixos/hardware-configuration.nix`, an absolute path that only works with
+`--impure`. The clan CLI evaluates *every* machine for `clan vars`; if it does
+so purely, those two will fail it. The clan-native fix is to move each file
+into the repo as `machines/<name>/hardware-configuration.nix`, which clan
+auto-imports.
 
 ### 2 — secrets onto clan's store
 
