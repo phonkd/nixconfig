@@ -9,9 +9,9 @@
 # -- that SOCKS half is load-bearing, this can't just be an HTTP proxy.
 # Everything else goes straight out, unaware this exists.
 #
-# TWO traffic classes: bedag (the work config's domain/ip rules) -> SOCKS ssh
-# tunnels; everything else -> direct. The homelab is a third class that never
-# reaches sing-box: `no_proxy` carries `.phonkd.net` and 100.64.0.0/10,
+# Three traffic classes: Reddit -> Proton WireGuard; bedag (the work config's
+# domain/ip rules) -> SOCKS ssh tunnels; everything else -> direct. The homelab
+# never reaches sing-box: `no_proxy` carries `.phonkd.net` and 100.64.0.0/10,
 # routing to tailscaled over the headscale mesh -- keeping homelab
 # reachability independent of this service's health.
 #
@@ -21,11 +21,10 @@
 # ignores $http_proxy. modules/proxy/README.md and
 # `git log -- modules/proxy/` have the details.
 #
-# TWO config files, merged by sing-box: /etc/sing-box/config.json (generated
-# here, public: inbound/DNS/direct outbound -- path matters, see
-# `environment.etc` below) and ~/git/bedag-setup/singbox.json (private repo's
-# SOCKS outbounds + picking rules, referenced by path, never restated here --
-# what keeps this repo publishable).
+# Three config files on z14, merged by sing-box: /etc/sing-box/config.json
+# (public routes/inbound/DNS/direct outbound), the private work config under
+# ~/git/bedag-setup, and a runtime SOPS template holding Proton's WireGuard
+# key. The /etc path sorts first so Reddit's rule precedes work rules.
 #
 # Shares only the package with the macOS half (modules/proxy/darwin.nix):
 # that one needs a DNS split for a macOS-only reason (scoped resolvers
@@ -42,6 +41,14 @@
     }:
     let
       cfg = config.noughty.proxy;
+      redditVpn = cfg.protonReddit.enable;
+
+      redditDomains = [
+        "reddit.com"
+        "redd.it"
+        "redditstatic.com"
+        "redditmedia.com"
+      ];
 
       singBoxConfig = {
         log.level = cfg.logLevel;
@@ -78,10 +85,15 @@
           # in 1.14).
           default_domain_resolver = "upstream";
 
-          # No `rules` of our own, deliberately: every routing decision
-          # belongs to the work config, which brings its own; anything it
-          # doesn't claim lands on `final`. Old rules here (sniff, tailnet,
-          # ssh carve-out) existed only to make the removed tun behave.
+          # /etc sorts before the private config under /home, so these rules
+          # run before the work rules. Other destinations keep their existing
+          # work routing and direct fallback.
+          rules = lib.optionals redditVpn [
+            {
+              domain_suffix = redditDomains;
+              outbound = "proton-reddit";
+            }
+          ];
           final = "direct";
         };
       };
@@ -91,6 +103,8 @@
     {
       options.noughty.proxy = {
         enable = lib.mkEnableOption "the sing-box HTTP/SOCKS proxy (bedag work tunnels)";
+
+        protonReddit.enable = lib.mkEnableOption "ProtonVPN egress for Reddit through sing-box";
 
         additionalConfigFile = lib.mkOption {
           type = lib.types.str;
@@ -143,6 +157,35 @@
       };
 
       config = lib.mkIf cfg.enable {
+        sops.secrets.proton_z14_wg_privatekey = lib.mkIf redditVpn { };
+        sops.templates."sing-box-proton-reddit.json" = lib.mkIf redditVpn {
+          content = builtins.toJSON {
+            endpoints = [
+              {
+                type = "wireguard";
+                tag = "proton-reddit";
+                address = [
+                  "10.2.0.2/32"
+                  "2a07:b944::2:2/128"
+                ];
+                private_key = config.sops.placeholder.proton_z14_wg_privatekey;
+                peers = [
+                  {
+                    address = "79.127.184.1";
+                    port = 51820;
+                    public_key = "snSASVcKZegpITPNw2scm44NBC6NPUropoTkfEGtq18=";
+                    allowed_ips = [
+                      "0.0.0.0/0"
+                      "::/0"
+                    ];
+                    persistent_keepalive_interval = 25;
+                  }
+                ];
+              }
+            ];
+          };
+        };
+
         environment.systemPackages = [
           pkgs.sing-box
           # the work ssh catch-all's SOCKS ProxyCommand
@@ -173,18 +216,21 @@
           unitConfig.ConditionPathExists = cfg.additionalConfigFile;
 
           serviceConfig = {
-            ExecStart = lib.concatStringsSep " " [
+            ExecStart = lib.concatStringsSep " " ([
               "${pkgs.sing-box}/bin/sing-box"
               "run"
               "--config"
               "/etc/sing-box/config.json"
               "--config"
               cfg.additionalConfigFile
-            ];
+            ] ++ lib.optionals redditVpn [
+              "--config"
+              config.sops.templates."sing-box-proton-reddit.json".path
+            ]);
             Restart = "on-failure";
             RestartSec = 30;
             # Root only because the config files live under /home; the
-            # process itself just opens sockets and reads two files. No
+            # process itself just opens sockets and reads the configs. No
             # AmbientCapabilities: CAP_NET_ADMIN was the tun's, now gone. No
             # StateDirectory either; that held the tsnet node identity.
             ProtectSystem = "strict";

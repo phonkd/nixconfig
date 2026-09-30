@@ -56,6 +56,7 @@
       '';
     in
     lib.mkIf (config.noughty.host.name == "z14") {
+      noughty.proxy.protonReddit.enable = true;
       networking.hostName = "z14";
 
       # limine (not systemd-boot): the g14-stopgap rebuild already installed

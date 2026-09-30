@@ -32,6 +32,12 @@ under the tun, where the tailnet *had* to re-enter sing-box to be routed. It
 did register a second `z14-singbox` node on the mesh while it existed, which
 is one of the leftovers this removal cleaned up.
 
+On z14, sing-box also routes Reddit domains through a ProtonVPN WireGuard
+endpoint. The private key is rendered from SOPS at runtime; the public endpoint
+and route rule live in `nixos.nix`. Zen's existing profile uses the local HTTP
+proxy on port 2080, so its Reddit requests reach that rule. Other destinations
+still follow the work config or the direct fallback.
+
 They were one file with platform branches until the Linux side grew a tun,
 three traffic classes and a secret. The resemblance was superficial and it made
 both harder to read; see the file headers. The two are close in shape again now
