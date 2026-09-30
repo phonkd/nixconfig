@@ -23,16 +23,13 @@ rec {
   cursorName = "Bibata-Modern-Classic";
   cursorSize = 24;
 
-  cfg = osConfig.noughty.hyprland or { };
-  guiCfg = osConfig.noughty.gui or { };
-  wallpaperDir = guiCfg.wallpaperDir or null;
-  wallpaperInterval = guiCfg.wallpaperInterval or 300;
-  colorMode = guiCfg.colorMode or "dark";
-  colorScheme = guiCfg.colorScheme or "scheme-tonal-spot";
-  scale = cfg.scale or "1";
-  loudnessKnob = cfg.loudnessKnob or false;
+  wallpaperDir = "/home/phonkd/Downloads/Walls";
+  wallpaperInterval = 300;
+  colorMode = "dark";
+  colorScheme = "scheme-tonal-spot";
+  scale = "1";
 
-  layout = cfg.layout or "dwindle";
+  layout = "hy3";
   hy3 = layout == "hy3";
 
   # From nixpkgs, NOT hy3's own flake input: pkgs.hyprlandPlugins.hy3 is built
@@ -211,68 +208,16 @@ rec {
     ]) workspaceKeys
   );
 
-  # Launchers. Absolute store paths -- `exec` runs under the compositor, not
-  # a login shell, so nothing guarantees the user profile is on PATH.
-  # modules/zen-browser.nix, not the flake input directly: that package
-  # carries the smooth-scrolling prefs.
-  zen = "${self.packages.${pkgs.system}.zen-browser}/bin/zen";
+  zen = "${inputs.zen-browser.packages.${pkgs.system}.default}/bin/zen";
   kitty = "${config.programs.kitty.package}/bin/kitty";
 
   # perSystem packages rather than inlined `writeShellScript`s, so both are
   # runnable by hand (`nix run .#hypr-sink-switcher`) without a session.
-  eeVolume = "${self.packages.${pkgs.system}.hypr-ee-volume}/bin/hypr-ee-volume";
   sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
   rbwMode = "${self.packages.${pkgs.system}.rofi-rbw-mode}/bin/rofi-rbw-mode";
 
-  # -- Screenshots: capture, then annotate -------------------------------
-  #
-  # grimblast captures; satty annotates behind it (arrows, boxes, blur, text,
-  # highlight, numbered markers). Satty tool keys (not in its --help): z
-  # arrow, r rectangle, e ellipse, i line, b brush, t text, g highlight, m
-  # numbered marker, u blur, c crop, p pointer. Enter copies *and* saves;
-  # Escape copies only.
-  #
-  # Wired through grimblast's `edit` action (writes to a temp file, runs
-  # $GRIMBLAST_EDITOR with that path) rather than a pipe -- `grimblast save
-  # area - | satty --filename -` is a trap: save() ends in `echo "$file"`, so
-  # against `-` it drops a stray "-\n" after the PNG's IEND chunk.
-  #
-  # The action list is order-sensitive: satty raises its early-exit flag
-  # after the first action and checks it immediately, so `--early-exit` next
-  # to a multi-action list drops the later ones. Hence no `--early-exit` and
-  # a trailing `exit` that runs all three.
-  #
-  # Escape copies before exiting (not satty's default, which is a bare
-  # discard) so neither exit from the editor can lose the shot.
-  #
-  # --copy-command rather than satty's native clipboard: a Wayland clipboard
-  # offer dies with the process that made it, and satty exits right after
-  # copying. wl-copy forks a daemon that keeps serving the selection.
-  sattyEdit = pkgs.writeShellScript "satty-edit" ''
-    set -u
-    dir="''${XDG_SCREENSHOTS_DIR:-''${XDG_PICTURES_DIR:-$HOME}}"
-    ${pkgs.coreutils}/bin/mkdir -p "$dir"
-    ${pkgs.satty}/bin/satty \
-      --filename "$1" \
-      --output-filename "$dir/%Y%m%d_%H%M%S.png" \
-      --actions-on-enter save-to-clipboard,save-to-file,exit \
-      --actions-on-escape save-to-clipboard,exit \
-      --copy-command ${pkgs.wl-clipboard}/bin/wl-copy
-    ${pkgs.coreutils}/bin/rm -f "$1"
-  '';
-
-  # grimblast parks `edit`'s temp file in /tmp (world readable);
-  # $XDG_RUNTIME_DIR is 0700 and goes away with the session, and the wrapper
-  # above deletes it either way.
-  annotate =
-    target:
-    "env GRIMBLAST_EDITOR=${sattyEdit} DEFAULT_TMP_EDITOR_DIR=\"$XDG_RUNTIME_DIR\""
-    + " ${pkgs.grimblast}/bin/grimblast --freeze edit ${target}";
-
-  # Mutable Hyprland state: Monique writes monitors.conf, including workspace
-  # assignments. The former workspaces.conf is retained for migration/backup.
+  # Written by Monique (monitor layout + workspace assignments).
   monitorsConf = "${cfgHome}/hypr/monitors.conf";
-  workspacesConf = "${cfgHome}/hypr/workspaces.conf";
 
   # Where each matugen template lands, under $XDG_CONFIG_HOME so the files
   # survive a reboot and a first login has something to read (see the
@@ -320,6 +265,4 @@ rec {
       "$next" > ${lib.escapeShellArg groupbarMode}
     ${pkgs.hyprland}/bin/hyprctl keyword group:groupbar:stacked "$next" >/dev/null
   '';
-
-  themingEnabled = wallpaperDir != null;
 }

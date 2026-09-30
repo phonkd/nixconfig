@@ -1,10 +1,6 @@
-# Shared wallpaper rotation, derived colours, and activation scripts.
-# that seed the files everything else `source`s.
-#
-# _home.nix wraps this whole file in `lib.mkIf scope.themingEnabled`, so
-# setting noughty.gui.wallpaperDir = null leaves a perfectly usable
-# static-colour session -- which is also why monitors.conf/workspaces.conf/
-# groupbar-mode.conf seeding lives here rather than beside the compositor.
+# Shared wallpaper rotation, derived colours, and the activation scripts that
+# seed the files everything else `source`s (incl. monitors.conf and
+# groupbar-mode.conf for Hyprland).
 #
 # The machinery this consumes -- templates, the matugen config, the rotation
 # script, the GTK helpers -- is in _matugen.nix.
@@ -36,7 +32,6 @@ let
     monitorsConf
     wallpaperDir
     wallpaperInterval
-    workspacesConf
     ;
 in
 {
@@ -243,36 +238,15 @@ in
     Install.WantedBy = [ "graphical-session.target" ];
   };
 
-  # Seed monitors.conf because Hyprland treats a missing `source` as a config
-  # error. Keep workspaces.conf as local state for the migration below.
+  # Hyprland treats a missing `source`d file as a config error.
   home.activation.hyprlandDisplays = lib.mkIf hyprlandEnabled (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    if [ -z "''${DRY_RUN:-}" ]; then
-      for f in ${lib.escapeShellArgs [ monitorsConf workspacesConf ]}; do
-        if [ ! -e "$f" ]; then
-          verboseEcho "Seeding $f for Hyprland"
-          $DRY_RUN_CMD ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$f")"
-          $DRY_RUN_CMD ${pkgs.coreutils}/bin/touch "$f"
-        fi
-      done
+    f=${lib.escapeShellArg monitorsConf}
+    if [ -z "''${DRY_RUN:-}" ] && [ ! -e "$f" ]; then
+      verboseEcho "Seeding $f for Hyprland"
+      ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$f")"
+      ${pkgs.coreutils}/bin/touch "$f"
     fi
   '');
-
-  # Monique reads workspace rules from monitors.conf. Carry the old
-  # nwg-displays rules over once, leaving workspaces.conf intact as a backup.
-  home.activation.moniqueWorkspaceMigration = lib.mkIf hyprlandEnabled (
-    lib.hm.dag.entryAfter [ "hyprlandDisplays" ] ''
-      marker=${lib.escapeShellArg "${config.xdg.configHome}/monique/.nwg-workspaces-migrated"}
-      if [ -z "''${DRY_RUN:-}" ] && [ ! -e "$marker" ]; then
-        if [ -s ${lib.escapeShellArg workspacesConf} ] \
-          && ! ${pkgs.gnugrep}/bin/grep -q '^workspace=' ${lib.escapeShellArg monitorsConf}; then
-          ${pkgs.gnugrep}/bin/grep '^workspace=' ${lib.escapeShellArg workspacesConf} \
-            >> ${lib.escapeShellArg monitorsConf} || true
-        fi
-        ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$marker")"
-        ${pkgs.coreutils}/bin/touch "$marker"
-      fi
-    ''
-  );
 
   # Seed every generated file, so the very first Hyprland login -- before
   # the timer has ever fired -- finds them present; otherwise Hyprland

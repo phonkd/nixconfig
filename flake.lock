@@ -98,7 +98,7 @@
     "cl-nix-lite": {
       "inputs": {
         "flake-parts": "flake-parts_3",
-        "nixpkgs": "nixpkgs_6",
+        "nixpkgs": "nixpkgs_5",
         "systems": "systems_5",
         "treefmt-nix": "treefmt-nix"
       },
@@ -173,24 +173,6 @@
       "original": {
         "owner": "serokell",
         "repo": "deploy-rs",
-        "type": "github"
-      }
-    },
-    "driftwm": {
-      "inputs": {
-        "nixpkgs": "nixpkgs_2"
-      },
-      "locked": {
-        "lastModified": 1790010713,
-        "narHash": "sha256-6tcKQSa7yJrCvS1Tv4oEtbyLwQSeedbLRosWyUTkbro=",
-        "owner": "malbiruk",
-        "repo": "driftwm",
-        "rev": "352333a8fa1b22171492d4b71a54102045c9a19d",
-        "type": "github"
-      },
-      "original": {
-        "owner": "malbiruk",
-        "repo": "driftwm",
         "type": "github"
       }
     },
@@ -424,7 +406,7 @@
       "inputs": {
         "flake-parts": "flake-parts_2",
         "home-manager": "home-manager",
-        "nixpkgs": "nixpkgs_3",
+        "nixpkgs": "nixpkgs_2",
         "npm-lockfile-fix": "npm-lockfile-fix",
         "pyproject-build-systems": "pyproject-build-systems",
         "pyproject-nix": "pyproject-nix",
@@ -467,7 +449,7 @@
     },
     "home-manager-android": {
       "inputs": {
-        "nixpkgs": "nixpkgs_4"
+        "nixpkgs": "nixpkgs_3"
       },
       "locked": {
         "lastModified": 1774984355,
@@ -594,7 +576,7 @@
         "hyprutils": "hyprutils",
         "hyprwayland-scanner": "hyprwayland-scanner",
         "hyprwire": "hyprwire",
-        "nixpkgs": "nixpkgs_5",
+        "nixpkgs": "nixpkgs_4",
         "pre-commit-hooks": "pre-commit-hooks",
         "systems": "systems_3",
         "xdph": "xdph"
@@ -1241,22 +1223,6 @@
     },
     "nixpkgs_10": {
       "locked": {
-        "lastModified": 1790480522,
-        "narHash": "sha256-fXrm/q9klVBtVq5rGQ+XpI/dokPuSB15ZK2CZvWxXOk=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "8d5d270900d3fc75655ea2d9d248b234f6631439",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_11": {
-      "locked": {
         "lastModified": 1744536153,
         "narHash": "sha256-awS2zRgF4uTwrOKwwiJcByDzDOdo3Q1rPZbiHQg/N38=",
         "owner": "NixOS",
@@ -1273,22 +1239,6 @@
     },
     "nixpkgs_2": {
       "locked": {
-        "lastModified": 1786599213,
-        "narHash": "sha256-yNJd40f11EzXBjSByCB7IPpeFFAdeoSKKM67dGkfFoU=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "0e251e24a4f24e036a084b6b4b2d2491af4167f4",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixos-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_3": {
-      "locked": {
         "lastModified": 1785318670,
         "narHash": "sha256-dN6Ou5x/+23FZLEpYP3IffO+NyJFzUlGumt1uu3MMaY=",
         "owner": "NixOS",
@@ -1303,7 +1253,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_4": {
+    "nixpkgs_3": {
       "locked": {
         "lastModified": 1774386573,
         "narHash": "sha256-4hAV26quOxdC6iyG7kYaZcM3VOskcPUrdCQd/nx8obc=",
@@ -1319,7 +1269,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_5": {
+    "nixpkgs_4": {
       "locked": {
         "lastModified": 1789684949,
         "narHash": "sha256-ZKhUe/2IJUq1JhKxKMu8rbkgSGmPP2ZCqlIPn40aGCM=",
@@ -1335,7 +1285,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_6": {
+    "nixpkgs_5": {
       "locked": {
         "lastModified": 1779796641,
         "narHash": "sha256-ZsIrKmhp4vbBXoXXmR/tBXA/UCsAQiJL9vsgZEduhVY=",
@@ -1351,7 +1301,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_7": {
+    "nixpkgs_6": {
       "locked": {
         "lastModified": 1761236834,
         "narHash": "sha256-+pthv6hrL5VLW2UqPdISGuLiUZ6SnAXdd2DdUE+fV2Q=",
@@ -1367,7 +1317,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_8": {
+    "nixpkgs_7": {
       "locked": {
         "lastModified": 1770107345,
         "narHash": "sha256-tbS0Ebx2PiA1FRW8mt8oejR0qMXmziJmPaU1d4kYY9g=",
@@ -1383,7 +1333,7 @@
         "type": "github"
       }
     },
-    "nixpkgs_9": {
+    "nixpkgs_8": {
       "locked": {
         "lastModified": 1790533781,
         "narHash": "sha256-F+b8u43BVF5DlM0pz7JQSbtbwKy5PrHIT5zQUekXsD0=",
@@ -1395,6 +1345,22 @@
       "original": {
         "owner": "nixos",
         "ref": "nixos-26.05",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_9": {
+      "locked": {
+        "lastModified": 1790480522,
+        "narHash": "sha256-fXrm/q9klVBtVq5rGQ+XpI/dokPuSB15ZK2CZvWxXOk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "8d5d270900d3fc75655ea2d9d248b234f6631439",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -1557,7 +1523,6 @@
         "claude-code-nix": "claude-code-nix",
         "claude-codex": "claude-codex",
         "deploy-rs": "deploy-rs",
-        "driftwm": "driftwm",
         "flake-parts": "flake-parts",
         "hermes-agent": "hermes-agent",
         "home-manager": "home-manager_2",
@@ -1572,7 +1537,7 @@
         "nix-index-database": "nix-index-database",
         "nix-on-droid": "nix-on-droid",
         "nixflix": "nixflix",
-        "nixpkgs": "nixpkgs_9",
+        "nixpkgs": "nixpkgs_8",
         "nixpkgs-android": "nixpkgs-android",
         "nixpkgs-fork": "nixpkgs-fork",
         "nixpkgs-immich": "nixpkgs-immich",
@@ -1581,14 +1546,13 @@
         "slop-trove": "slop-trove",
         "sops-nix": "sops-nix",
         "try-rs": "try-rs",
-        "viewflow": "viewflow",
         "wrapper-modules": "wrapper-modules",
         "zen-browser": "zen-browser"
       }
     },
     "rust-overlay": {
       "inputs": {
-        "nixpkgs": "nixpkgs_11"
+        "nixpkgs": "nixpkgs_10"
       },
       "locked": {
         "lastModified": 1769742225,
@@ -1667,7 +1631,7 @@
     },
     "sops-nix": {
       "inputs": {
-        "nixpkgs": "nixpkgs_10"
+        "nixpkgs": "nixpkgs_9"
       },
       "locked": {
         "lastModified": 1790498116,
@@ -1790,7 +1754,7 @@
     },
     "treefmt-nix": {
       "inputs": {
-        "nixpkgs": "nixpkgs_7"
+        "nixpkgs": "nixpkgs_6"
       },
       "locked": {
         "lastModified": 1766000401,
@@ -1808,7 +1772,7 @@
     },
     "treefmt-nix_2": {
       "inputs": {
-        "nixpkgs": "nixpkgs_8"
+        "nixpkgs": "nixpkgs_7"
       },
       "locked": {
         "lastModified": 1780220602,
@@ -1907,23 +1871,6 @@
       "original": {
         "owner": "pyproject-nix",
         "repo": "uv2nix",
-        "type": "github"
-      }
-    },
-    "viewflow": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1789280055,
-        "narHash": "sha256-okBXEDkfqhNxR2Ww1fMkKLIXIMiPjvrANIQVQ4g5QaU=",
-        "owner": "gfhdhytghd",
-        "repo": "viewflow",
-        "rev": "767739c1037eab84e7b5ba235056ec6b09b0e692",
-        "type": "github"
-      },
-      "original": {
-        "owner": "gfhdhytghd",
-        "repo": "viewflow",
-        "rev": "767739c1037eab84e7b5ba235056ec6b09b0e692",
         "type": "github"
       }
     },

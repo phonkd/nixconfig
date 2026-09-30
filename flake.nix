@@ -125,20 +125,6 @@
     # the package is built with uv2nix against the upstream-pinned
     # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
     hermes-agent.url = "github:NousResearch/hermes-agent";
-    # viewflow -- cross-device window sharing (Hyprland <-> Windows peer). See
-    # plans/viewflow.md and modules/viewflow.nix. `flake = false`: upstream
-    # has no flake.nix, no releases, no tags.
-    #
-    # PINNED to a rev, not HEAD, load-bearing not cautious: the QUIC control
-    # protocol version ("protocol 2.1") is negotiated *between peers*, so a
-    # half-updated pair refuses each other. Bumping it means rebuilding the
-    # Linux side AND the Windows binaries on blac by hand, together --
-    # upstream is pre-alpha and rewrites weekly, and an implicit update
-    # dragging in a new protocol version would break both halves at once.
-    viewflow = {
-      url = "github:gfhdhytghd/viewflow/767739c1037eab84e7b5ba235056ec6b09b0e692";
-      flake = false;
-    };
     # claude-codex: local Anthropic-API router that lets the ordinary `claude`
     # CLI run inference on the ChatGPT/Codex subscription instead of the
     # Anthropic one (modules/claude-codex.nix). Source-only -- upstream ships
@@ -158,7 +144,6 @@
       url = "github:phonkd/slop-trove/discord-dce-ingest";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    driftwm.url = "github:malbiruk/driftwm";
   };
 
   outputs =

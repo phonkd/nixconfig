@@ -17,8 +17,6 @@
 
     systemd = {
       enable = true;
-      # Shared by every NixOS GUI compositor. DriftWM and Home Manager's
-      # Hyprland integration both drive this standard session target.
       target = "graphical-session.target";
     };
 

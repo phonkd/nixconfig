@@ -42,20 +42,15 @@ in
         inherit config lib pkgs scope;
         monique = inputs.monique.packages.${pkgs.system}.default;
       })
-
-      # Split out so that setting noughty.gui.wallpaperDir = null leaves a
-      # perfectly usable static-colour session.
-      (lib.mkIf scope.themingEnabled (
-        import ./_theming.nix {
-          inherit
-            config
-            lib
-            pkgs
-            scope
-            matugen
-            ;
-        }
-      ))
+      (import ./_theming.nix {
+        inherit
+          config
+          lib
+          pkgs
+          scope
+          matugen
+          ;
+      })
     ]
   );
 }

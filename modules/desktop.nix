@@ -119,22 +119,6 @@
       # Desktop environment name comes from the registry (noughty.host.desktop);
       # this module is the single place mapping it onto GDM/SDDM etc.
       de = config.noughty.host.desktop;
-
-      # The session list the greeter below offers: NixOS' merged wayland-sessions
-      # directory, minus "Hyprland (uwsm-managed)". That entry ships with the
-      # Hyprland package itself (independent of programs.hyprland.withUWSM), and
-      # picking it hands the session to uwsm, which never touches
-      # hyprland-session.target -- the target every user service in
-      # modules/hyprland.nix is bound to, so it logs you into a compositor with
-      # no bar, no wallpaper daemon, no idle handling. Copy-then-remove rather
-      # than copy-one-file so any other session a host installs still shows up.
-      sessionsWithoutUwsm = pkgs.runCommand "wayland-sessions-no-uwsm" { } ''
-        mkdir -p $out/share/wayland-sessions
-        cp ${config.services.displayManager.sessionData.desktops}/share/wayland-sessions/*.desktop \
-          $out/share/wayland-sessions/
-        chmod -R u+w $out/share/wayland-sessions
-        rm -f $out/share/wayland-sessions/hyprland-uwsm.desktop
-      '';
     in
     lib.mkIf config.noughty.host.is.nixosDesktop {
       # --- Desktop environment selection (driven by registry) ----------
@@ -142,13 +126,8 @@
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;
       services.desktopManager.gnome.enable = lib.mkIf (de == "gnome") true;
 
-      # Hyprland desktops: greetd running tuigreet, deliberately *not* SDDM.
-      # SDDM's Wayland greeter leans on a cursor theme a KDE-less host never
-      # installs, and without it comes up drawing no pointer -- so the session
-      # dropdown is unreachable and you're stuck with whatever was preselected.
-      # tuigreet is a text UI on VT1: no compositor, no Qt theme, no cursor
-      # needed, and it reads the same wayland-sessions entries
-      # `programs.hyprland.enable` installs -- session picker on F3.
+      # Hyprland desktops: greetd + tuigreet (text UI on VT1; SDDM drew no
+      # cursor without KDE). Session picker on F3.
       services.greetd = lib.mkIf (de == "hyprland") {
         enable = true;
         # Sends the unit's stderr to the journal and gives it /dev/tty1 properly
@@ -163,9 +142,8 @@
           "--remember"
           "--remember-user-session"
           "--asterisks"
-          # tuigreet's built-in default is the FHS /usr/share path, which
-          # doesn't exist here; sessionsWithoutUwsm above stands in.
-          "--sessions ${sessionsWithoutUwsm}/share/wayland-sessions"
+          # tuigreet's default is the FHS /usr/share path.
+          "--sessions ${config.services.displayManager.sessionData.desktops}/share/wayland-sessions"
         ];
       };
       # mkDefault so a host can still opt out of the boot splash.
@@ -230,11 +208,7 @@
 
       programs.dconf.enable = true;
       users.users.phonkd.packages = with pkgs; [
-        # Zen Browser (Firefox fork) via modules/zen-browser.nix rather than the
-        # zen-browser-flake input directly: that's where the smooth-scrolling
-        # prefs live, and the SUPER-B launcher in modules/hyprland.nix
-        # has to get the same build.
-        self.packages.${pkgs.system}.zen-browser
+        inputs.zen-browser.packages.${pkgs.system}.default
         gst_all_1.gstreamer
         gst_all_1.gst-plugins-base
         gst_all_1.gst-plugins-good
@@ -291,23 +265,10 @@
       networking.firewall.trustedInterfaces = [ "virbr0" ];
       services.flatpak = {
         enable = true;
-        # nixos-26.05's AFFiNE 0.26.6 falls back to email magic-link auth
-        # against the self-hosted 0.27.x server. Track FlatPark's current
-        # repack of the upstream client instead; Flathub supplies its runtime.
         remotes = [
-          {
-            name = "flatpark";
-            location = "https://dl.flatpark.org/flatpark.flatpakrepo";
-          }
           {
             name = "flathub";
             location = "https://dl.flathub.org/repo/flathub.flatpakrepo";
-          }
-        ];
-        packages = [
-          {
-            appId = "pro.affine.AFFiNE";
-            origin = "flatpark";
           }
         ];
         update.auto.enable = true;

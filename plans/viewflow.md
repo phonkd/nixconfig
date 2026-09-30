@@ -1,13 +1,12 @@
 # viewflow — cross-device window sharing
 
-**Repo(s):** nixconfig (this repo only — upstream is consumed as a pinned
-`flake = false` input)   **Status:** **done and working end to end** — blac's
-windows display on g14 as individual Hyprland windows (2026-09-18). Phase 1 (the
-nix-packaged Linux half) is on `main` and deployed; Phase 2 (the Windows half,
-hand-built on the peer) is built and running. Phase 3 (the atlas/desktop-drag
-launcher, and with it any pointer/keyboard crossover) remains deferred — this
-path is **view-only**. See the bring-up log for what it looks like and the
-hybrid-GPU fix that was required.
+**Repo(s):** nixconfig (this repo only — upstream was consumed as a pinned
+`flake = false` input)   **Status:** retired (2026-09-30) — removed from
+nixconfig: the `viewflow` flake input, `modules/viewflow.nix` and its
+`builder.nix` entry are gone. It did work end to end (blac's windows as
+Hyprland windows on g14, 2026-09-18); the history below is kept because
+re-adding it means restoring the module *and* rebuilding the Windows half on
+the peer at the same rev.
 **g14 was the Linux end of every pairing**; the Windows end can be blac *or* z14,
 both of which are dual-boot.
 

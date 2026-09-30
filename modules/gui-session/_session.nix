@@ -62,10 +62,9 @@ in
   home.packages = (with pkgs; [
     # Compositor-independent Wayland desktop tools.
     rofi
+    grim
     slurp
     satty
-    swappy
-    cliphist
     wl-clipboard
     brightnessctl
     pavucontrol
@@ -74,7 +73,6 @@ in
     matugen
     nwg-look
     wlogout
-    hyprpolkitagent
   ]) ++ lib.optionals scope.hyprlandEnabled (with pkgs; [
     # These integrate directly with Hyprland IPC/configuration.
     grimblast
@@ -82,32 +80,21 @@ in
     hyprpicker
   ]);
 
-  # Session plumbing belongs to the Linux GUI, not to a compositor's
-  # exec-once list. graphical-session.target gives it the same lifecycle in
-  # Hyprland and DriftWM and prevents duplicate watchers after a reload.
-  systemd.user.services.gui-clipboard-text = {
-    Unit = {
-      Description = "Store text clipboard history";
-      PartOf = [ "graphical-session.target" ];
-    };
-    Service = {
-      ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --type text --watch ${pkgs.cliphist}/bin/cliphist store";
-      Restart = "on-failure";
-    };
-    Install.WantedBy = [ "graphical-session.target" ];
-  };
+  xdg.configFile."satty/config.toml".text = ''
+    [general]
+    output-filename = "~/Pictures/Screenshots/%Y%m%d_%H%M%S.png"
+    actions-on-enter = ["save-to-clipboard", "save-to-file", "exit"]
+    actions-on-escape = ["save-to-clipboard", "exit"]
+    copy-command = "${pkgs.wl-clipboard}/bin/wl-copy"
+  '';
+  # satty does not create the output directory.
+  systemd.user.tmpfiles.rules = [ "d %h/Pictures/Screenshots - - - -" ];
 
-  systemd.user.services.gui-clipboard-image = {
-    Unit = {
-      Description = "Store image clipboard history";
-      PartOf = [ "graphical-session.target" ];
-    };
-    Service = {
-      ExecStart = "${pkgs.wl-clipboard}/bin/wl-paste --type image --watch ${pkgs.cliphist}/bin/cliphist store";
-      Restart = "on-failure";
-    };
-    Install.WantedBy = [ "graphical-session.target" ];
+  services.cliphist = {
+    enable = true;
+    allowImages = true;
   };
+  services.hyprpolkitagent.enable = true;
 
   systemd.user.services.moniqued = lib.mkIf scope.hyprlandEnabled {
     Unit = {
@@ -119,18 +106,6 @@ in
       ExecStart = "${monique}/bin/moniqued";
       Restart = "on-failure";
       RestartSec = 2;
-    };
-    Install.WantedBy = [ "graphical-session.target" ];
-  };
-
-  systemd.user.services.gui-polkit-agent = {
-    Unit = {
-      Description = "Graphical polkit authentication agent";
-      PartOf = [ "graphical-session.target" ];
-    };
-    Service = {
-      ExecStart = "${pkgs.hyprpolkitagent}/libexec/hyprpolkitagent";
-      Restart = "on-failure";
     };
     Install.WantedBy = [ "graphical-session.target" ];
   };

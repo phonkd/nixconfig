@@ -5,8 +5,8 @@ let
     let
       scope = import ./gui-session/_scope.nix { inherit config lib pkgs self inputs osConfig; };
       monique = inputs.monique.packages.${pkgs.system}.default;
-      inherit (scope) annotate cursorName cursorSize dispatch eeVolume generated groupbarMode
-        groupBinds hy3 hy3Plugin hyprctl kitty layout layoutSettings loudnessKnob mod
+      inherit (scope) cursorName cursorSize dispatch generated groupbarMode
+        groupBinds hy3 hy3Plugin hyprctl kitty layout layoutSettings mod
         monitorsConf moveWindowDispatch scale sinkSwitcher workspaceBinds zen;
       # SHORTCUTS: add or change a line in the lists below.
       # Each line is "MODIFIERS, KEY, ACTION, ARGUMENT". For example:
@@ -41,11 +41,11 @@ let
 
           # Screenshots. code:10/11/12 are the physical 1/2/3 keys, so
           # Alt+Shift still works with the Swiss keyboard layout.
-          "${mod} SHIFT, code:10, exec, ${annotate "output"}"
-          "${mod} SHIFT, code:11, exec, SLURP_ARGS=-r ${annotate "area"}"
-          "${mod} SHIFT, code:12, exec, ${annotate "area"}"
+          "${mod} SHIFT, code:10, exec, grim -g \"$(slurp -o)\" - | satty -f -"
+          "${mod} SHIFT, code:11, exec, grim -g \"$(slurp)\" - | satty -f -"
+          "${mod} SHIFT, code:12, exec, grim -g \"$(slurp)\" - | satty -f -"
           ", Print, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
-          "SHIFT, Print, exec, ${annotate "area"}"
+          "SHIFT, Print, exec, grim -g \"$(slurp)\" - | satty -f -"
 
           # Desktop tools.
           "SUPER, P, exec, ${monique}/bin/monique"
@@ -58,10 +58,6 @@ let
           # Volume and brightness repeat while the keys are held.
           "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
           "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-        ] ++ lib.optionals loudnessKnob [
-          "${mod}, M, exec, ${eeVolume} up"
-          "${mod} SHIFT, M, exec, ${eeVolume} down"
-        ] ++ [
           ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
           ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
           "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
@@ -146,14 +142,6 @@ in {
   flake.homeModules.hyprland-session = homeModule;
   flake.nixosModules.hyprland = { config, pkgs, lib, noughtyLib, ... }:
     let enabled = noughtyLib.hostHasTag "hyprland"; in {
-      options.noughty.hyprland = {
-        loudnessKnob = lib.mkOption { type = lib.types.bool; default = false;
-          description = "Use Alt+M for the pre-effects EasyEffects volume."; };
-        scale = lib.mkOption { type = lib.types.str; default = "1";
-          description = "Hyprland output scale (for example 1, 1.25, or auto)."; };
-        layout = lib.mkOption { type = lib.types.enum [ "dwindle" "hy3" ]; default = "hy3";
-          description = "Hyprland tiling layout."; };
-      };
       config = lib.mkIf (enabled && config.noughty.host.is.nixosDesktop) {
         programs.hyprland = { enable = true; withUWSM = false; xwayland.enable = true; };
         programs.hyprlock.enable = true;
