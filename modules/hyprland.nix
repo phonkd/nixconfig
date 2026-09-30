@@ -7,22 +7,46 @@ let
       inherit (scope) annotate cursorName cursorSize dispatch eeVolume generated groupbarMode
         groupBinds hy3 hy3Plugin hyprctl kitty layout layoutSettings loudnessKnob mod
         monitorsConf moveWindowDispatch scale sinkSwitcher workspaceBinds workspacesConf zen;
+      # SHORTCUTS: add or change a line in the lists below.
+      # Each line is "MODIFIERS, KEY, ACTION, ARGUMENT". For example:
+      #   "SUPER SHIFT, T, exec, ${kitty}"
+      # SUPER is the Windows key; `mod` is Alt. Use `exec` to launch a program.
+      # A trailing comma means the action takes no argument.
+      # bind = normal key; bindel = repeat while held; bindl = works while locked;
+      # bindm = mouse drag. Group and workspace shortcuts are appended below;
+      # their layout-aware definitions live in gui-session/_scope.nix.
       keybinds = {
         bind = [
-          "${mod}, H, ${dispatch "movefocus"}, l" "${mod}, J, ${dispatch "movefocus"}, d"
-          "${mod}, K, ${dispatch "movefocus"}, u" "${mod}, L, ${dispatch "movefocus"}, r"
-          "${mod} SHIFT, H, ${moveWindowDispatch}, l" "${mod} SHIFT, J, ${moveWindowDispatch}, d"
-          "${mod} SHIFT, K, ${moveWindowDispatch}, u" "${mod} SHIFT, L, ${moveWindowDispatch}, r"
+          # Focus and move windows with Alt+H/J/K/L (left/down/up/right).
+          "${mod}, H, ${dispatch "movefocus"}, l"
+          "${mod}, J, ${dispatch "movefocus"}, d"
+          "${mod}, K, ${dispatch "movefocus"}, u"
+          "${mod}, L, ${dispatch "movefocus"}, r"
+          "${mod} SHIFT, H, ${moveWindowDispatch}, l"
+          "${mod} SHIFT, J, ${moveWindowDispatch}, d"
+          "${mod} SHIFT, K, ${moveWindowDispatch}, u"
+          "${mod} SHIFT, L, ${moveWindowDispatch}, r"
         ] ++ groupBinds ++ [
-          "${mod}, F, fullscreen, 0" "SUPER, Q, ${dispatch "killactive"},"
-          "${mod}, B, exec, ${zen}" "${mod}, V, exec, ${kitty}"
-          "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show combi" "SUPER, SPACE, togglefloating,"
-          "SUPER, E, exec, ${pkgs.nautilus}/bin/nautilus" "SUPER, L, exec, ${pkgs.hyprlock}/bin/hyprlock"
-          "SUPER SHIFT, E, exit," "${mod} SHIFT, code:10, exec, ${annotate "output"}"
+          # Window actions and apps.
+          "${mod}, F, fullscreen, 0"
+          "SUPER, Q, ${dispatch "killactive"},"
+          "SUPER, SPACE, togglefloating,"
+          "${mod}, B, exec, ${zen}"
+          "${mod}, V, exec, ${kitty}"
+          "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show combi"
+          "SUPER, E, exec, ${pkgs.nautilus}/bin/nautilus"
+          "SUPER, L, exec, ${pkgs.hyprlock}/bin/hyprlock"
+          "SUPER SHIFT, E, exit,"
+
+          # Screenshots. code:10/11/12 are the physical 1/2/3 keys, so
+          # Alt+Shift still works with the Swiss keyboard layout.
+          "${mod} SHIFT, code:10, exec, ${annotate "output"}"
           "${mod} SHIFT, code:11, exec, SLURP_ARGS=-r ${annotate "area"}"
           "${mod} SHIFT, code:12, exec, ${annotate "area"}"
           ", Print, exec, ${pkgs.grimblast}/bin/grimblast --freeze copysave area"
           "SHIFT, Print, exec, ${annotate "area"}"
+
+          # Desktop tools.
           "SUPER, P, exec, ${pkgs.nwg-displays}/bin/nwg-displays -n 9"
           "SUPER, C, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a"
           "SUPER, V, exec, ${pkgs.cliphist}/bin/cliphist list | ${pkgs.rofi}/bin/rofi -dmenu | ${pkgs.cliphist}/bin/cliphist decode | ${pkgs.wl-clipboard}/bin/wl-copy"
@@ -30,20 +54,27 @@ let
           "SUPER, code:19, exec, ${sinkSwitcher}"
         ] ++ workspaceBinds;
         bindel = [
+          # Volume and brightness repeat while the keys are held.
           "SUPER, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume -l 1.4 @DEFAULT_AUDIO_SINK@ 5%+"
           "SUPER SHIFT, M, exec, ${pkgs.wireplumber}/bin/wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
         ] ++ lib.optionals loudnessKnob [
-          "${mod}, M, exec, ${eeVolume} up" "${mod} SHIFT, M, exec, ${eeVolume} down"
+          "${mod}, M, exec, ${eeVolume} up"
+          "${mod} SHIFT, M, exec, ${eeVolume} down"
         ] ++ [
           ", XF86AudioMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
           ", XF86AudioMicMute, exec, ${pkgs.wireplumber}/bin/wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
           "SUPER, I, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%+"
           "SUPER SHIFT, i, exec, ${pkgs.brightnessctl}/bin/brightnessctl set 5%-"
         ];
-        bindl = [ "SUPER, B, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
+        bindl = [
+          "SUPER, B, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
           "SUPER, N, exec, ${pkgs.playerctl}/bin/playerctl next"
-          "SUPER SHIFT, N, exec, ${pkgs.playerctl}/bin/playerctl previous" ];
-        bindm = [ "SUPER, mouse:272, movewindow" "SUPER, mouse:273, resizewindow" ];
+          "SUPER SHIFT, N, exec, ${pkgs.playerctl}/bin/playerctl previous"
+        ];
+        bindm = [
+          "SUPER, mouse:272, movewindow"
+          "SUPER, mouse:273, resizewindow"
+        ];
       };
     in {
       config = lib.mkIf scope.hyprlandEnabled {
