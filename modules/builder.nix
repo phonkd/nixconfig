@@ -151,6 +151,7 @@ let
     "203-media"
     "ext-mail"
     "observability"
+    "201-mono"
   ];
   isClan = name: lib.elem name clanHosts;
 
