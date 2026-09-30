@@ -259,6 +259,8 @@
 
             sonarr = {
               enable = true;
+              # Ahead of Sonarr 4.0.20's Allowed Hosts rule -- see prowlarr below.
+              settings.server.allowedHosts = "0.0.0.0";
               config = {
                 apiKey._secret = "/run/secrets/sonarr-api-key";
                 hostConfig = {
@@ -270,6 +272,8 @@
             };
             radarr = {
               enable = true;
+              # Ahead of Radarr 6.4.4's Allowed Hosts rule -- see prowlarr below.
+              settings.server.allowedHosts = "0.0.0.0";
               config = {
                 apiKey._secret = "/run/secrets/radarr-api-key";
                 hostConfig = {
@@ -299,7 +303,8 @@
               # activation. 0.0.0.0 passes the validator and is ASP.NET Core's
               # any-host wildcard: nothing gets restricted, and nixflix's own calls
               # to http://0.0.0.0:9696 keep working. Radarr >= 6.4.4 and Sonarr
-              # >= 4.0.20 carry the same rule; add this there when they arrive.
+              # >= 4.0.20 carry the same rule, so they get it pre-emptively above;
+              # Lidarr has it only on develop so far and will need it next.
               settings.server.allowedHosts = "0.0.0.0";
               config = {
                 apiKey._secret = "/run/secrets/prowlarr-api-key";
