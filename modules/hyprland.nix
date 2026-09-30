@@ -65,9 +65,9 @@ let
               "windows, 1, 5, wind" "windowsOut, 1, 5, default, popin 80%"
               "border, 1, 10, default" "fade, 1, 5, default" "workspaces, 1, 5, default" ]; };
             input = { kb_layout = "ch"; kb_variant = "de_nodeadkeys"; follow_mouse = 1;
-              scroll_factor = 0.5;
+              scroll_factor = 0.25;
               touchpad = { natural_scroll = false; disable_while_typing = false; clickfinger_behavior = true;
-                scroll_factor = 0.5; }; };
+                scroll_factor = 0.25; }; };
             misc = { disable_hyprland_logo = true; disable_splash_rendering = true; vrr = 1; force_default_wallpaper = 0; };
             windowrule = [ "match:class .*, suppress_event maximize"
               "match:title (Authentication Required), float on"
