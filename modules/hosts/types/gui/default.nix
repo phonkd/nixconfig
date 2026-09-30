@@ -58,6 +58,25 @@
         pkgs.distrobox
         pkgs.distrobox-tui
       ];
+      # AFFiNE 0.27.x picks Electron's unencrypted "basic_text" backend under
+      # Hyprland, despite gnome-keyring already providing Secret Service.
+      # Its login then lasts only until the app exits. Pass the backend flag
+      # through Flatpak's launcher until upstream fixes desktop detection.
+      xdg.desktopEntries."pro.affine.AFFiNE" = {
+        name = "AFFiNE";
+        genericName = "Knowledge Base";
+        comment = "Write, draw and plan all at once";
+        exec = "flatpak run --branch=stable --arch=x86_64 --command=affine --file-forwarding pro.affine.AFFiNE --password-store=gnome-libsecret @@u %U @@";
+        icon = "pro.affine.AFFiNE";
+        terminal = false;
+        startupNotify = true;
+        categories = [ "Office" ];
+        mimeType = [ "x-scheme-handler/affine" ];
+        settings = {
+          StartupWMClass = "AFFiNE";
+          "X-Flatpak" = "pro.affine.AFFiNE";
+        };
+      };
     };
   # Gated on host.is.nixosDesktop. No `imports` needed -- system-minimal
   # lives in alwaysImport directly (function modules can't be deduped by
