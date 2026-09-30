@@ -145,7 +145,10 @@ let
   # Hosts built by clan-core instead of nixosSystem. The migration in
   # plans/clan-lol-migration.md moves them over one at a time; both paths get
   # the identical module list from nixosModulesFor.
-  clanHosts = [ "205-builder" ];
+  clanHosts = [
+    "205-builder"
+    "204-agent"
+  ];
   isClan = name: lib.elem name clanHosts;
 
   nixosModulesFor =
