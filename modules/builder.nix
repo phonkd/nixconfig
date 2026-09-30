@@ -148,6 +148,7 @@ let
   clanHosts = [
     "205-builder"
     "204-agent"
+    "203-media"
   ];
   isClan = name: lib.elem name clanHosts;
 
