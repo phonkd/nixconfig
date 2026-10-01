@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — Phase 1: all six servers on clan-core; z14, blac, Mac committed, awaiting local switch
+**Repo(s):** nixconfig   **Status:** in-progress — servers on clan-core and reading clan's secret store (2a); z14, blac, Mac awaiting local switch
 
 ## Why
 
@@ -148,7 +148,13 @@ unchanged in content and permissions after the deploy.
       observability 2. Corrupting the store (a swapped value, a removed link)
       made it fail with the exact secret named. `snapshot`/`verify` were
       exercised on 205 and ext-mail.
-- [ ] Real run on `main` → commit → snapshot, deploy, verify each server.
+- [x] Real run on `main` (`bab07e6`, 2026-10-01): `VALIDATION PASSED`, then
+      snapshot → deploy → verify on all six servers. Every `/run/secrets` file
+      unchanged in content and permissions (205: 2, 204: 8, 203: 29,
+      ext-mail: 11, observability: 2, 201: 21); 0 failed units; 201's
+      endpoints 200. Side effect on 205: its alloy and node exporter had been
+      down since its first clan deploy (stopped by that activation) and this
+      deploy started them.
 
 **After 2a, secret.yaml and the clan store are two copies.** The servers read
 clan; z14, blac and the Mac still read `secret.yaml`. Until they move too,

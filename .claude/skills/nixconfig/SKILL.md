@@ -68,12 +68,28 @@ valid for the parent domain that set it, so traefik picks by suffix),
 `sops.templates."homepage.env"` as `HOMEPAGE_VAR_<APP>_KEY` (reverse-proxy block of
 arr-slime.nix).
 
-## Secrets (sops-nix)
+## Secrets (sops-nix, partly via clan)
 
-One shared file for all servers: `modules/homelab/global-secrets/secret.yaml`
-(defaultSopsFile, age-encrypted; the Mac's key at `~/.config/sops/age/keys.txt` can
-edit it). Both 201 and 203 decrypt it, which is why widget keys live on 201 and
-service secrets on 203 with no duplication.
+**Two stores since 2026-10-01** (plans/clan-lol-migration.md, Phase 2a):
+
+- `sops/secrets/<name>/secret` — clan's store. Every secret a **server** uses
+  is linked there to that server (`sops/secrets/<name>/machines/<host>`), and
+  clan then declares `sops.secrets.<name>` from that file, overriding
+  `secret.yaml` for it. Consumer modules didn't change.
+- `modules/homelab/global-secrets/secret.yaml` — still the source for z14,
+  blac and the Mac, and still `defaultSopsFile`.
+
+**Changing an existing server secret in `secret.yaml` alone silently does
+nothing on the server.** Change it in clan too (`clan secrets set <name>`, from
+`nix develop`), keep `secret.yaml` in step for the desktops, then run
+`scripts/clan-secrets-migrate.sh validate` — it doubles as the drift check
+between the two. A **new** secret can still go into `secret.yaml` the old way:
+nothing links it, so it falls through to `defaultSopsFile`. Never run `clan`
+with `--debug` near secrets: it echoes stdin.
+
+One shared age key decrypts everything (the Mac's and every host's
+`~/.config/sops/age/keys.txt`, registered in clan as user `phonkd` and as each
+machine).
 
 Add a secret non-interactively:
 ```
