@@ -56,6 +56,7 @@
         inputs.llm-agents.packages.${pkgs.system}.opencode
         pkgs.distrobox
         pkgs.distrobox-tui
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.heidisql
       ];
     };
   # Gated on host.is.nixosDesktop. No `imports` needed -- system-minimal
