@@ -31,7 +31,28 @@
         android-tools
         unzip
         heimdall
+        # Agent Deck runs the existing Claude Code/Codex CLIs in tmux sessions.
+        inputs.llm-agents.packages.${pkgs.system}.agent-deck
+        tmux
       ];
+      # `ad` starts a Codex chat here; `ad claude` selects Claude Code;
+      # `ad agents` opens the session board. Ctrl+Q detaches back to it.
+      programs.zsh.siteFunctions.ad = ''
+        case "''${1:-codex}" in
+          agents)
+            shift
+            command agent-deck "$@"
+            ;;
+          codex|claude)
+            local tool="''${1:-codex}"
+            if (( $# )); then shift; fi
+            command agent-deck add . -c "$tool" -g working --attach "$@"
+            ;;
+          *)
+            command agent-deck "$@"
+            ;;
+        esac
+      '';
     };
   flake.homeModules.gui-nixos =
     {
@@ -53,7 +74,7 @@
         self.homeModules.zed-editor
       ];
       home.packages = [
-        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.opencode
+        inputs.llm-agents.packages.${pkgs.system}.opencode
         pkgs.distrobox
         pkgs.distrobox-tui
       ];

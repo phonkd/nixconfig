@@ -118,13 +118,9 @@
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Claude Code CLI, tracked at the latest npm release (nixpkgs' lags well
-    # behind) -- the NixOS analogue of the Mac's `claude-code@latest` cask.
-    # Wired into the NixOS-desktop HM module in modules/desktop.nix.
-    claude-code-nix = {
-      url = "github:sadjow/claude-code-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # Daily-updated AI agent packages for NixOS desktops. Keep upstream's
+    # nixpkgs pin so its prebuilt packages use the Numtide cache.
+    llm-agents.url = "github:numtide/llm-agents.nix";
     nixflix = {
       url = "github:kiriwalawren/nixflix";
       inputs.nixpkgs.follows = "nixpkgs";

@@ -43,9 +43,8 @@
         # Visual disk-usage analyzer -- "squirreldisk" is dead weight in nixpkgs
         # (unfree, marked broken, dropped from unstable); maintained stand-in.
         qdirstat
-        # Latest Claude Code from the claude-code-nix flake, not the lagging
-        # nixpkgs claude-code (see the input comment in flake.nix).
-        inputs.claude-code-nix.packages.${pkgs.system}.default
+        # Daily-updated Claude Code from llm-agents.nix (see flake.nix).
+        inputs.llm-agents.packages.${pkgs.system}.claude-code
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.codex
       ];
       qt = {
