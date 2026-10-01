@@ -115,26 +115,68 @@ Verified by spike: `clan secrets import-sops` writes clan's legacy
 for every secret a machine can decrypt — so `config.sops.secrets."x".path` and
 all four `sops.templates` blocks keep working with **no consumer edits**.
 
-1. `clan vars keygen --user phonkd` — registers the existing
-   `~/.config/sops/age/keys.txt` as the admin key.
-2. Machine keys. Today every host decrypts with the *shared user key* at
-   `/home/phonkd/.config/sops/age/keys.txt`. Clan's model is one key per
-   machine. Start by registering the shared key's public half for each
-   machine (`clan secrets machines add`) — no key distribution changes — then
-   move hosts to their own keys once the store is proven.
-   **Do not derive machine keys from ssh host keys yet:** 204 and 205 present
-   the identical ed25519 host key (cloned VM image), so ssh-derived age keys
-   would let each decrypt the other's secrets. Clan's default — a fresh age
-   key per machine — sidesteps this; regenerating the cloned host keys is
-   worth doing regardless.
-3. `clan secrets import-sops --group admins --machine … <file>` for
-   `global-secrets/secret.yaml` and the three per-app files.
-4. Drop bare `sops.secrets.<name> = { };` declarations; keep the ~10 that set
-   `owner`/`group`/`mode`.
-5. Then vars, but only for secrets that are genuinely *generatable* (passwords,
-   keypairs, the headscale pre-auth key). The ~45 opaque third-party API keys
-   can stay in the store — vars has no importer for them, prompts can't be
-   piped, and there is no `sops.templates` equivalent.
+**Phase 2a — `global-secrets/secret.yaml` → clan, for the six servers.**
+Scripted in `scripts/clan-secrets-migrate.sh`, which prints names and
+statuses only, never values or hashes of values. Run it inside `nix develop`:
+
+```
+scripts/clan-secrets-migrate.sh plan        # read-only mapping + config baseline
+scripts/clan-secrets-migrate.sh migrate     # writes + stages sops/, no commit
+scripts/clan-secrets-migrate.sh validate    # must say VALIDATION PASSED
+git commit -m '…' -- sops                   # then, per server:
+scripts/clan-secrets-migrate.sh snapshot <host>; deploy <host>; …verify <host>
+```
+
+What it does: registers `phonkd` and each server with the **shared age key**
+(no key distribution changes), imports all 48 secrets, then links each one
+only to the servers that declare it today — 55 links — so clan declares
+exactly what each host already had, nothing more. Clan auto-commits every
+step; the script folds those back into one staged change.
+
+`validate` proves three things:
+- every value round-trips byte for byte and is encrypted to exactly the
+  shared key;
+- each server's evaluated `sops` wiring is identical to the pre-migration
+  baseline, except YAML → clan for exactly the planned secrets;
+- templates are unchanged.
+
+`verify` additionally proves every file under `/run/secrets` on the host is
+unchanged in content and permissions after the deploy.
+
+- [x] Dry run in a throwaway worktree (2026-10-01): `VALIDATION PASSED` —
+      48/48 identical; 201 15 migrated, 203 27, 204 8, 205 2, ext-mail 1,
+      observability 2. Corrupting the store (a swapped value, a removed link)
+      made it fail with the exact secret named. `snapshot`/`verify` were
+      exercised on 205 and ext-mail.
+- [ ] Real run on `main` → commit → snapshot, deploy, verify each server.
+
+**After 2a, secret.yaml and the clan store are two copies.** The servers read
+clan; z14, blac and the Mac still read `secret.yaml`. Until they move too,
+change a server secret in *both* places (`clan secrets set <name>` plus
+`sops-secret` / `sops set`), and re-run `validate`, which doubles as a drift
+check between the two.
+
+**Out of 2a, deliberately:**
+- `authelia-secret.yaml` and `traefik-secret.txt` — their consumers set
+  `sopsFile` explicitly, which would collide with clan's auto-declaration;
+  they need that line dropped in the same change.
+- The mail files are encrypted to a different age key (`age1y5wx…`) that
+  isn't on z14.
+- The desktops and the Mac follow once their local switch is done.
+
+Later:
+- **Machine keys.** Move each host to its own key once the store is proven.
+  **Do not derive them from ssh host keys yet:** 204 and 205 present the
+  identical ed25519 host key (cloned VM image), so ssh-derived age keys would
+  let each decrypt the other's secrets. Clan's default — a fresh age key per
+  machine — sidesteps this; regenerating the cloned host keys is worth doing
+  regardless.
+- Drop bare `sops.secrets.<name> = { };` declarations — clan declares them
+  now; keep the ~10 that set `owner`/`group`/`mode`.
+- Then vars, but only for secrets that are genuinely *generatable* (passwords,
+  keypairs, the headscale pre-auth key). The opaque third-party API keys can
+  stay in the store — vars has no importer for them, prompts can't be piped,
+  and there is no `sops.templates` equivalent.
 
 Watch for: `migrateFact` no longer exists; the vars sops name changed
 between 26.05 and main (`vars/<gen>/<file>` → `vars/per-machine/…`); upstream
