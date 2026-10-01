@@ -8,6 +8,31 @@ let
       inherit (scope) cursorName cursorSize dispatch generated groupbarMode
         groupBinds hy3 hy3Plugin hyprctl kitty layout layoutSettings mod
         monitorsConf moveWindowDispatch scale sinkSwitcher workspaceBinds zen;
+      # Lid close follows Caelestia's "keep awake" toggle. That toggle is only a
+      # Wayland idle inhibitor -- hypridle honours it, logind's lid switch does
+      # not -- so Hyprland holds logind's handle-lid-switch lock (exec-once
+      # below) and decides here instead: keep awake on -> only blank the panel,
+      # so music, wifi and downloads carry on; off -> suspend as before. Docked
+      # (another monitor up) does nothing, like logind's
+      # HandleLidSwitchDocked=ignore. A shell that doesn't answer isn't "true",
+      # so it falls back to suspend.
+      jq = "${pkgs.jq}/bin/jq";
+      lidClose = pkgs.writeShellScript "hypr-lid-close" ''
+        monitors=$(${hyprctl} monitors -j)
+        [ "$(echo "$monitors" | ${jq} length)" -gt 1 ] && exit 0
+        if [ "$(${lib.getExe' config.programs.caelestia.package "caelestia-shell"} ipc call idleInhibitor isEnabled)" = true ]; then
+          for m in $(echo "$monitors" | ${jq} -r '.[].name | select(startswith("eDP"))'); do
+            ${hyprctl} dispatch dpms off "$m"
+          done
+        else
+          ${pkgs.systemd}/bin/systemctl suspend
+        fi
+      '';
+      # The loop ends once Hyprland's socket is gone, handing the lid back to
+      # logind for the greeter or a tty.
+      lidInhibit = "${pkgs.systemd}/bin/systemd-inhibit --what=handle-lid-switch --who=Hyprland"
+        + " --why='Lid follows the Caelestia keep-awake toggle' --mode=block"
+        + " ${pkgs.bash}/bin/sh -c 'while ${hyprctl} version >/dev/null 2>&1; do sleep 30; done'";
       # SHORTCUTS: add or change a line in the lists below.
       # Each line is "MODIFIERS, KEY, ACTION, ARGUMENT". For example:
       #   "SUPER SHIFT, T, exec, ${kitty}"
@@ -67,6 +92,8 @@ let
           "SUPER, B, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
           "SUPER, N, exec, ${pkgs.playerctl}/bin/playerctl next"
           "SUPER SHIFT, N, exec, ${pkgs.playerctl}/bin/playerctl previous"
+          ", switch:on:Lid Switch, exec, ${lidClose}"
+          ", switch:off:Lid Switch, exec, ${hyprctl} dispatch dpms on"
         ];
         bindm = [
           "SUPER, mouse:272, movewindow"
@@ -102,7 +129,7 @@ let
               "match:class ^com\\.gabm\\.satty$, float on" ];
             layerrule = [ "match:namespace ^caelestia-.*, blur on"
               "match:namespace ^caelestia-.*, ignore_alpha 0.3" ];
-            exec-once = lib.optional hy3 "${hyprctl} plugin load ${hy3Plugin} && ${hyprctl} reload config-only";
+            exec-once = [ lidInhibit ] ++ lib.optional hy3 "${hyprctl} plugin load ${hy3Plugin} && ${hyprctl} reload config-only";
           } // keybinds // layoutSettings;
         };
         programs.hyprlock = {
