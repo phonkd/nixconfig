@@ -215,6 +215,7 @@ rec {
   # runnable by hand (`nix run .#hypr-sink-switcher`) without a session.
   sinkSwitcher = "${self.packages.${pkgs.system}.hypr-sink-switcher}/bin/hypr-sink-switcher";
   rbwMode = "${self.packages.${pkgs.system}.rofi-rbw-mode}/bin/rofi-rbw-mode";
+  hyprWindows = "${self.packages.${pkgs.system}.rofi-hypr-windows}/bin/rofi-hypr-windows";
 
   # Written by Monique (monitor layout + workspace assignments).
   monitorsConf = "${cfgHome}/hypr/monitors.conf";

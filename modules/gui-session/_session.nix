@@ -13,6 +13,10 @@ let
     rbwMode
     sinkSwitcher
     ;
+  # A script mode can't reuse the built-in name `window`.
+  windowModeName = if scope.hyprlandEnabled then "windows" else "window";
+  windowMode =
+    if scope.hyprlandEnabled then "windows:${scope.hyprWindows}" else "window";
 in
 {
   # mako is OFF: Caelestia force-loads its own notification service on shell
@@ -31,11 +35,14 @@ in
     font = "Inter 13";
     extraConfig = {
       # `modes` is rofi 2.0's spelling (`modi` is the pre-2.0 alias).
-      modes = "combi,bitwarden:${rbwMode},audio:${sinkSwitcher},drun,run,window";
-      # Ctrl+<n> jumps to mode <n> from anywhere in the launcher: drun, run,
-      # window and script modes all treat kb-custom-<k> as "switch to mode
-      # index k-1", so kb-custom-2 opens `bitwarden` (index 1), kb-custom-3
+      modes = "combi,bitwarden:${rbwMode},audio:${sinkSwitcher},drun,run,${windowMode}";
+      # Ctrl+<n> jumps to mode <n> from anywhere in the launcher: drun, run
+      # and script modes all treat kb-custom-<k> as "switch to mode index
+      # k-1", so kb-custom-2 opens `bitwarden` (index 1), kb-custom-3
       # `audio`, and Ctrl+0 returns to combi. Alt+<k> stays as rofi's default.
+      # combi hands the key to the highlighted row's mode, and the built-in
+      # `window` mode exits on it instead -- hence the script mode on
+      # Hyprland (rofi-hypr-windows.nix).
       kb-custom-1 = "Alt+1,Control+0";
       kb-custom-2 = "Alt+2,Control+1";
       kb-custom-3 = "Alt+3,Control+2";
@@ -43,10 +50,10 @@ in
       # than interleaving them, so an already-running window always sorts
       # above the .desktop entry that would start a second copy.
       #
-      # `window` mode works only because nixpkgs merged rofi-wayland into
-      # `rofi` (2025-09-06) and 2.0 speaks foreign-toplevel natively; the
-      # old X11 build saw XWayland windows only.
-      combi-modes = "window,drun,run";
+      # Off Hyprland, the built-in `window` mode works only because nixpkgs
+      # merged rofi-wayland into `rofi` (2025-09-06) and 2.0 speaks
+      # foreign-toplevel natively; the old X11 build saw XWayland windows only.
+      combi-modes = "${windowModeName},drun,run";
       show-icons = true;
       drun-display-format = "{name}";
       # rofi's default `{w}` desktop-number field is always empty on
