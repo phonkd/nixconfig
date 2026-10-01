@@ -87,6 +87,17 @@
       # itself -- see plans/auto-brightness-z14.md.
       hardware.sensor.iio.enable = true;
 
+      # CPU temperature. This Ryzen AI 7 445 (family 1Ah model 68h) has a
+      # data-fabric F3 device 1022:114b that no k10temp knows yet -- not 6.18,
+      # not upstream 7.3-rc5 -- so the driver never binds and there's no
+      # Tctl. Caelestia then falls back to the ACPI zone that sits at a
+      # constant 20°C. Hand the ID to k10temp at runtime via new_id; drop
+      # this once the kernel lists 0x114b itself.
+      boot.kernelModules = [ "k10temp" ];
+      services.udev.extraRules = ''
+        ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x1022", ATTR{device}=="0x114b", RUN+="${pkgs.runtimeShell} -c '${pkgs.kmod}/bin/modprobe k10temp; echo 1022 114b > /sys/bus/pci/drivers/k10temp/new_id'"
+      '';
+
       # AirPlay audio *out* (carried over from g14, now retired): z14 is the sender,
       # turning reachable AirPlay/Sonos receivers into PipeWire sinks. Needs
       # three things PipeWire doesn't do alone: avahi (module-raop-discover
