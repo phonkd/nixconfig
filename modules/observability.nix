@@ -119,9 +119,17 @@
             tsdb.dir = "/var/lib/mimir/tsdb";
           };
 
+          # Every ring pins instance_addr. Unpinned, a ring looks for an
+          # address on eth0/en0, which this host doesn't have (enp1s0/enp7s0):
+          # the store-gateway failed "no useable address found for interfaces
+          # [eth0 en0]" at boot on 2026-09-07 and 2026-10-02, and systemd gave
+          # up after five fast restarts.
           compactor = {
             data_dir = "/var/lib/mimir/compactor";
-            sharding_ring.kvstore.store = "memberlist";
+            sharding_ring = {
+              instance_addr = "127.0.0.1";
+              kvstore.store = "memberlist";
+            };
           };
 
           distributor.ring = {
@@ -135,7 +143,12 @@
             replication_factor = 1;
           };
 
-          store_gateway.sharding_ring.replication_factor = 1;
+          store_gateway.sharding_ring = {
+            instance_addr = "127.0.0.1";
+            replication_factor = 1;
+          };
+          ruler.ring.instance_addr = "127.0.0.1";
+          alertmanager.sharding_ring.instance_addr = "127.0.0.1";
 
           # "filesystem" (not "local") so Mimir's own DynamicUser owns the whole
           # tree it writes into. The ruler config API (used by mimirtool, and by
