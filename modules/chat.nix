@@ -39,8 +39,6 @@
       serverName = "phonkd.net";
       matrixHost = "matrix.phonkd.net";
 
-      chatSecrets = ./homelab/secrets/chat.yaml;
-
       # Every service on this box reaches postgres over the unix socket --
       # landmine 1 in the plan: sshd owns :5432 on hetzner-vm hosts, so
       # postgres must not bind TCP at all.
@@ -121,6 +119,7 @@
         # (modules/devshell.nix). Every value is a random string; none is an
         # account credential. The Signal / WhatsApp / Discord logins happen
         # at runtime over a bot DM, never through this file.
+        # All six come from clan's store (sops/secrets/<name>), linked to this host.
         sops.secrets =
           lib.genAttrs
             [
@@ -130,19 +129,13 @@
               "chat_whatsapp_pickle_key"
               "chat_signal_pickle_key"
             ]
-            (_: {
-              sopsFile = chatSecrets;
-            })
+            (_: { })
           // {
             # Not a chat secret: the Cloudflare token traefik already uses,
             # borrowed for the apex certificate's DNS-01 challenge (see the
-            # acme block below). Encrypted to the one shared age key this
-            # host holds, so it needs no re-encryption. Its own name so it
+            # acme block below). Its own name so it
             # cannot collide with traefik's if a host ever has both modules.
-            chat_cf_dns_token = {
-              sopsFile = ./homelab/apps/traefik/traefik-secret.txt;
-              format = "binary";
-            };
+            chat_cf_dns_token = { };
           };
 
         # Synapse refuses these three as nix-store values: the module carries

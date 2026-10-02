@@ -42,20 +42,17 @@
           ipfilter = false;
         };
       };
+      # The four authelia secrets come from clan's store (sops/secrets/<name>).
       sops.secrets.authelia_jwt_secret = {
-        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
       sops.secrets.authelia_session_secret = {
-        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
       sops.secrets.authelia_storage_encryption_key = {
-        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
       sops.secrets.authelia_users_database = {
-        sopsFile = ./authelia-secret.yaml;
         owner = "authelia-main";
       };
 

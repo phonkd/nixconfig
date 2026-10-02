@@ -175,9 +175,8 @@
       };
     in
     lib.mkIf (noughtyLib.hostHasTag "reverse-proxy") {
+      # From clan's store (sops/secrets/CF_DNS_API_TOKEN).
       sops.secrets.CF_DNS_API_TOKEN = {
-        sopsFile = ./traefik-secret.txt;
-        format = "binary";
         owner = "traefik";
       };
 
