@@ -96,6 +96,13 @@
       # Monolithic single-node ("target = all") with filesystem block storage.
       # Modelled on Grafana's canonical single-process example; state under
       # /var/lib/mimir.
+      #
+      # Ordered after network-online as well as pinning its addresses (see the
+      # comment at compactor below), in case a future version detects one more.
+      systemd.services.mimir = {
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+      };
       services.mimir = {
         enable = true;
         configuration = {
@@ -119,11 +126,14 @@
             tsdb.dir = "/var/lib/mimir/tsdb";
           };
 
-          # Every ring pins instance_addr. Unpinned, a ring looks for an
-          # address on eth0/en0, which this host doesn't have (enp1s0/enp7s0):
-          # the store-gateway failed "no useable address found for interfaces
-          # [eth0 en0]" at boot on 2026-09-07 and 2026-10-02, and systemd gave
-          # up after five fast restarts.
+          # Every address Mimir would otherwise detect is pinned (the rings, the
+          # query-frontend, memberlist). Unpinned, it picks the interfaces that
+          # hold a private address *when it starts* -- [enp7s0, tailscale0] once
+          # the host is up -- and falls back to [eth0 en0] when none do. At
+          # boot Mimir starts ~1s before DHCP assigns anything, so every boot
+          # since at least 2026-09-07 died "no useable address found for
+          # interfaces [eth0 en0]" until something restarted it later.
+          # Single node, so loopback is right for all of them.
           compactor = {
             data_dir = "/var/lib/mimir/compactor";
             sharding_ring = {
@@ -149,6 +159,8 @@
           };
           ruler.ring.instance_addr = "127.0.0.1";
           alertmanager.sharding_ring.instance_addr = "127.0.0.1";
+          frontend.address = "127.0.0.1";
+          memberlist.advertise_addr = "127.0.0.1";
 
           # "filesystem" (not "local") so Mimir's own DynamicUser owns the whole
           # tree it writes into. The ruler config API (used by mimirtool, and by
