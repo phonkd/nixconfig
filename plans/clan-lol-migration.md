@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — servers on clan-core and reading clan's secret store (2a); z14, blac, Mac awaiting local switch
+**Repo(s):** nixconfig   **Status:** in-progress — servers on clan-core with every secret but mail-secret in clan's store; z14 needs its local switch
 
 ## Why
 
@@ -98,7 +98,17 @@ clan deploy also carries the systemd bump — deploy each one off-tailnet
       on every machine, darwin included, and the Mac never set one, so without
       this nix-darwin would start renaming it via `scutil`.
 
-When z14, blac and the Mac have switched cleanly: delete `mkNixos`, `mkDarwin`
+- [x] All six servers rebooted onto 6.18.54 (2026-10-03), one at a time, each
+      checked by named workload afterwards. Observability's reboot exposed a
+      Mimir bug that had been there since at least the 2026-09-07 boot:
+      Mimir chose its addresses from interfaces holding a private IP at
+      startup, and starts ~1s before DHCP, so every boot died "no useable
+      address found for interfaces [eth0 en0]". Fixed in `b5a8b63` (all
+      addresses pinned, unit after network-online) and proven by a second
+      cold boot: Mimir up on its own, 0 restarts, `/ready` 200.
+
+With blac and the Mac parked, `mkNixos`, `mkDarwin` and the `clanHosts` filter
+stay as their build path. When they come back and switch cleanly: delete `mkNixos`, `mkDarwin`
 and the `clanHosts` filter — until then they are the rollback lever.
 
 **Before Phase 2, check:** z14 and blac import
@@ -162,16 +172,38 @@ change a server secret in *both* places (`clan secrets set <name>` plus
 `sops-secret` / `sops set`), and re-run `validate`, which doubles as a drift
 check between the two.
 
-**Out of 2a, deliberately:**
-- `authelia-secret.yaml` and `traefik-secret.txt` — their consumers set
-  `sopsFile` explicitly, which would collide with clan's auto-declaration;
-  they need that line dropped in the same change.
-- The mail files are encrypted to a different age key (`age1y5wx…`) that
-  isn't on z14.
-- The desktops and the Mac follow once their local switch is done.
+**Phase 2b — the rest, and z14.** Same script, now incremental and taking
+several sources (`80fdc1c`): authelia's four and traefik's Cloudflare token
+(as `CF_DNS_API_TOKEN`) on 201; the five chat secrets and the same token (as
+`chat_cf_dns_token`) on ext-mail; z14 registered and linked to its three. Their
+consumers' explicit `sopsFile` lines are gone — kept, they collide with clan's
+auto-declaration and the host stops evaluating (the dry run proved it).
+
+- [x] `validate`: 59/59 identical; 201 moved 5, ext-mail 6, z14 3.
+- [x] 201 and ext-mail: snapshot → deploy → verify, every `/run/secrets` file
+      unchanged (21 and 11).
+- [ ] z14: `snapshot z14` → `sudo nixos-rebuild switch --flake .#z14 --impure`
+      → `verify z14` (needs the sudo password, so it's a manual step).
+
+Every secret a server uses now comes from clan **except ext-mail's
+`mail-secret`**, and that is on purpose. It is encrypted to ext-mail's own key
+(`age1y5wx…`, only on ext-mail), so no homelab host can read the mail password
+hash. Clan always adds the admin key as a recipient, and the admin key here is
+the shared key every host holds — moving it now would widen who can read it
+from one host to all of them. It moves after the machine-keys step below.
+`modules/hetzner/mail/secrets/secret.yaml` is referenced nowhere.
+
+The old source files stay in the repo for now, but nothing reads them any
+more: editing them changes nothing anywhere.
+
+Not migrated, by choice: blac and the Mac are parked. (The Mac's secrets are
+home-manager-level, which clan's auto-declaration doesn't reach anyway.)
 
 Later:
 - **Machine keys.** Move each host to its own key once the store is proven.
+  This is also what unblocks `mail-secret`: with an admin key that lives only
+  on the operator's machines, mail can be encrypted to admin + ext-mail
+  without any other host gaining access.
   **Do not derive them from ssh host keys yet:** 204 and 205 present the
   identical ed25519 host key (cloned VM image), so ssh-derived age keys would
   let each decrypt the other's secrets. Clan's default — a fresh age key per
