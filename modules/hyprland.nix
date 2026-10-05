@@ -171,6 +171,9 @@ in {
     let enabled = noughtyLib.hostHasTag "hyprland"; in {
       config = lib.mkIf (enabled && config.noughty.host.is.nixosDesktop) {
         programs.hyprland = { enable = true; withUWSM = false; xwayland.enable = true; };
+        environment.systemPackages = lib.optionals config.noughty.host.is.laptop [
+          inputs.screenening.packages.${pkgs.system}.default
+        ];
         programs.hyprlock.enable = true;
         security.pam.services.hyprlock = { }; security.polkit.enable = true;
         fonts.packages = with pkgs; [ nerd-fonts.jetbrains-mono nerd-fonts.symbols-only
