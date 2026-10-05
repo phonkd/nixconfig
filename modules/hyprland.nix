@@ -52,6 +52,13 @@ let
           "${mod} SHIFT, J, ${moveWindowDispatch}, d"
           "${mod} SHIFT, K, ${moveWindowDispatch}, u"
           "${mod} SHIFT, L, ${moveWindowDispatch}, r"
+        ] ++ lib.optionals hy3 [
+          # A | B | C (C focused) -> A | B/C. Bindings run in order:
+          # split the left neighbor vertically, return, then join its split.
+          "${mod}, minus, hy3:movefocus, l"
+          "${mod}, minus, hy3:makegroup, v"
+          "${mod}, minus, hy3:movefocus, r"
+          "${mod}, minus, hy3:movewindow, l"
         ] ++ groupBinds ++ [
           # Window actions and apps.
           "${mod}, F, fullscreen, 0"
