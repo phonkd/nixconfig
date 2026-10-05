@@ -171,7 +171,7 @@ in {
     let enabled = noughtyLib.hostHasTag "hyprland"; in {
       config = lib.mkIf (enabled && config.noughty.host.is.nixosDesktop) {
         programs.hyprland = { enable = true; withUWSM = false; xwayland.enable = true; };
-        environment.systemPackages = lib.optionals config.noughty.host.is.laptop [
+        environment.systemPackages = [
           inputs.screenening.packages.${pkgs.system}.default
         ];
         programs.hyprlock.enable = true;
