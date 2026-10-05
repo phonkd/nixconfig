@@ -5,10 +5,21 @@ Single source of truth for agent guidance in this repo (`AGENTS.md` points here)
 ## Change workflow
 
 Size decides the ceremony. Everything else is identical, and all of it is
-autonomous — don't hand back work you can finish. One exception: **ask first**
-before writing a custom systemd unit or a nixpkgs package override/overlay. An
+autonomous — don't hand back work you can finish. Approval exceptions: **ask first**
+before writing custom glue code (see below), a custom systemd unit, or a nixpkgs
+package override/overlay. An
 existing option often covers it, or the fix belongs upstream as a PR (details in
 the `nixconfig` skill).
+
+**Native configuration first.** Before adding glue code, check the installed
+version's native options, commands, and existing integrations. This includes
+`writeShellScript`, `writeShellApplication`, inline shell, Python helpers, and
+equivalent wrappers.
+
+If custom code is still necessary, explain the missing capability, what native
+alternatives you checked, and the maintenance cost. **Ask before implementing
+it.** Do not treat convenience or uncertainty about native features as
+justification.
 
 **Small to medium** — the everyday case: an option tweak, a version bump, a
 secret, a dashboard entry, a contained edit to one module. Just do it, no plan.
