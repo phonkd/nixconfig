@@ -1708,6 +1708,7 @@
         "nixpkgs-fork": "nixpkgs-fork",
         "nixpkgs-immich": "nixpkgs-immich",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "screenening": "screenening",
         "simple-nixos-mailserver": "simple-nixos-mailserver",
         "slop-trove": "slop-trove",
         "sops-nix": "sops-nix",
@@ -1731,6 +1732,29 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "screenening": {
+      "inputs": {
+        "monique": [
+          "monique"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791191183,
+        "narHash": "sha256-bE9eFF7rJrwZvRZ1i4CJNt6e2BFE7xdD9ZHkGrqaS5s=",
+        "owner": "phonkd",
+        "repo": "screenening",
+        "rev": "37d69797c4d63e2e95770cd1b9d5354727c62f77",
+        "type": "github"
+      },
+      "original": {
+        "owner": "phonkd",
+        "repo": "screenening",
         "type": "github"
       }
     },

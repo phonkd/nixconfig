@@ -41,6 +41,11 @@
       url = "github:ToRvaLDz/monique";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    screenening = {
+      url = "github:phonkd/screenening";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.monique.follows = "monique";
+    };
     # Makes nix-installed .app bundles launchable on the Mac: home-manager's
     # `targets.darwin.linkApps` symlinks bundles into ~/Applications/Home
     # Manager Apps, but that target lives on the /nix volume (mounted
