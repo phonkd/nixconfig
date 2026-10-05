@@ -31,6 +31,7 @@
         android-tools
         unzip
         heimdall
+        inputs.wutchatwusdat.packages.${pkgs.system}.default
       ];
     };
   flake.homeModules.gui-nixos =

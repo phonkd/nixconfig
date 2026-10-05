@@ -123,6 +123,10 @@
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    wutchatwusdat = {
+      url = "github:phonkd/wutchatwusdat";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     # Daily-updated AI agent packages for NixOS desktops. Keep upstream's
     # nixpkgs pin so its prebuilt packages use the Numtide cache.
     llm-agents.url = "github:numtide/llm-agents.nix";
