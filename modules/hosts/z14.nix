@@ -11,7 +11,7 @@
 #
 # tlp stays off: it and power-profiles-daemon (enabled in modules/desktop.nix)
 # fight over the same CPU governor.
-{ ... }:
+{ self, ... }:
 {
   flake.nixosModules.z14 =
     {
@@ -56,6 +56,8 @@
       '';
     in
     lib.mkIf (config.noughty.host.name == "z14") {
+      home-manager.users.phonkd.imports = [ self.homeModules.z14-blur-rule ];
+
       # Use Betterbird for mail on this laptop; Owl is its Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
       services.flatpak.packages = [

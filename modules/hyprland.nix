@@ -108,7 +108,6 @@ let
         ];
       };
     in {
-      imports = [ self.homeModules.z14-blur-rule ];
       config = lib.mkIf scope.hyprlandEnabled {
         wayland.windowManager.hyprland = {
           enable = true; package = null; portalPackage = null;
