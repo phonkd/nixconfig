@@ -8,7 +8,7 @@ Add Spotifast to the shared Linux desktop package set for z14 and blac.
 
 ## Approach
 
-Use the official `github:crmne/spotifast` flake package with its upstream
+Use the official `github:crmne/spotifast/v0.12.0` flake package with its upstream
 nixpkgs and Rust toolchain pins. Install alongside Spotify in the existing
 desktop module.
 
@@ -16,7 +16,13 @@ desktop module.
 
 - [x] Add and lock the upstream input, then reference its default package.
 - [x] Parse the changed Nix files and review the lockfile diff.
-- [ ] Commit to local main and activate on z14 with its native local rebuild.
+- [x] Commit the initial configuration to local main (`1045c6b`).
+- [ ] Pin the release and activate on z14 with its native local rebuild.
+
+The initial main-branch pin (`dd2d5e34`) compiled, but failed the upstream
+localization test: the custom title-bar tooltip in the translation template
+was missing from a catalog. Pin v0.12.0 (`ed9cb550`), released before that change, keeping tests
+enabled and avoiding a local package override.
 
 ## Risks / rollout
 
