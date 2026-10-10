@@ -58,6 +58,9 @@
     lib.mkIf (config.noughty.host.name == "z14") {
       home-manager.users.phonkd.imports = [ self.homeModules.z14-blur-rule ];
 
+      # GPG needs an explicit pinentry path for private-key imports and signing.
+      home-manager.users.phonkd.services.gpg-agent.pinentry.package = pkgs.pinentry-curses;
+
       # Use Betterbird for mail on this laptop; Owl is its Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
       services.flatpak.packages = [
