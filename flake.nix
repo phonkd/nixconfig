@@ -119,6 +119,8 @@
       url = "github:youwen5/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Keep upstream's nixpkgs and Rust toolchain pins for the desktop client.
+    spotifast.url = "github:crmne/spotifast";
     try-rs = {
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";

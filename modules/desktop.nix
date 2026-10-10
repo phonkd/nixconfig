@@ -234,6 +234,7 @@
         trayscale
         exfat
         spotify
+        inputs.spotifast.packages.${pkgs.system}.default
         ipcalc
         virt-viewer
         home-manager
