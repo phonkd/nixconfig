@@ -61,6 +61,9 @@
       # GPG needs an explicit pinentry path for private-key imports and signing.
       home-manager.users.phonkd.services.gpg-agent.pinentry.package = pkgs.pinentry-curses;
 
+      # MilkDrop-compatible visualizer with the Qt preset/playlist manager.
+      environment.systemPackages = [ pkgs.projectm_3 ];
+
       # Use Betterbird for mail on this laptop; Owl is its Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
       services.flatpak.packages = [
