@@ -21,6 +21,28 @@
       ...
     }:
     let
+      # Spotifast v0.12.0: current settings plus src/milkdrop/engine.rs defaults.
+      # Share its downloaded presets/textures; seed a writable config so the
+      # standalone player's settings UI can still save later adjustments.
+      projectMDefaults = pkgs.writeText "projectMSDL.properties" ''
+        window.fullscreen = false
+        window.width = 920
+        window.height = 1142
+        projectM.presetPath = /home/phonkd/.config/spotifast/milkdrop
+        projectM.texturePath = /home/phonkd/.config/spotifast/milkdrop
+        projectM.texturePath.1 = /home/phonkd/.config/spotifast/milkdrop/textures
+        projectM.enableSplash = false
+        projectM.fps = 60
+        projectM.displayDuration = 10
+        projectM.transitionDuration = 2.7
+        projectM.meshX = 48
+        projectM.meshY = 36
+        projectM.shuffleEnabled = true
+        projectM.presetLocked = false
+        projectM.hardCutsEnabled = false
+        projectM.aspectCorrectionEnabled = true
+      '';
+
       # The internal mic read "atrocious quality" rather than "quiet" because
       # PipeWire's alsa-card-profile merges ALC294's two capture gain controls
       # (Capture ADC 0..63 @ 0.75dB/step, Mic Boost pre-amp 0..3 @ 10dB/step)
@@ -61,8 +83,22 @@
       # GPG needs an explicit pinentry path for private-key imports and signing.
       home-manager.users.phonkd.services.gpg-agent.pinentry.package = pkgs.pinentry-curses;
 
-      # MilkDrop-compatible visualizer with the Qt preset/playlist manager.
-      environment.systemPackages = [ pkgs.projectm_3 ];
+      # projectM 4 matches Spotifast's engine API and fractional fade duration.
+      # Esc opens the built-in preset browser/settings. The package has no
+      # desktop entry; capture playback through PipeWire's PulseAudio server.
+      environment.systemPackages = [ pkgs.projectm-sdl-cpp ];
+      systemd.tmpfiles.rules = [
+        "d /home/phonkd/.config/projectM 0755 phonkd users -"
+        "C /home/phonkd/.config/projectM/projectMSDL.properties 0644 phonkd users - ${projectMDefaults}"
+      ];
+      home-manager.users.phonkd.xdg.desktopEntries.projectm = {
+        name = "projectM";
+        genericName = "Music Visualizer";
+        comment = "MilkDrop visuals using Spotifast's presets";
+        exec = "${pkgs.coreutils}/bin/env SDL_AUDIODRIVER=pulseaudio PULSE_SOURCE=@DEFAULT_MONITOR@ ${pkgs.projectm-sdl-cpp}/bin/projectMSDL";
+        terminal = false;
+        categories = [ "AudioVideo" "Audio" ];
+      };
 
       # Use Betterbird for mail on this laptop; Owl is its Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
