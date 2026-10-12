@@ -163,7 +163,7 @@ rec {
         "SUPER, Tab, hy3:focustab, r"
         "SUPER SHIFT, Tab, hy3:focustab, l"
         # Temporarily grow a node over its siblings, and back.
-        "${mod}, X, hy3:expand, expand"
+        "${mod} CTRL, X, hy3:expand, expand"
         "${mod} SHIFT, X, hy3:expand, base"
       ]
     else

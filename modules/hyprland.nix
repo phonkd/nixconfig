@@ -66,6 +66,8 @@ let
           "SUPER, SPACE, togglefloating,"
           "${mod}, B, exec, ${zen}"
           "${mod}, V, exec, ${kitty}"
+          "${mod}, Y, exec, ${pkgs.rofi-rbw-wayland}/bin/rofi-rbw"
+          "${mod}, X, exec, ${pkgs.yubioath-flutter}/bin/yubioath-flutter"
           "SUPER, D, exec, ${pkgs.rofi}/bin/rofi -show combi"
           "SUPER, E, exec, ${pkgs.nautilus}/bin/nautilus"
           "SUPER, L, exec, ${pkgs.hyprlock}/bin/hyprlock"
