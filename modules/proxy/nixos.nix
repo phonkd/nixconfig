@@ -56,7 +56,9 @@
         dns = {
           servers = [
             {
-              type = "udp";
+              # Concurrent A/AAAA replies over UDP go missing on the phone
+              # hotspot, stalling lookups until the 10-second DNS timeout.
+              type = "tcp";
               tag = "upstream";
               server = cfg.upstreamDns;
             }
