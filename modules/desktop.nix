@@ -40,7 +40,6 @@
       home.packages = with pkgs; [
         dracula-theme
         yt-dlp
-        onlyoffice-desktopeditors
         # Visual disk-usage analyzer -- "squirreldisk" is dead weight in nixpkgs
         # (unfree, marked broken, dropped from unstable); maintained stand-in.
         qdirstat

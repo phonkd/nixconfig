@@ -33,6 +33,7 @@
         heimdall
         inputs.wutchatwusdat.packages.${pkgs.system}.default
       ];
+      programs.zsh.shellAliases.wcwd = "wutchatwusdat";
     };
   flake.homeModules.gui-nixos =
     {
