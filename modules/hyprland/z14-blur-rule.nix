@@ -1,4 +1,4 @@
-# Hyprland's hyprlang rules cannot condition global blur on an output count.
+# Disable global blur whenever an external monitor is active.
 # Use its monitor/reload events; Caelestia reloads Hyprland when game mode ends.
 { ... }:
 {
@@ -21,7 +21,7 @@
           ') || return 0
 
           enabled=false
-          if (( external_count < 2 )); then
+          if (( external_count == 0 )); then
             # Never restore blur when the shell cannot confirm game mode is
             # off. In particular, do not infer game mode from blur itself.
             game_mode=$(${pkgs.coreutils}/bin/timeout 2 ${shell} ipc call gameMode isEnabled 2>/dev/null) || return 0
