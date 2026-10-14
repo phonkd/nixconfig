@@ -49,12 +49,9 @@
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.codex
       ];
       qt = {
-        enable = false;
-        platformTheme.name = "gtk";
-        style = {
-          name = "Nordic-darker";
-          package = pkgs.nordic;
-        };
+        enable = true;
+        platformTheme.name = "gtk3";
+        style.name = "breeze";
       };
 
       # GTK configuration
