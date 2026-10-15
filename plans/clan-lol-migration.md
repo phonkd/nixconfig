@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — servers on clan-core with every secret but mail-secret in clan's store; z14 needs its local switch
+**Repo(s):** nixconfig   **Status:** in-progress — builder migration complete for the active fleet; next: separate admin and machine keys, then migrate mail-secret
 
 ## Why
 
@@ -11,6 +11,13 @@ upstream what's missing instead of routing around it. So a gap is a
 contribution candidate, not a reason to stop.
 
 ## Scope
+
+**Active fleet (confirmed 2026-10-15):** `201-mono`, `203-media`, `204-agent`,
+`205-builder`, `ext-mail`, `observability`, and `z14`. z14 is the only active
+non-server machine; the user rebuilds it daily and confirms it has switched.
+`Eliss-MacBook-Pro` is no longer used and `blac` is outside the active scope.
+Neither blocks progress or completion; removing their existing configuration
+is separate work, not part of this scope update.
 
 **In:** the builder (hosts become clan machines), secrets (clan's store, then
 vars), the module system (inventory, then clan services where roles fit),
@@ -27,6 +34,8 @@ clan's own network probing entirely.
 ## Phases
 
 ### 1 — clan-core is the builder, one host at a time
+
+**Complete for the active fleet.**
 
 `modules/builder.nix` routes every name in `clanHosts` through
 `clan.machines.<name>` instead of `nixosSystem`. Both paths get the identical
@@ -92,11 +101,12 @@ clan deploy also carries the systemd bump — deploy each one off-tailnet
       home.phonkd.net answer 200. z14 reaches `192.168.3.201` over the home
       LAN via the router, not the tailnet — so this path only exists while
       z14 is at home.
-- [ ] `z14`, `blac`, `Eliss-MacBook-Pro` — committed in `5f0d1ad`, **not yet
-      switched**; each is a local rebuild. The Mac's clan machine sets
-      `networking.hostName = mkOverride 900 null`: clan defaults the hostname
-      on every machine, darwin included, and the Mac never set one, so without
-      this nix-darwin would start renaming it via `scutil`.
+- [x] `z14` — configured in `5f0d1ad`; local switch confirmed by the user on
+      2026-10-15; the user rebuilds it daily. No additional rebuild is required
+      just to complete this migration step.
+- Out of scope: `blac` and `Eliss-MacBook-Pro`. Their Clan configuration landed
+      in `5f0d1ad`; local switches are no longer migration requirements. The
+      Mac's hostname override remains in place to avoid an unintended rename.
 
 - [x] All six servers rebooted onto 6.18.54 (2026-10-03), one at a time, each
       checked by named workload afterwards. Observability's reboot exposed a
@@ -107,16 +117,17 @@ clan deploy also carries the systemd bump — deploy each one off-tailnet
       addresses pinned, unit after network-online) and proven by a second
       cold boot: Mimir up on its own, 0 restarts, `/ready` 200.
 
-With blac and the Mac parked, `mkNixos`, `mkDarwin` and the `clanHosts` filter
-stay as their build path. When they come back and switch cleanly: delete `mkNixos`, `mkDarwin`
-and the `clanHosts` filter — until then they are the rollback lever.
+`mkNixos`, `mkDarwin` and the `clanHosts` filter remain in the builder as legacy
+fallback paths. Their cleanup must not wait for blac or the Mac to return;
+decide it separately from completion of the active fleet's migration.
 
-**Before Phase 2, check:** z14 and blac import
+**Before adopting vars, check:** z14 and blac import
 `/etc/nixos/hardware-configuration.nix`, an absolute path that only works with
 `--impure`. The clan CLI evaluates *every* machine for `clan vars`; if it does
 so purely, those two will fail it. The clan-native fix is to move each file
 into the repo as `machines/<name>/hardware-configuration.nix`, which clan
-auto-imports.
+auto-imports. blac is out of operational scope, but its configuration must not
+break whole-fleet CLI evaluation while it remains registered.
 
 ### 2 — secrets onto clan's store
 
@@ -166,11 +177,12 @@ unchanged in content and permissions after the deploy.
       down since its first clan deploy (stopped by that activation) and this
       deploy started them.
 
-**After 2a, secret.yaml and the clan store are two copies.** The servers read
-clan; z14, blac and the Mac still read `secret.yaml`. Until they move too,
-change a server secret in *both* places (`clan secrets set <name>` plus
-`sops-secret` / `sops set`), and re-run `validate`, which doubles as a drift
-check between the two.
+**Historical transition after 2a:** the servers read Clan while z14, blac and
+the Mac still read `secret.yaml`, requiring edits in both stores. Phase 2b and
+z14's confirmed switch supersede that requirement for the active fleet: Clan
+is now authoritative for migrated secrets. Out-of-scope machines do not impose
+a dual-write requirement. The migration script's value-equality check is a
+historical migration check, not a reason to keep obsolete sources synchronized.
 
 **Phase 2b — the rest, and z14.** Same script, now incremental and taking
 several sources (`80fdc1c`): authelia's four and traefik's Cloudflare token
@@ -182,8 +194,10 @@ auto-declaration and the host stops evaluating (the dry run proved it).
 - [x] `validate`: 59/59 identical; 201 moved 5, ext-mail 6, z14 3.
 - [x] 201 and ext-mail: snapshot → deploy → verify, every `/run/secrets` file
       unchanged (21 and 11).
-- [ ] z14: `snapshot z14` → `sudo nixos-rebuild switch --flake .#z14 --impure`
-      → `verify z14` (needs the sudo password, so it's a manual step).
+- [x] z14: local switch confirmed by the user on 2026-10-15; rebuilt daily.
+      The originally planned snapshot/verify run is not recorded, so byte-for-byte
+      comparison against the pre-migration state is not claimed. This does not
+      require repeating the switch.
 
 Every secret a server uses now comes from clan **except ext-mail's
 `mail-secret`**, and that is on purpose. It is encrypted to ext-mail's own key
@@ -193,22 +207,29 @@ the shared key every host holds — moving it now would widen who can read it
 from one host to all of them. It moves after the machine-keys step below.
 `modules/hetzner/mail/secrets/secret.yaml` is referenced nowhere.
 
-The old source files stay in the repo for now, but nothing reads them any
-more: editing them changes nothing anywhere.
+The old migrated source files stay in the repo for now, but the active fleet
+no longer reads them. Check remaining out-of-scope references before deleting
+them; they are not the source of truth for active hosts.
 
-Not migrated, by choice: blac and the Mac are parked. (The Mac's secrets are
-home-manager-level, which clan's auto-declaration doesn't reach anyway.)
+Not migrated, by choice: blac and the Mac are outside the active scope. (The
+Mac's secrets are home-manager-level, which Clan's auto-declaration doesn't
+reach anyway.) Neither is a prerequisite for the next steps.
 
-Later:
-- **Machine keys.** Move each host to its own key once the store is proven.
-  This is also what unblocks `mail-secret`: with an admin key that lives only
-  on the operator's machines, mail can be encrypted to admin + ext-mail
-  without any other host gaining access.
+**Next — secret isolation, before module migration:**
+- Separate the admin key from the shared machine key. Keep the admin key on
+  z14 with an offline recovery copy, not on servers.
+- **Machine keys.** Give each active host its own fresh age key through Clan's
+  native mechanism. Re-encrypt secrets to admin + actual consumers, rolling
+  out one host at a time and verifying decryption before removing the shared
+  recipient. Host-specific links alone do not provide isolation while every
+  host holds the shared private key.
   **Do not derive them from ssh host keys yet:** 204 and 205 present the
   identical ed25519 host key (cloned VM image), so ssh-derived age keys would
   let each decrypt the other's secrets. Clan's default — a fresh age key per
   machine — sidesteps this; regenerating the cloned host keys is worth doing
   regardless.
+- Migrate `mail-secret` only after admin + ext-mail can be its sole recipients
+  without any other server gaining access.
 - Drop bare `sops.secrets.<name> = { };` declarations — clan declares them
   now; keep the ~10 that set `owner`/`group`/`mode`.
 - Then vars, but only for secrets that are genuinely *generatable* (passwords,
