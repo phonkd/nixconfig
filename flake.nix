@@ -119,10 +119,9 @@
       url = "github:youwen5/zen-browser-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Pin the release: later main commits fail the localization test because
-    # the custom title-bar strings differ between the translation catalogs.
+    # v0.13.2 includes the title-bar translation fix and passes upstream Nix CI.
     # Keep upstream's nixpkgs and Rust toolchain pins for the desktop client.
-    spotifast.url = "github:crmne/spotifast/v0.12.0";
+    spotifast.url = "github:crmne/spotifast/v0.13.2";
     try-rs = {
       url = "github:phonkd/try-rs";
       inputs.nixpkgs.follows = "nixpkgs";
