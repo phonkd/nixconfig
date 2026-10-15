@@ -34,6 +34,7 @@
         inputs.wutchatwusdat.packages.${pkgs.system}.default
       ];
       programs.zsh.shellAliases.wcwd = "wutchatwusdat";
+      programs.zsh.shellAliases.codex = "codex --approve-for-me";
     };
   flake.homeModules.gui-nixos =
     {
