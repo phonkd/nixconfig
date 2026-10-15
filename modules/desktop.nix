@@ -47,6 +47,9 @@
         # Daily-updated Claude Code from llm-agents.nix (see flake.nix).
         inputs.llm-agents.packages.${pkgs.system}.claude-code
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.codex
+        # REA's native analysis provider needs Ghidra 12.1 and a full JDK.
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.ghidra
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jdk21
       ];
       qt = {
         enable = true;
