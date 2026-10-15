@@ -171,6 +171,8 @@
       programs.steam.enable = true;
       services.hardware.bolt.enable = true;
       services.gvfs.enable = true;
+      # Nautilus uses Sushi for Finder-style previews of the selection on Space.
+      services.gnome.sushi.enable = true;
 
       # --- Desktop baseline (no DE provides these) -----------------------
       # upower: battery/AC state on D-Bus, read by the status bar.
