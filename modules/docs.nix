@@ -239,28 +239,32 @@ in
         hash = "sha256-vBMuP43qWgXDlD2nmCLZLtfzIYRW6wUb2B0R1PBYARQ=";
       };
       pname = "affine";
+      extracted = pkgs.appimageTools.extract { inherit pname version src; };
     in
     {
       home.packages = [
         (pkgs.appimageTools.wrapType2 {
           inherit pname version src;
+          # Under Hyprland Electron finds no keyring backend and falls back
+          # to basic_text, so AFFiNE drops its login on every exit.
+          # gnome-keyring already serves Secret Service (modules/desktop.nix);
+          # name it. On the binary itself, not the desktop entry: launches
+          # that bypass the entry (a shell, an affine:// link, a relaunch)
+          # otherwise lose it. wrapType2's own runScript plus the flag.
+          runScript = "appimage-exec.sh -w ${extracted} -- --password-store=gnome-libsecret";
           extraInstallCommands = ''
-            install -Dm444 ${
-              pkgs.appimageTools.extract { inherit pname version src; }
-            }/affine-electron.png $out/share/icons/hicolor/512x512/apps/affine.png
+            install -Dm444 ${extracted}/affine-electron.png \
+              $out/share/icons/hicolor/512x512/apps/affine.png
           '';
         })
       ];
 
-      # Under Hyprland Electron finds no keyring backend and falls back to
-      # basic_text, so AFFiNE drops its login on every exit. gnome-keyring
-      # already serves Secret Service (modules/desktop.nix); name it. Also
+      # The AppImage ships no desktop entry outside the image. This one also
       # registers the affine:// handler that sign-in redirects back through.
-      # Launch from the menu: a bare `affine` in a shell skips the flag.
       xdg.desktopEntries.affine = {
         name = "AFFiNE";
         comment = "AFFiNE Desktop App";
-        exec = "affine --password-store=gnome-libsecret %U";
+        exec = "affine %U";
         icon = "affine";
         terminal = false;
         categories = [ "Utility" ];
