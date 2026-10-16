@@ -91,6 +91,21 @@
         pkgs.affine
         pkgs.projectm-sdl-cpp
       ];
+      # Under Hyprland Electron finds no keyring backend and falls back to
+      # basic_text, so AFFiNE drops its login on every exit. gnome-keyring
+      # already serves Secret Service (modules/desktop.nix); name it. Same id
+      # as the package's entry, so this one shadows it and keeps the
+      # affine:// handler that sign-in redirects back through.
+      home-manager.users.phonkd.xdg.desktopEntries.affine = {
+        name = "AFFiNE";
+        comment = "AFFiNE Desktop App";
+        exec = "affine --password-store=gnome-libsecret %U";
+        icon = "affine";
+        terminal = false;
+        categories = [ "Utility" ];
+        mimeType = [ "x-scheme-handler/affine" ];
+        settings.StartupWMClass = "affine";
+      };
       systemd.tmpfiles.rules = [
         "d /home/phonkd/.config/projectM 0755 phonkd users -"
         "C /home/phonkd/.config/projectM/projectMSDL.properties 0644 phonkd users - ${projectMDefaults}"
