@@ -7,7 +7,7 @@
   # so containers run as the calling user and $HOME/uid map straight through
   # (needs no manual /etc/subuid: autoSubUidGidRange defaults true). Servers
   # stay out of scope: 201 already enables podman on its own terms for
-  # homelab/apps/affine.nix's oci-containers stack.
+  # docs.nix's oci-containers stack (AFFiNE).
   #
   # Wired via builder.nix alwaysImport; self-gates on host.is.nixosDesktop.
   flake.nixosModules.containers =

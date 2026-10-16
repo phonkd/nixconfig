@@ -87,40 +87,8 @@
       # Esc opens the built-in preset browser/settings. The package has no
       # desktop entry; capture playback through PipeWire's PulseAudio server.
       environment.systemPackages = [
-        # Upstream's AppImage, not nixpkgs' `affine`: that is still 0.26, and
-        # a 0.26 client can't sign in to the 0.27 server on 203 (it ignores
-        # the password method and asks for an email code the server can't
-        # send). Keep the version in step with the server image in
-        # modules/homelab/apps/affine.nix. Desktop entry is below.
-        (pkgs.appimageTools.wrapType2 rec {
-          pname = "affine";
-          version = "0.27.3";
-          src = pkgs.fetchurl {
-            url = "https://github.com/toeverything/AFFiNE/releases/download/v${version}/affine-${version}-stable-linux-x64.appimage";
-            hash = "sha256-vBMuP43qWgXDlD2nmCLZLtfzIYRW6wUb2B0R1PBYARQ=";
-          };
-          extraInstallCommands = ''
-            install -Dm444 ${
-              pkgs.appimageTools.extract { inherit pname version src; }
-            }/affine-electron.png $out/share/icons/hicolor/512x512/apps/affine.png
-          '';
-        })
         pkgs.projectm-sdl-cpp
       ];
-      # Under Hyprland Electron finds no keyring backend and falls back to
-      # basic_text, so AFFiNE drops its login on every exit. gnome-keyring
-      # already serves Secret Service (modules/desktop.nix); name it. Also
-      # registers the affine:// handler that sign-in redirects back through.
-      home-manager.users.phonkd.xdg.desktopEntries.affine = {
-        name = "AFFiNE";
-        comment = "AFFiNE Desktop App";
-        exec = "affine --password-store=gnome-libsecret %U";
-        icon = "affine";
-        terminal = false;
-        categories = [ "Utility" ];
-        mimeType = [ "x-scheme-handler/affine" ];
-        settings.StartupWMClass = "AFFiNE";
-      };
       systemd.tmpfiles.rules = [
         "d /home/phonkd/.config/projectM 0755 phonkd users -"
         "C /home/phonkd/.config/projectM/projectMSDL.properties 0644 phonkd users - ${projectMDefaults}"

@@ -74,7 +74,7 @@ let
     homelab-ocis
     homelab-immich
     homelab-garage
-    homelab-affine
+    docs-server # AFFiNE; routing on "reverse-proxy", workload on "media-server"
     homelab-hermes
 
     # Observability stack (server + VPN gated on "observability-server",

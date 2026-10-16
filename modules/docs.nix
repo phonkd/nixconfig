@@ -1,6 +1,21 @@
-# AFFiNE -- self-hosted block-based docs/whiteboard workspace. Routing and
-# dashboard on 201 (reverse-proxy), workload on 203-media, split the same way
-# as ocis.nix / immich.nix. Additive to homelab-notes; nothing migrates.
+# AFFiNE -- self-hosted block-based docs/whiteboard workspace, and the
+# desktop client that talks to it.
+#
+# Both halves live here, the way modules/chat.nix keeps its server and client
+# together:
+#
+#   flake.nixosModules.docs-server -- routing + dashboard on 201
+#                                     (reverse-proxy), workload on 203-media,
+#                                     split the same way as ocis.nix /
+#                                     immich.nix. Additive to homelab-notes;
+#                                     nothing migrates.
+#   flake.homeModules.docs         -- the Linux desktop client
+#
+# The client MUST track the server's version: a 0.26 client against the 0.27
+# server ignores the password method and falls back to an email code, which
+# this server can't send (no mailer configured). Both read `version` below,
+# so a bump moves them together -- update both hashes. The Mac client is the
+# `affine` cask in modules/hosts/types/gui, which tracks upstream's latest.
 #
 # nixpkgs has no AFFiNE *server* (`pkgs.affine`/`affine-bin` is the Electron
 # desktop client), so this runs under oci-containers -- the only container in
@@ -19,8 +34,12 @@
   inputs,
   ...
 }:
+let
+  version = "0.27.3";
+in
 {
-  flake.nixosModules."homelab-affine" =
+  # ── server half ───────────────────────────────────────────────────────
+  flake.nixosModules.docs-server =
     {
       config,
       pkgs,
@@ -38,7 +57,7 @@
       # Pinned, not upstream's floating `stable` tag: that would move version
       # under us on any container restart and re-run migrations unattended.
       # Bumping = new tag AND new digest (skopeo inspect docker://<image>).
-      image = "ghcr.io/toeverything/affine:0.27.3@sha256:d9d145f9f47b862d1fa96e2a887052b5762846237f75fbb077be990ef646e05c";
+      image = "ghcr.io/toeverything/affine:${version}@sha256:d9d145f9f47b862d1fa96e2a887052b5762846237f75fbb077be990ef646e05c";
 
       # Env var names verified against v0.27.3's own config definitions
       # (packages/backend/server/src/{core/config,base/redis,base/prisma}/config.ts),
@@ -207,4 +226,46 @@
         };
       })
     ];
+
+  # ── client half ───────────────────────────────────────────────────────
+  # Imported from flake.homeModules.gui-nixos (modules/hosts/types/gui).
+  flake.homeModules.docs =
+    { pkgs, ... }:
+    let
+      # Upstream's AppImage, not nixpkgs' `affine`: that is still 0.26 (see
+      # the version note at the top).
+      src = pkgs.fetchurl {
+        url = "https://github.com/toeverything/AFFiNE/releases/download/v${version}/affine-${version}-stable-linux-x64.appimage";
+        hash = "sha256-vBMuP43qWgXDlD2nmCLZLtfzIYRW6wUb2B0R1PBYARQ=";
+      };
+      pname = "affine";
+    in
+    {
+      home.packages = [
+        (pkgs.appimageTools.wrapType2 {
+          inherit pname version src;
+          extraInstallCommands = ''
+            install -Dm444 ${
+              pkgs.appimageTools.extract { inherit pname version src; }
+            }/affine-electron.png $out/share/icons/hicolor/512x512/apps/affine.png
+          '';
+        })
+      ];
+
+      # Under Hyprland Electron finds no keyring backend and falls back to
+      # basic_text, so AFFiNE drops its login on every exit. gnome-keyring
+      # already serves Secret Service (modules/desktop.nix); name it. Also
+      # registers the affine:// handler that sign-in redirects back through.
+      # Launch from the menu: a bare `affine` in a shell skips the flag.
+      xdg.desktopEntries.affine = {
+        name = "AFFiNE";
+        comment = "AFFiNE Desktop App";
+        exec = "affine --password-store=gnome-libsecret %U";
+        icon = "affine";
+        terminal = false;
+        categories = [ "Utility" ];
+        mimeType = [ "x-scheme-handler/affine" ];
+        settings.StartupWMClass = "AFFiNE";
+      };
+    };
 }

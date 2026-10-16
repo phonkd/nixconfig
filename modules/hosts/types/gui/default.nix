@@ -51,6 +51,7 @@
         self.homeModules.hyprland-session
         self.homeModules.gaming
         self.homeModules.chat
+        self.homeModules.docs
         inputs.nix-index-database.homeModules.default
         { programs.nix-index-database.comma.enable = true; }
         self.homeModules.zed-editor
@@ -135,10 +136,10 @@
         "firefox"
         "android-platform-tools"
         "obsidian"
-        # Client for the self-hosted AFFiNE on 201 (plans/affine.md). A
-        # cask, not nixpkgs' `affine`: HM's store-symlink apps aren't
-        # Spotlight-indexed on Tahoe. Also tracks 0.27.3, the version the
-        # server runs (nixpkgs is on 0.26.6).
+        # Client for the self-hosted AFFiNE (modules/docs.nix, whose
+        # homeModules.docs is the Linux client). A cask, not nixpkgs'
+        # `affine`: HM's store-symlink apps aren't Spotlight-indexed on
+        # Tahoe, and nixpkgs is on 0.26, too old for the 0.27 server.
         "affine"
         "spotify"
         "claude-code@latest"
