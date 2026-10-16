@@ -86,7 +86,11 @@
       # projectM 4 matches Spotifast's engine API and fractional fade duration.
       # Esc opens the built-in preset browser/settings. The package has no
       # desktop entry; capture playback through PipeWire's PulseAudio server.
-      environment.systemPackages = [ pkgs.projectm-sdl-cpp ];
+      environment.systemPackages = [
+        # Native Electron build; the Flatpak and PWA lose keyboard shortcuts.
+        pkgs.affine
+        pkgs.projectm-sdl-cpp
+      ];
       systemd.tmpfiles.rules = [
         "d /home/phonkd/.config/projectM 0755 phonkd users -"
         "C /home/phonkd/.config/projectM/projectMSDL.properties 0644 phonkd users - ${projectMDefaults}"
