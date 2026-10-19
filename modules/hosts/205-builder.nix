@@ -35,6 +35,7 @@
         security.sudo.wheelNeedsPassword = false;
         networking.networkmanager.dhcp = "internal";
         networking.firewall.allowedTCPPorts = [ 22 ];
+        boot.loader.grub.configurationLimit = 10;
 
         # Droid profile targets aarch64-linux; register qemu-user so Nix can
         # build its activation closure on this x86_64 builder.
