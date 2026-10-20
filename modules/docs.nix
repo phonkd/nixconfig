@@ -63,6 +63,13 @@ in
       # (packages/backend/server/src/{core/config,base/redis,base/prisma}/config.ts),
       # not from the docs site.
       environment = {
+        # v0.27.3 includes MCP create/update tools, but gates both those tools
+        # and READ_WRITE credentials on env.namespaces.canary (AFFINE_ENV=dev).
+        # This selects the feature namespace, not NODE_ENV=development.
+        AFFINE_ENV = "dev";
+        NODE_ENV = "production";
+        DEPLOYMENT_TYPE = "selfhosted";
+
         # The password is ignored -- pg_hba below grants `trust` for this
         # role/db over loopback, mirroring upstream compose's
         # POSTGRES_HOST_AUTH_METHOD: trust. It is present only because the
