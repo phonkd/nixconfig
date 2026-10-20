@@ -118,8 +118,20 @@
       # Desktop environment name comes from the registry (noughty.host.desktop);
       # this module is the single place mapping it onto GDM/SDDM etc.
       de = config.noughty.host.desktop;
+      betterbirdProfiles = {
+        z14 = "18ry4efv.default-default";
+        blac = "i7u9sccx.default-default";
+      };
+      betterbirdProfile = betterbirdProfiles.${config.noughty.host.name} or null;
     in
     lib.mkIf config.noughty.host.is.nixosDesktop {
+      home-manager.users.phonkd.home.file = lib.mkIf (betterbirdProfile != null) {
+        ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/user.js".source =
+          inputs.betterbird-theme + "/theme/user.js";
+        ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/chrome/userChrome.css".source =
+          inputs.betterbird-theme + "/theme/userChrome.css";
+      };
+
       # --- Desktop environment selection (driven by registry) ----------
       services.xserver.enable = true;
       services.displayManager.gdm.enable = lib.mkIf (de == "gnome") true;

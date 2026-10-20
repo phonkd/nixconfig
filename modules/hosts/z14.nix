@@ -11,7 +11,7 @@
 #
 # tlp stays off: it and power-profiles-daemon (enabled in modules/desktop.nix)
 # fight over the same CPU governor.
-{ self, inputs, ... }:
+{ self, ... }:
 {
   flake.nixosModules.z14 =
     {
@@ -104,12 +104,6 @@
 
       # Use Betterbird for mail on this laptop; Owl is its Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
-      home-manager.users.phonkd.home.file = {
-        ".var/app/eu.betterbird.Betterbird/.thunderbird/18ry4efv.default-default/user.js".source =
-          inputs.betterbird-theme + "/theme/user.js";
-        ".var/app/eu.betterbird.Betterbird/.thunderbird/18ry4efv.default-default/chrome/userChrome.css".source =
-          inputs.betterbird-theme + "/theme/userChrome.css";
-      };
       services.flatpak.packages = [
         {
           appId = "eu.betterbird.Betterbird";
