@@ -57,7 +57,7 @@
         self.homeModules.zed-editor
       ];
       home.packages = [
-        inputs.llm-agents.packages.${pkgs.system}.opencode
+        inputs.llm-agents.packages.${pkgs.system}.opencode2
         pkgs.distrobox
         pkgs.distrobox-tui
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.heidisql

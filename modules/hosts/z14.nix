@@ -109,6 +109,10 @@
           appId = "eu.betterbird.Betterbird";
           origin = "flathub";
         }
+        {
+          appId = "org.onlyoffice.desktopeditors";
+          origin = "flathub";
+        }
       ];
 
       noughty.proxy.protonReddit.enable = true;
