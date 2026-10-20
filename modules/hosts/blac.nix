@@ -14,6 +14,15 @@
       # Shared desktop baseline lives in modules/desktop.nix, gated on
       # noughty.host.is.nixosDesktop.
 
+      # Match z14's mail client; Owl is Betterbird's Exchange add-on.
+      home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
+      services.flatpak.packages = [
+        {
+          appId = "eu.betterbird.Betterbird";
+          origin = "flathub";
+        }
+      ];
+
       # SSH access (e.g. from the Mac). openssh opens port 22 itself.
       services.openssh = {
         enable = true;

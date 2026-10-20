@@ -34,6 +34,7 @@
       # The only session on this host now (KDE dropped). See modules/hyprland/
       # and plans/hyprland.md.
       "hyprland"
+      "work"
     ];
     username = "phonkd";
 
