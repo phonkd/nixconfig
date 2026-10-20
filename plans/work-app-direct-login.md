@@ -1,6 +1,6 @@
 # Direct login for Betterbird and Teams
 
-**Repo(s):** nixconfig   **Status:** in-progress
+**Repo(s):** nixconfig   **Status:** done
 
 ## Goal
 
@@ -20,7 +20,15 @@ with existing user settings, preserving the configured user agent.
 
 - [x] Add the two app settings and check syntax and the diff.
 - [x] Commit on local main without pushing.
-- [ ] Rebuild the current desktop (blac) and inspect the installed settings.
+- [x] Rebuild the current desktop (blac) and inspect the installed settings.
+
+## Verification
+
+Both changed Nix modules parse cleanly. The blac build and switch succeeded;
+the installed Betterbird `user.js` sets `network.proxy.type` to `0` and
+`/etc/teams-for-linux/config.json` sets `proxyServer` to `direct://`. The shared
+sing-box configuration is byte-identical to the previous configuration.
+Interactive login remains for the user after restarting the apps.
 
 ## Risks / rollout
 
