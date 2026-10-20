@@ -219,6 +219,14 @@
         # `$http_proxy` goes direct. modules/proxy/nixos.nix has the why.
         noughty.proxy.enable = true;
 
+        # Teams login must reach the external endpoint even when Bedag's
+        # domain rules select an internal tunnel. The app passes this native
+        # setting to Chromium's --proxy-server; direct:// bypasses the proxy.
+        # User settings (such as the sign-in user agent) merge with this file.
+        environment.etc."teams-for-linux/config.json".text = builtins.toJSON {
+          proxyServer = "direct://";
+        };
+
         home-manager.users.${config.noughty.user.name}.imports = [
           self.homeModules.work
           self.homeModules.work-ssh-bypass

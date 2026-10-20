@@ -126,8 +126,13 @@
     in
     lib.mkIf config.noughty.host.is.nixosDesktop {
       home-manager.users.phonkd.home.file = lib.mkIf (betterbirdProfile != null) {
-        ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/user.js".source =
-          inputs.betterbird-theme + "/theme/user.js";
+        ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/user.js".text =
+          builtins.readFile (inputs.betterbird-theme + "/theme/user.js")
+          + lib.optionalString config.noughty.proxy.enable ''
+
+            // Work login must use the external endpoint, bypassing Bedag's proxy rules.
+            user_pref("network.proxy.type", 0);
+          '';
         ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/chrome/userChrome.css".source =
           inputs.betterbird-theme + "/theme/userChrome.css";
       };
