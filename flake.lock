@@ -33,6 +33,22 @@
         "type": "github"
       }
     },
+    "betterbird-theme": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1791304369,
+        "narHash": "sha256-5BRzMbIv4kwg+p3CboiaBrDp8OYK9XbsadtnEDL8HSs=",
+        "ref": "refs/heads/main",
+        "rev": "b71717c3e18512f678efebeb0b3d6c6a3b849bc6",
+        "revCount": 1,
+        "type": "git",
+        "url": "ssh://git@github.com/phonkd/betterbird-theme.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/phonkd/betterbird-theme.git"
+      }
+    },
     "blobs": {
       "flake": false,
       "locked": {
@@ -1736,6 +1752,7 @@
     },
     "root": {
       "inputs": {
+        "betterbird-theme": "betterbird-theme",
         "caelestia": "caelestia",
         "clan-core": "clan-core",
         "claude-codex": "claude-codex",

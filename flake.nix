@@ -109,6 +109,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     nix-flatpak.url = "github:gmodena/nix-flatpak/v0.7.0";
+    betterbird-theme = {
+      url = "git+ssh://git@github.com/phonkd/betterbird-theme.git";
+      flake = false;
+    };
     kubectl-aliases = {
       url = "github:phonkd/kubectl-aliases";
       inputs.nixpkgs.follows = "nixpkgs";
