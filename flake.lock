@@ -2293,11 +2293,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791192603,
-        "narHash": "sha256-E9+iEU5vmCmVrEFrm8TTuA/VZcxgXkg71DnmahQChfo=",
+        "lastModified": 1792515153,
+        "narHash": "sha256-HB96t97wyMaIM3/30cqQx1oUx8MnlYb1nBZFTUmhxYU=",
         "owner": "phonkd",
         "repo": "wutchatwusdat",
-        "rev": "ff0dea07ef64f1e5de45505acfbdf77adcf04871",
+        "rev": "6ff0309948269d56634563396bca087274f8e032",
         "type": "github"
       },
       "original": {
