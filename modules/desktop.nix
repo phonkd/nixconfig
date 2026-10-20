@@ -131,6 +131,11 @@
         ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/chrome/userChrome.css".source =
           inputs.betterbird-theme + "/theme/userChrome.css";
       };
+      # Home Manager links profile files into /nix/store; Betterbird's Flatpak
+      # needs read access there to follow the links.
+      services.flatpak.overrides = lib.mkIf (betterbirdProfile != null) {
+        "eu.betterbird.Betterbird".Context.filesystems = [ "/nix/store:ro" ];
+      };
 
       # --- Desktop environment selection (driven by registry) ----------
       services.xserver.enable = true;
