@@ -9,6 +9,10 @@
         "${inputs.nixpkgs-unstable}/nixos/modules/services/misc/cliproxyapi.nix"
       ];
 
+      # This newer module adds manual anchors absent from stable's redirect
+      # table. The manual can still build without validating that table.
+      documentation.nixos.checkRedirects = false;
+
       sops.secrets.cliproxyapi-api-key = {
         restartUnits = [ "cliproxyapi.service" ];
       };

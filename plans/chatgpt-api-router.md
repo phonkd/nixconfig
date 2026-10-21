@@ -21,7 +21,7 @@ Keep refreshed OAuth credentials in the service's private state directory.
 
 - [x] Check existing adapters, native module options, upstream config, and ports.
 - [x] Add the service, encrypted keys, and internal route.
-- [ ] Parse changed Nix files, review wiring, and commit on main without pushing.
+- [x] Parse changed Nix files, review wiring, and commit on main without pushing.
 - [ ] Deploy 201 and verify routing, authentication, and service health.
 - [ ] Complete ChatGPT OAuth enrollment with the user and verify an inference request.
 
@@ -38,3 +38,8 @@ Deploy with `deploy 201` after committing. Check existing Traefik service health
 as well as the new endpoint. Disable the new service and registry entry and
 redeploy to roll back. OAuth sign-in requires the account owner's browser approval;
 never store OAuth tokens in the repository or Nix store.
+
+The first deploy stopped before activation because stable's NixOS manual redirect
+table lacks the newer module's anchors. Set the native
+`documentation.nixos.checkRedirects = false` option on this host to permit the
+mixed-version manual. No package patch or custom unit is needed.
