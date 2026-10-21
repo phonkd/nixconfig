@@ -59,6 +59,20 @@ in
       # Bumping = new tag AND new digest (skopeo inspect docker://<image>).
       image = "ghcr.io/toeverything/affine:${version}@sha256:d9d145f9f47b862d1fa96e2a887052b5762846237f75fbb077be990ef646e05c";
 
+      # v0.27.3 reads this native config path for the Copilot/BYOK policy.
+      # The subscription router resolves to a tailnet IP, so both custom
+      # endpoints and private targets must be enabled for workspace BYOK.
+      copilotConfig = (pkgs.formats.json { }).generate "affine-copilot-config.json" {
+        copilot = {
+          enabled = true;
+          byok = {
+            enabled = true;
+            allowCustomEndpoint = true;
+            allowPrivateEndpoint = true;
+          };
+        };
+      };
+
       # Env var names verified against v0.27.3's own config definitions
       # (packages/backend/server/src/{core/config,base/redis,base/prisma}/config.ts),
       # not from the docs site.
@@ -100,6 +114,7 @@ in
       volumes = [
         "${dataDir}/storage:/root/.affine/storage"
         "${dataDir}/config:/root/.affine/config"
+        "${copilotConfig}:/root/.affine/config/config.json:ro"
       ];
 
       # The migration one-shot runs the same image with the same env/volumes,
