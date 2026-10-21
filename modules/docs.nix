@@ -18,8 +18,8 @@
 # `affine` cask in modules/hosts/types/gui, which tracks upstream's latest.
 #
 # nixpkgs has no AFFiNE *server* (`pkgs.affine`/`affine-bin` is the Electron
-# desktop client), so this runs under oci-containers -- the only container in
-# this config. podman, not docker: docker's daemon installs its own iptables
+# desktop client), so this and its search backend run under oci-containers.
+# podman, not docker: docker's daemon installs its own iptables
 # chains and bridge, and both candidate hosts are routing-sensitive (201 does
 # NAT for wg0 and is the tailscale exit node, 203 runs a ProtonVPN full tunnel
 # whose ip rules must stay below Tailscale's) -- podman with --network=host
@@ -109,9 +109,11 @@ in
         LISTEN_ADDR = "0.0.0.0";
         AFFINE_SERVER_PORT = toString port;
 
-        # Matches upstream's compose: the indexer wants Elasticsearch, which we
-        # do not run. Costs server-side full-text search across docs.
-        AFFINE_INDEXER_ENABLED = "false";
+        # Intelligence's document search needs this lexical index when no
+        # embedding provider is configured. Native jobs index existing docs.
+        AFFINE_INDEXER_ENABLED = "true";
+        AFFINE_INDEXER_SEARCH_PROVIDER = "manticoresearch";
+        AFFINE_INDEXER_SEARCH_ENDPOINT = "http://127.0.0.1:9308";
       };
 
       volumes = [
@@ -185,8 +187,27 @@ in
         virtualisation.podman.enable = true;
         virtualisation.oci-containers.backend = "podman";
 
+        # Upstream AFFiNE 0.27.4 uses this version. nixpkgs' Manticore omits
+        # jieba, required by AFFiNE's multilingual table definitions.
+        virtualisation.oci-containers.containers.affine-search = {
+          image = "docker.io/manticoresearch/manticore:10.1.0@sha256:958f201e06390ca1ab9874c3033ca7c7b2570eb1fe14b9e5c51f53f44d416297";
+          environment.searchd_listen = "127.0.0.1:9306:mysql41|127.0.0.1:9308:http";
+          volumes = [ "${dataDir}/search:/var/lib/manticore" ];
+          podman.sdnotify = "healthy";
+          extraOptions = [
+            "--network=host"
+            "--health-cmd=mysql --protocol=tcp -h127.0.0.1 -P9306 -e 'SELECT 1'"
+            "--health-interval=5s"
+            "--health-retries=12"
+            "--ulimit=nofile=65535:65535"
+            "--ulimit=nproc=65535:65535"
+            "--ulimit=memlock=-1:-1"
+          ];
+        };
+
         virtualisation.oci-containers.containers.affine = {
           inherit image environment volumes;
+          dependsOn = [ "affine-search" ];
           extraOptions = [ "--network=host" ];
           autoStart = true;
         };
@@ -195,6 +216,7 @@ in
           "d ${dataDir} 0750 root root -"
           "d ${dataDir}/storage 0750 root root -"
           "d ${dataDir}/config 0750 root root -"
+          "d ${dataDir}/search 0750 root root -"
         ];
 
         # `CREATE EXTENSION` needs superuser, and the affine role is not one --
@@ -227,11 +249,13 @@ in
             "postgresql-setup.service"
             "redis-affine.service"
             "affine-pgvector.service"
+            "podman-affine-search.service"
           ];
           after = [
             "postgresql-setup.service"
             "redis-affine.service"
             "affine-pgvector.service"
+            "podman-affine-search.service"
             "network-online.target"
           ];
           wants = [ "network-online.target" ];
