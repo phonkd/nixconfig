@@ -38,6 +38,11 @@
         # dedicated service account, boot-time sign-in or enrollment command.
         systemd.packages = [ cfg.package ];
         services.gnome.gnome-keyring.enable = true;
+        # The native broker's WebKitGTK sign-in needs GIO's dynamically loaded
+        # TLS backend. Linking WebKit alone doesn't expose it in a Hyprland
+        # session: without this, HTTPS fails with G_TLS_ERROR_UNAVAILABLE (0)
+        # and the broker displays error 4b25j before sign-in can proceed.
+        services.gnome.glib-networking.enable = true;
 
         # Reproduce only the directory creation from the official 3.0.2 DEB's
         # postinst. Its actual key paths differ from the release-note text.

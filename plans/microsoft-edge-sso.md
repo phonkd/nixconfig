@@ -63,3 +63,19 @@ never delete keyrings or device keys as part of activation/rollback.
   sign-in, graphical broker UI and next-day renewal using
   `docs/microsoft-edge-sso.md`. No token acquisition, join or enrollment has
   been performed during implementation.
+
+### Interactive follow-up: error 4b25j
+
+- User activated the initial configuration; both broker interfaces work and the
+  root device service runs. Edge reaches the broker's interactive method.
+- The sign-in WebKit window fails before authentication with
+  `g-tls-error-quark` code 0 (TLS provider unavailable). The running broker's
+  GIO module path lacks glib-networking.
+- Enabled the native `services.gnome.glib-networking` option. No override or
+  custom wrapper. With the broker's actual GLib, TLS support changes from false
+  to true; a certificate-validated connection to Microsoft's public login host
+  succeeds without requesting authentication. NixOS assertions/parse/format
+  checks pass, and the evaluated session environment includes the provider.
+- Local sudo authentication is still required to activate this fix. Rebuild
+  and reboot (or restart the full session and broker), then manually retry the
+  sign-in. Authenticated renewal remains unverified.

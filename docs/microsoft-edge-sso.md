@@ -16,6 +16,9 @@ currently `z14` and `blac`. Servers and macOS are unaffected.
 - GNOME Keyring provides Secret Service; greetd's existing PAM integration
   unlocks the login keyring. Its password must match the login password.
   Passwordless login does not automatically unlock a password-protected keyring.
+- `services.gnome.glib-networking` exposes GIO's dynamically loaded TLS provider
+  to the session. The broker's WebKitGTK needs this to load HTTPS sign-in pages;
+  having all ELF libraries present is not sufficient.
 - `/etc/opt/edge/policies/recommended/nixconfig.json` recommends ordinary cookie
   storage and no clearing of browsing data at exit. These are defaults, not
   mandatory policy overrides. Existing user preferences and organization policies
@@ -196,6 +199,31 @@ authentication path accepts NixOS; authenticated renewal remains a manual test.
 
 ## Validation record
 
+### First interactive test: fixed missing TLS provider
+
+The initial deployment successfully activated both broker components. Edge
+called `getAccounts`, `acquireTokenSilently` and `acquireTokenInteractively`, and
+the broker created its GTK/WebKit window. The interactive request then failed
+with `4b25j`: its log reported `g-tls-error-quark`, code `0`, which means
+[no TLS provider is available](https://docs.gtk.org/gio/error.TlsError.html).
+The live broker's `GIO_EXTRA_MODULES` contained gvfs and dconf, but no
+glib-networking TLS backend. This is a local runtime dependency failure, not
+evidence that the tenant rejected authentication.
+
+The module now enables the existing NixOS `services.gnome.glib-networking`
+option. Testing the broker's actual GLib with the host's provider changes
+`g_tls_backend_supports_tls` from false to true. A certificate-validated TLS
+connection to `login.microsoftonline.com:443` also succeeds with that provider;
+no credentials or authentication requests were sent by that test. Configuration
+evaluation confirms the provider is included in the session environment.
+
+After rebuilding this fix, restart the graphical session and its broker before
+retrying. Rebooting is the simplest way to ensure no old broker or D-Bus
+activation environment survives. The change neither disables certificate
+validation nor modifies keyrings/device state.
+
+### Initial implementation checks
+
 Passed on z14:
 
 - Parsing both changed Nix files; formatting the new module; diff whitespace
@@ -220,9 +248,10 @@ nix build --impure --no-link \
   .#nixosConfigurations.z14.config.home-manager.users.phonkd.programs.microsoft-edge.finalPackage
 ```
 
-**Not yet verified:** privileged system activation/system-bus startup, Edge's
-effective policy UI, interactive Wayland authentication, authenticated Edge-to-
-broker exchange, tenant acceptance, or token renewal across days. `sudo -n true`
-reports that a password is required, so system activation must be run locally.
-No Microsoft sign-in, device join or enrollment was attempted. See
+**Confirmed after deployment:** system-bus startup, Edge-to-broker requests and
+creation of the interactive GTK/WebKit window. **Still unverified:** effective
+Edge policies, successful authentication after the TLS fix, tenant acceptance,
+or token renewal across days. `sudo -n true` still reports that a password is
+required, so activation of the fix must be run locally. The agent has not
+performed a Microsoft sign-in, device join or enrollment. See
 `plans/microsoft-edge-sso.md` for rollout status.
