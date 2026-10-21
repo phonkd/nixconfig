@@ -35,7 +35,7 @@
   ...
 }:
 let
-  version = "0.27.3";
+  version = "0.27.4";
 in
 {
   # ── server half ───────────────────────────────────────────────────────
@@ -57,9 +57,9 @@ in
       # Pinned, not upstream's floating `stable` tag: that would move version
       # under us on any container restart and re-run migrations unattended.
       # Bumping = new tag AND new digest (skopeo inspect docker://<image>).
-      image = "ghcr.io/toeverything/affine:${version}@sha256:d9d145f9f47b862d1fa96e2a887052b5762846237f75fbb077be990ef646e05c";
+      image = "ghcr.io/toeverything/affine:${version}@sha256:b649f5ce2384ffdf13c23bccf81d759e15973d59d0b0058af65d895a84373099";
 
-      # v0.27.3 reads this native config path for the Copilot/BYOK policy.
+      # Both runtimes read this native config for the Copilot/BYOK policy.
       # The subscription router resolves to a tailnet IP, so both custom
       # endpoints and private targets must be enabled for workspace BYOK.
       copilotConfig = (pkgs.formats.json { }).generate "affine-copilot-config.json" {
@@ -83,6 +83,9 @@ in
         AFFINE_ENV = "dev";
         NODE_ENV = "production";
         DEPLOYMENT_TYPE = "selfhosted";
+        # 0.27.4's Rust BYOK runtime otherwise searches /app and the
+        # executable directory, missing the Node server's config mount.
+        AFFINE_BACKEND_RUNTIME_CONFIG_PATH = "/root/.affine/config/config.json";
 
         # The password is ignored -- pg_hba below grants `trust` for this
         # role/db over loopback, mirroring upstream compose's
@@ -258,7 +261,7 @@ in
       # the version note at the top).
       src = pkgs.fetchurl {
         url = "https://github.com/toeverything/AFFiNE/releases/download/v${version}/affine-${version}-stable-linux-x64.appimage";
-        hash = "sha256-vBMuP43qWgXDlD2nmCLZLtfzIYRW6wUb2B0R1PBYARQ=";
+          hash = "sha256-EC/wk+o69wZ4k+dq6FuKXVgYqpLIeF05kxK9j0aPXKw=";
       };
       pname = "affine";
       extracted = pkgs.appimageTools.extract { inherit pname version src; };
