@@ -34,7 +34,14 @@ No paid API fallback is configured. Available models and limits follow the accou
 
 ## Rollout / rollback
 
-Deploy with `deploy 201` after committing. Check existing Traefik service health
+Deploy after committing. Use the LAN SSH path through 203 if activation may
+restart Tailscale, even when its package version is unchanged:
+
+```sh
+deploy 201 --hostname 192.168.3.201 --ssh-opts "-o ConnectTimeout=10 -o BatchMode=yes -o ProxyCommand='ssh -o ConnectTimeout=8 -o BatchMode=yes 203-media nc %h %p'"
+```
+
+Check existing Traefik service health
 as well as the new endpoint. Disable the new service and registry entry and
 redeploy to roll back. OAuth sign-in requires the account owner's browser approval;
 never store OAuth tokens in the repository or Nix store.
@@ -44,3 +51,25 @@ table lacks the newer module's anchors. Set the native
 `documentation.nixos.checkRedirects = false` option and register the module with
 `documentation.nixos.extraModules` so its option references are included in the
 mixed-version manual. No package patch or custom unit is needed.
+
+The first activation restarted Tailscale and interrupted deploy's SSH session,
+leaving services stopped despite deploy reporting rollback. Completed the current
+generation's activation over the LAN path with `switch-to-configuration switch`,
+restored DNS and all enabled services, then retried certificate/catalog downloads.
+ChatGPT device enrollment succeeded with the user's browser approval.
+
+## Client setup and operations
+
+- Base URL: `https://models.home.phonkd.net/v1` (tailnet access required).
+- API key: the sops entry `cliproxyapi-api-key`. Retrieve from this checkout with
+  `sops decrypt --extract '["cliproxyapi-api-key"]' modules/homelab/global-secrets/secret.yaml`.
+- Management UI: `https://models.home.phonkd.net/management.html`; its separate
+  key is the sops entry `cliproxyapi-management-key`.
+- Discover available model IDs with authenticated `GET /v1/models`.
+- Enroll or renew the account on the host with
+  `sudo -H -u cliproxyapi cliproxyapi -config /var/lib/cliproxyapi/config.yaml -codex-device-login -no-browser`
+  from a directory readable by the service user, such as `/var/lib`.
+  Complete the device approval in the account owner's browser. The service
+  watches its OAuth directory and picks up the credential without a restart.
+- Configuration is declarative: management UI config edits are overwritten on
+  restart. Provider OAuth tokens remain in `/var/lib/cliproxyapi`.
