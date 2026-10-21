@@ -37,8 +37,22 @@ No paid API fallback is configured. Available models and limits follow the accou
 Deploy after committing. Use the LAN SSH path through 203 if activation may
 restart Tailscale, even when its package version is unchanged:
 
+Put the connection in an SSH config file (deploy-rs splits `--ssh-opts` on spaces,
+so a quoted inline ProxyCommand does not survive activation):
+
+```sshconfig
+Host 192.168.3.201
+  User phonkd
+  ConnectTimeout 10
+  BatchMode yes
+  ProxyCommand ssh -o ConnectTimeout=8 -o BatchMode=yes 203-media nc %h %p
+
+Host *
+  Include /home/phonkd/.ssh/config
+```
+
 ```sh
-deploy 201 --hostname 192.168.3.201 --ssh-opts "-o ConnectTimeout=10 -o BatchMode=yes -o ProxyCommand='ssh -o ConnectTimeout=8 -o BatchMode=yes 203-media nc %h %p'"
+deploy 201 --hostname 192.168.3.201 --ssh-opts '-F /tmp/nixconfig-router-ssh.conf'
 ```
 
 Check existing Traefik service health
