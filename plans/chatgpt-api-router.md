@@ -1,7 +1,7 @@
 # ChatGPT subscription API router
 
 **Repo:** nixconfig  
-**Status:** in-progress
+**Status:** done
 
 ## Goal
 
@@ -22,8 +22,8 @@ Keep refreshed OAuth credentials in the service's private state directory.
 - [x] Check existing adapters, native module options, upstream config, and ports.
 - [x] Add the service, encrypted keys, and internal route.
 - [x] Parse changed Nix files, review wiring, and commit on main without pushing.
-- [ ] Deploy 201 and verify routing, authentication, and service health.
-- [ ] Complete ChatGPT OAuth enrollment with the user and verify an inference request.
+- [x] Deploy 201 and verify routing, authentication, and service health.
+- [x] Complete ChatGPT OAuth enrollment with the user and verify an inference request.
 
 ## Decisions
 
@@ -87,3 +87,14 @@ ChatGPT device enrollment succeeded with the user's browser approval.
   watches its OAuth directory and picks up the credential without a restart.
 - Configuration is declarative: management UI config edits are overwritten on
   restart. Provider OAuth tokens remain in `/var/lib/cliproxyapi`.
+
+## Verification (2026-10-21)
+
+- Final `deploy 201` over the SSH-config LAN route succeeded and confirmed activation.
+- HTTPS certificate validation passed; missing and invalid API keys both returned 401.
+- Authenticated `/v1/models` returned 13 model IDs.
+- Both `/v1/chat/completions` and `/v1/responses` returned HTTP 200 and `OK`
+  using `gpt-6-luna` through the enrolled ChatGPT account.
+- Management UI returned HTTP 200. Credentials remain outside the Nix store.
+- Traefik, DNS, Authelia, homepage, paperless, vaultwarden, and CLIProxyAPI were
+  active after recovery; the final deployment completed without service errors.
