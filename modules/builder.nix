@@ -46,6 +46,7 @@ let
     gui # gated on host.is.nixosDesktop
     fosi-mc331 # gated on hostHasTag "fosi-mc331"
     work # work setup (private repo); gated on hostHasTag "work"
+    microsoft-edge # Edge + native broker; gated on work-tagged NixOS desktops
     proxy # sing-box system proxy; gated on noughty.proxy.enable (set by `work`)
     containers # rootless podman for distrobox; gated on host.is.nixosDesktop
 
