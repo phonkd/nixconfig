@@ -41,5 +41,6 @@ never store OAuth tokens in the repository or Nix store.
 
 The first deploy stopped before activation because stable's NixOS manual redirect
 table lacks the newer module's anchors. Set the native
-`documentation.nixos.checkRedirects = false` option on this host to permit the
+`documentation.nixos.checkRedirects = false` option and register the module with
+`documentation.nixos.extraModules` so its option references are included in the
 mixed-version manual. No package patch or custom unit is needed.
