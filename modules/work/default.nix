@@ -225,6 +225,9 @@
         # User settings (such as the sign-in user agent) merge with this file.
         environment.etc."teams-for-linux/config.json".text = builtins.toJSON {
           proxyServer = "direct://";
+          # Reuse the existing broker account/PRT; this does not install or
+          # enroll in Intune. Stop requesting broker SSO if it is disabled.
+          auth.intune.enabled = config.services.microsoft-identity-broker.enable;
         };
 
         home-manager.users.${config.noughty.user.name}.imports = [
