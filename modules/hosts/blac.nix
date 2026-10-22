@@ -41,6 +41,8 @@
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 
       boot.loader.systemd-boot.enable = false;
+      # Always wait for an explicit choice between NixOS and Windows.
+      boot.loader.timeout = null;
       boot.loader.limine = {
         enable = true;
         secureBoot.enable = true;
