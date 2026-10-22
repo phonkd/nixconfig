@@ -306,22 +306,6 @@
         "type": "github"
       }
     },
-    "entra-bridge-packages": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1792428584,
-        "narHash": "sha256-NIahaPr3ya1R4H80kwrGidixF8C7OZw96WeV5qvv5aA=",
-        "owner": "codgician",
-        "repo": "nur-packages",
-        "rev": "0aff7da2bfe2230b4d11407d6061a44c595a69a7",
-        "type": "github"
-      },
-      "original": {
-        "owner": "codgician",
-        "repo": "nur-packages",
-        "type": "github"
-      }
-    },
     "flake-compat": {
       "flake": false,
       "locked": {
@@ -1773,7 +1757,6 @@
         "clan-core": "clan-core",
         "claude-codex": "claude-codex",
         "deploy-rs": "deploy-rs",
-        "entra-bridge-packages": "entra-bridge-packages",
         "flake-parts": "flake-parts",
         "hermes-agent": "hermes-agent",
         "home-manager": "home-manager_2",
@@ -1854,11 +1837,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791192499,
-        "narHash": "sha256-+Rfog+OoEqYOwhCT23txQAWgzezHTjRoFxP0KECEPZM=",
+        "lastModified": 1792659217,
+        "narHash": "sha256-8qjO6JsXcXDKcikho/dTW1glh6Aq5iyrTWieA7BF6FI=",
         "owner": "phonkd",
         "repo": "screenening",
-        "rev": "fe4977e9d7e008e0860f8a94087863303b1a49dd",
+        "rev": "20ebef8bab968ba595c70e6c642a970004df52e2",
         "type": "github"
       },
       "original": {

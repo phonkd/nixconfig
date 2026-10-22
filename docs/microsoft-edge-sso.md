@@ -57,37 +57,6 @@ especially if cookies survive browser restarts. See [session lifetime policies](
 
 ## Activate
 
-### Betterbird's Linux Entra Bridge extension
-
-The existing Betterbird Flatpak profiles on `z14` and `blac` also receive the
-Linux Entra Bridge **0.1.1** native host when the Microsoft broker is enabled.
-The host is built with the existing NUR derivation from the locked
-`entra-bridge-packages` input; no local package fork or mutable installer is used.
-The signed **Linux Entra Bridge** Thunderbird extension is installed manually.
-
-Home Manager installs its manifest in `~/.mozilla/native-messaging-hosts`.
-Betterbird receives read-only access to that directory and the Nix store, plus
-session D-Bus talk permission for `com.microsoft.identity.broker1`. Its two
-native-messaging portal/proxy preferences are set to `0` so the host executes
-inside the Flatpak sandbox, rather than through an uninstalled external proxy.
-
-After rebuilding, fully quit and restart Betterbird, then open the extension's
-options and check the native-host/broker status. A restart is necessary for both
-Flatpak permissions and `user.js`. The package was built and its native messaging
-protocol tested; a version query from inside Flatpak reached broker **3.0.2**.
-Actual extension SSO and long-term token renewal still require interactive testing.
-
-This integration is for Microsoft Entra sign-ins. The existing Owl account uses
-`mail.bedag.ch` with `adfs.bedag.ch`; installing the bridge does not establish
-persistent authentication for that separate AD FS flow. No join or enrollment
-operation is performed by this configuration.
-
-If reverting to a native-messaging portal/proxy later, reset
-`widget.use-xdg-desktop-portal.native-messaging` and
-`widget.use-xdg-desktop-portal.native-messaging-proxy` in Betterbird's Config
-Editor after removing these managed preferences: removing a `user.js` entry
-alone does not undo the preference already stored in `prefs.js`.
-
 ### Rebuild
 
 These desktops are local rebuild clients, not `deploy` targets. On each host:
