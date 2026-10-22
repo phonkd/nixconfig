@@ -113,6 +113,12 @@
       url = "git+ssh://git@github.com/phonkd/betterbird-theme.git";
       flake = false;
     };
+    # Reuse the maintained native host derivation without importing its overlays
+    # or replacing this flake's Nixpkgs.
+    entra-bridge-packages = {
+      url = "github:codgician/nur-packages";
+      flake = false;
+    };
     kubectl-aliases = {
       url = "github:phonkd/kubectl-aliases";
       inputs.nixpkgs.follows = "nixpkgs";

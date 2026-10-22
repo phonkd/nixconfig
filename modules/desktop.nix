@@ -123,6 +123,8 @@
         blac = "i7u9sccx.default-default";
       };
       betterbirdProfile = betterbirdProfiles.${config.noughty.host.name} or null;
+      betterbirdEntra = betterbirdProfile != null && config.services.microsoft-identity-broker.enable;
+      entraBridge = pkgs.callPackage (inputs.entra-bridge-packages + "/pkgs/linux-entra-bridge") { };
     in
     lib.mkIf config.noughty.host.is.nixosDesktop {
       home-manager.users.phonkd.home.file = lib.mkIf (betterbirdProfile != null) {
@@ -132,14 +134,34 @@
 
             // Work login must use the external endpoint, bypassing Bedag's proxy rules.
             user_pref("network.proxy.type", 0);
+          ''
+          + lib.optionalString betterbirdEntra ''
+
+            // Run the Nix-packaged native host inside Flatpak. The external
+            // native-messaging portal/proxy is not installed on these hosts.
+            user_pref("widget.use-xdg-desktop-portal.native-messaging", 0);
+            user_pref("widget.use-xdg-desktop-portal.native-messaging-proxy", 0);
           '';
         ".var/app/eu.betterbird.Betterbird/.thunderbird/${betterbirdProfile}/chrome/userChrome.css".source =
           inputs.betterbird-theme + "/theme/userChrome.css";
+        ".mozilla/native-messaging-hosts/linux_entra_bridge.json" = lib.mkIf betterbirdEntra {
+          source = "${entraBridge}/lib/mozilla/native-messaging-hosts/linux_entra_bridge.json";
+        };
       };
       # Home Manager links profile files into /nix/store; Betterbird's Flatpak
       # needs read access there to follow the links.
       services.flatpak.overrides = lib.mkIf (betterbirdProfile != null) {
-        "eu.betterbird.Betterbird".Context.filesystems = [ "/nix/store:ro" ];
+        "eu.betterbird.Betterbird" = {
+          Context.filesystems = [
+            "/nix/store:ro"
+          ]
+          ++ lib.optional betterbirdEntra "~/.mozilla/native-messaging-hosts:ro";
+          # The host runs inside the sandbox and uses its filtered session bus.
+          # No host-command execution permission or full bus access is needed.
+          "Session Bus Policy" = lib.mkIf betterbirdEntra {
+            "com.microsoft.identity.broker1" = "talk";
+          };
+        };
       };
 
       # --- Desktop environment selection (driven by registry) ----------
