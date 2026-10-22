@@ -16,6 +16,9 @@
 
       # Match z14's mail client; Owl is Betterbird's Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
+      # Windows is firmware entry 0000; BootNext leaves the normal boot order intact.
+      home-manager.users.phonkd.programs.zsh.shellAliases.reboot-windows =
+        "sudo ${lib.getExe pkgs.efibootmgr} --bootnext 0000 && systemctl reboot";
       services.flatpak.packages = [
         {
           appId = "eu.betterbird.Betterbird";
