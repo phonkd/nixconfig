@@ -278,9 +278,9 @@
         nautilus
         compose2nix
         winbox4
-        # Uses the shared Podman backend (modules/containers.nix); the package
-        # supplies Compose and FreeRDP for its Windows VM and RemoteApp client.
-        winboat
+        # Stable uses EOL Electron 40; unstable ships WinBoat with Electron 43.
+        # Includes Compose and FreeRDP; uses Podman from modules/containers.nix.
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.winboat
         moonlight-qt
         ookla-speedtest
         iperf3
