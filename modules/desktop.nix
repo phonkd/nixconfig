@@ -189,6 +189,12 @@
 
       # --- Shared Linux-desktop baseline (was duplicated per host) ------
       networking.networkmanager.enable = true;
+      # Connect networking without holding up desktop boot.
+      systemd.services.NetworkManager-wait-online.enable = false;
+      systemd.services.tailscaled-autoconnect.serviceConfig = {
+        Type = lib.mkForce "simple";
+        NotifyAccess = "all";
+      };
       networking.nameservers = [
         "192.168.3.201"
         "1.1.1.1"
