@@ -15,8 +15,8 @@ Refresh security-relevant inputs, verify selected package versions and upstream 
 - [x] Create a security branch and inspect upstream PR/base state; incorporate remote main through `784bdd6`.
 - [x] Refresh package/browser inputs and identify remaining unfixed packages.
 - [ ] Address media/storage migrations and explicit pins using native packages.
-- [ ] Apply verified proxy hardening and review secondary dependencies/container pins.
-- [ ] Parse changed Nix, inspect option/package source compatibility, review the complete diff, and document outstanding findings.
+- [x] Apply verified proxy hardening and review secondary dependencies/container pins.
+- [x] Parse changed Nix, inspect option/package source compatibility, review the native-update diff, and document outstanding findings.
 - [ ] Commit, push the security branch, and create a PR with validation and rollout notes.
 
 ## Risks / rollout
@@ -52,6 +52,17 @@ The Immich calendar-heatmap finding previously had unclear fixed-version metadat
 The latest stable and unstable channel sources still carry curl 8.22.0 and Pillow 12.3.0 without the reviewed patches. Native oCIS packages remain 5.0.9. Stable MCP remains 1.26.0, while unstable has a new major API. The pinned claude-codex source retains vulnerable Rustls/private CA dependencies even in upstream's latest application tag.
 
 The repository requires explicit approval before package overrides; a scoped exception for these fixes was requested. Until approved and implemented, these remain unresolved findings. Native package updates above can be reviewed independently. AFFiNE 0.27.4 is already latest stable, and no supported Manticore compatibility upgrade was established; their explicit digests remain unchanged rather than claiming an unverified security update.
+
+Prepared exceptions, **not implemented**:
+
+- curl **8.23.0**, official `https://curl.se/download/curl-8.23.0.tar.xz`, verified hash `sha256-ja3X0lNqMU+YKtBaZRtxP0Jr99Aswsds/7l5byIY5sU=`. The single official CVE patch does not apply cleanly to the pinned source, so use the complete fixed release rather than a locally rewritten backport. Both full and minimal curl/library consumers need coverage.
+- Pillow **13.0.0**, official `python-pillow/Pillow` tag `13.0.0`, verified unpacked hash `sha256-7FHwvgfT40qiHmvcJFZN/FlOECE0YiqOLBEYCMugk+4=`. The targeted upstream fixes do not apply as a complete clean patch set to 12.3.0. Paperless/OCRmyPDF source checks found no explicitly removed API usage, but image-mode/plugin compatibility and builds remain unverified. This must cover Python dependencies, not merely add a newer top-level executable.
+- oCIS **8.2.2**, official Linux-amd64 binary hash `sha256-M+o+jqRNi+ErcZMWP88RDK3O+YsgJSgZ+YNhRr4dSAQ=`. Native package remains unsupported 5.0.9; [upstream removal PR](https://github.com/NixOS/nixpkgs/pull/566479) and closed upgrade PR 409138 confirm the packaging gap. A final binary bump alone cannot safely perform the staged migration below.
+- slop-trove: local dependency replacement with MCP **1.30.0**, preserving major-1 API rather than switching to unstable's major 2. Source checks confirm the used FastMCP/tool/run APIs remain compatible and finite body/session limits are enabled. The native service has a package option; the application's existing derivation accepts `python3Packages`.
+- claude-codex: keep application **0.3.1**, update only Cargo dependencies to Rustls **0.23.46**, rustls-webpki **0.103.16**, webpki-roots **1.0.11**. Native Cargo resolution and locked offline metadata checks succeeded in a temporary source copy with exactly those three version/checksum changes. `cargoPatches` alone is insufficient with the existing `cargoLock` import; the approved implementation must keep the source lock and dependency vendoring consistent.
+- **Jellyfin:** unstable offers 12.2 with matching web/FFmpeg dependencies, and its API-key database columns still match nixflix. However, nixflix's `ExecStartPost` waits at most 240 iterations and the unit times out after 300 seconds; upstream warns that first 12.x migration may take longer and must not be interrupted. Raising only the unit timeout does not fix the helper. Keep the backported 10.11.11 package until supervised offline migration or a verified readiness fix is prepared; the remaining HLS boundary finding is not cleared. [Upgrade guidance](https://jellyfin.org/docs/general/administration/upgrade/)
+
+Additional residuals: SABnzbd's two XSS advisories name 5.2.0Beta1 as fixed; this PR selects stable 5.1.3. Codex's updated vendor lock has webpki-roots 1.0.10 plus rustls-webpki intermediate countermeasures, but lacks the subsequent 1.0.11 root-removal rollup. Neither application is described as universally CVE-free.
 
 ## User-run migrations and verification
 
