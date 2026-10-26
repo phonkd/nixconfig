@@ -19,6 +19,12 @@ Select `nixflix.jellyfin.package` from main's **existing** unstable pin
 new unit or migration wrapper. Deploy only 203 using the native deploy CLI;
 no separate full-host evaluation/build verification.
 
+The resulting package is
+`/nix/store/wpc6ga77p1qabsr21ywlgmn8r6l708xq-jellyfin-12.2`, with web 12.2,
+.NET 10.0.12 and FFmpeg 8.1.2-5. This is the existing main-pin build of the same
+server release, not the newer security-PR package closure used for the one-off
+migration. Its FFmpeg also passed the synthetic H.264 NVENC smoke test on 203.
+
 The live database has already been migrated using native `--mode MigrateSystem`
 outside nixflix's normal startup lifecycle. Keep the existing persistent
 ExecStart bridge until successful deployment, then verify the generated unit
@@ -31,7 +37,7 @@ against accidentally starting 10.11 on the migrated database during rollback.
 - [x] Verify an offline full backup and preconditions; isolate ingress and starts.
 - [x] Quarantine incompatible plugins, migrate natively, and verify database.
 - [x] Restore service/helpers and public access; verify health and NVENC smoke test.
-- [ ] Integrate only the Jellyfin native package option and this record on main.
+- [x] Integrate only the Jellyfin native package option and this record on main.
 - [ ] Deploy 203; verify generated package and remove only our service bridge.
 - [ ] Verify service/helpers, public version/health, and no remaining bridge drift.
 
@@ -87,6 +93,28 @@ are also in the backup directory.
 Normal startup, all eight nixflix helper units, public 12.2.0 version/health, and
 a synthetic one-frame H.264 NVENC encode passed, with zero restarts. All temporary
 ingress/start guards were removed. Credential values were not inspected.
+
+## Deployment preparation
+
+Code commit `620fd0b` was fast-forwarded onto clean local main, preserving the
+completed Headscale commits and the shared security checkout. The native deploy
+CLI dry activation completed successfully: only `jellyfin.service` restarts and
+`dbus-broker.service` reloads; no Tailscale or other application restart. The
+built generated unit directly selects the existing-pin 12.2 executable above.
+The deployment system output is
+`/nix/store/08z1bksb90gvp03csxxkmqwr6vgxys00-nixos-system-203-media-26.05.20261013.a033e66`.
+The deployment is pinned to the same reviewed branch/commit rather than allowing
+another session's later main commit into this activation.
+
+The first real activation failed when `seerr-jellyfin.service` ran its
+authenticated Jellyfin connection test while Jellyfin was restarting; Seerr
+reported HTTP 500 `INVALID_URL`. deploy-rs automatically restored the previous
+generation. The persistent 12.2 bridge kept Jellyfin healthy throughout recovery;
+no old executable opened the migrated DB. Restarting the unchanged Seerr helper
+after Jellyfin was ready succeeded, confirming the ordering race. Add native
+`after`/`requires = [ "jellyfin.service" ]` dependencies to that existing helper:
+Jellyfin's post-start readiness command must finish before the helper's API test.
+No wrapper, retry glue, package override or new unit is introduced.
 
 ## Rollback / remaining acceptance
 

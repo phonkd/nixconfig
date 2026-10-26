@@ -464,6 +464,13 @@
             };
           };
 
+          # The Seerr settings endpoint tests Jellyfin's authenticated API.
+          # Wait for Jellyfin's ExecStartPost readiness before configuring it.
+          systemd.services.seerr-jellyfin = {
+            after = [ "jellyfin.service" ];
+            requires = [ "jellyfin.service" ];
+          };
+
           # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires
           # on seerr-radarr.service even when radarr is disabled, blocking
           # the oneshot from running. Force-drop the bad ref, plus add
