@@ -202,6 +202,10 @@
               transport.respondingTimeouts.readTimeout = "12h";
               http = {
                 tls = { };
+                # CVE-2026-88011: remove dot/underscore aliases before routing
+                # so backends cannot confuse them with Authelia's Remote-*
+                # identity headers. Canonical API/auth headers are preserved.
+                aliasHeadersStrategy = "delete";
               };
               forwardedHeaders = {
                 trustedIPs = [

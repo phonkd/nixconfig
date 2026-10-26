@@ -8,9 +8,6 @@
     # backend 'bw' not found". Re-check `secretspec --version` if you re-pin.
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-fork.url = "github:phonkd/nixpkgs/master";
-    # Pinned ahead of nixpkgs-unstable purely to get Immich 3.0.2 (not yet
-    # on nixpkgs-unstable's locked rev); used only for services.immich.package.
-    nixpkgs-immich.url = "github:nixos/nixpkgs/e7a3ca8092b61ff85b6a45bf863ea2b2d6a661b3";
     # nix-on-droid (modules/hosts/android.nix). PINNED as a pair, load-bearing
     # -- current nixpkgs/home-manager don't work on Android. Verified working
     # on the phone in April 2026 (nixpkgs-unstable 2026-01-21); must be the
@@ -149,17 +146,6 @@
     # the package is built with uv2nix against the upstream-pinned
     # nixos-unstable, and forcing it onto nixos-26.05 can break the venv.
     hermes-agent.url = "github:NousResearch/hermes-agent";
-    # claude-codex: local Anthropic-API router that lets the ordinary `claude`
-    # CLI run inference on the ChatGPT/Codex subscription instead of the
-    # Anthropic one (modules/claude-codex.nix). Source-only -- upstream ships
-    # no flake -- so it's built with rustPlatform off its own Cargo.lock.
-    # Pinned to a tag, not a branch: the proxy tracks two private wire
-    # protocols (Anthropic Messages in, the Codex Responses backend out), and
-    # an unattended bump is how you find out one of them moved.
-    claude-codex = {
-      url = "github:fcakyon/claude-code-with-codex/v0.3.1";
-      flake = false;
-    };
     # slop-trove: personal-data embedding/search platform (own repo, "the thing").
     # TEMPORARILY on discord-dce-ingest for the DiscordChatExporter ingester
     # 204's sources.discord now needs. Flip back to the bare URL once
