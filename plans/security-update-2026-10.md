@@ -17,7 +17,7 @@ Refresh security-relevant inputs, verify selected package versions and upstream 
 - [ ] Address media/storage migrations and explicit pins using native packages.
 - [x] Apply verified proxy hardening and review secondary dependencies/container pins.
 - [x] Parse changed Nix, inspect option/package source compatibility, review the native-update diff, and document outstanding findings.
-- [ ] Commit, push the security branch, and create a PR with validation and rollout notes.
+- [x] Commit and push `security/october-2026-cve-remediation`; open [draft PR #63](https://github.com/phonkd/nixconfig/pull/63) with validation, rollout notes, and unresolved exceptions.
 
 ## Risks / rollout
 
@@ -75,3 +75,5 @@ Additional residuals: SABnzbd's two XSS advisories name 5.2.0Beta1 as fixed; thi
 ## Validation boundary
 
 Changed native option names were checked against the pinned NixOS/nixflix modules; Traefik's option was checked against upstream 3.7.13 source. Source reviews verify the versions, backports and entrypoint wiring. Changed Nix files must pass `nix-instantiate --parse`, the lock must parse and preserve unrelated root inputs, and the diff must pass whitespace checks. No host evaluation, build, activation or runtime regression test has been performed. The PR must not describe these checks as deployment proof.
+
+PR verification: GitHub reports the draft open and mergeable; its head matches the pushed branch. All five changed Nix files parse, the lock parses, and whitespace checks pass. GitGuardian's remote check passed; it is not a build or runtime test. The working tree was clean after the implementation commits. Remaining override approval keeps the overall remediation effort in progress.
