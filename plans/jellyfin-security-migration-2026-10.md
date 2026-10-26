@@ -1,6 +1,6 @@
 # Jellyfin security migration and declarative deployment
 
-**Repo(s):** nixconfig   **Status:** in-progress
+**Repo(s):** nixconfig   **Status:** done (migration and declarative deployment)
 
 ## Goal / authorization
 
@@ -38,8 +38,8 @@ against accidentally starting 10.11 on the migrated database during rollback.
 - [x] Quarantine incompatible plugins, migrate natively, and verify database.
 - [x] Restore service/helpers and public access; verify health and NVENC smoke test.
 - [x] Integrate only the Jellyfin native package option and this record on main.
-- [ ] Deploy 203; verify generated package and remove only our service bridge.
-- [ ] Verify service/helpers, public version/health, and no remaining bridge drift.
+- [x] Deploy 203; verify generated package and remove only our service bridge.
+- [x] Verify service/helpers, public version/health, and no remaining bridge drift.
 
 ## Applicability and first-start risk
 
@@ -115,6 +115,28 @@ after Jellyfin was ready succeeded, confirming the ordering race. Add native
 `after`/`requires = [ "jellyfin.service" ]` dependencies to that existing helper:
 Jellyfin's post-start readiness command must finish before the helper's API test.
 No wrapper, retry glue, package override or new unit is introduced.
+
+## Deployment completion
+
+Native deployment of code commit `23dddd2` (also on local main) confirmed
+successfully with the normal magic/automatic rollback protections enabled.
+The running system is
+`/nix/store/qhsqc6grnjn69mg9g5b2g5hy4f3ms5ij-nixos-system-203-media-26.05.20261013.a033e66`.
+No root lock input was refreshed, and the rest of security PR #63 was not merged,
+pushed or deployed. No separate full-host evaluation/build checks were run;
+the host closure was built only through the requested native deployment.
+
+After checking the generated unit's native 12.2 ExecStart, the exact
+`90-security-package.conf` bridge was archived under the root-only maintenance
+directory and removed. Jellyfin was restarted on the declarative package;
+the existing Seerr settings helper was then started against the ready server.
+The effective unit has **no drop-ins**, reports success with zero restarts, and
+public version/health still report **12.2.0 / Healthy**. All eight Jellyfin
+management units, Seerr, its Jellyfin settings helper and library helper are
+active/successful; the host has no failed units. Final database integrity and
+foreign-key checks pass, with 4 users and 107 migration-history rows preserved.
+Keep the migration backups and rollback package roots; older pre-upgrade
+generations must not be booted against the 12.2 database without state restore.
 
 ## Rollback / remaining acceptance
 
