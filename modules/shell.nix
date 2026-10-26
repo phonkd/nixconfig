@@ -69,6 +69,29 @@
           }
         ];
         initContent = ''
+          # Show Kubernetes context for an hour after use, in this shell only.
+          autoload -Uz add-zsh-hook
+          zmodload zsh/datetime
+          typeset -gi _starship_kube_last_used=0
+          unset STARSHIP_KUBE_RECENT
+
+          _starship_kube_track() {
+            # $2 has aliases expanded, including k, kgp and kgpw.
+            local kube_command='(^|[;&|])[[:space:]]*((command|sudo|watch)[[:space:]]+)*(kubectl|kubecolor|kubectx|kubens|kgi)([[:space:]]|$)'
+            if [[ $2 =~ $kube_command ]]; then
+              _starship_kube_last_used=$EPOCHSECONDS
+            fi
+          }
+          _starship_kube_visibility() {
+            if (( _starship_kube_last_used > 0 && EPOCHSECONDS - _starship_kube_last_used < 3600 )); then
+              export STARSHIP_KUBE_RECENT=1
+            else
+              unset STARSHIP_KUBE_RECENT
+            fi
+          }
+          add-zsh-hook preexec _starship_kube_track
+          add-zsh-hook precmd _starship_kube_visibility
+
           bindkey -e
           bindkey '^I' expand-or-complete
           bindkey '^K' fzf-tab-complete
@@ -90,6 +113,7 @@
         settings = {
           kubernetes = {
             disabled = false;
+            detect_env_vars = [ "STARSHIP_KUBE_RECENT" ];
           };
           git_branch = {
             style = "bold green";
