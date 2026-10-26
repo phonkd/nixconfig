@@ -1360,6 +1360,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-headscale": {
+      "locked": {
+        "lastModified": 1792870934,
+        "narHash": "sha256-X85k1YFsNTYniViiqVV4wux7L6/7iyUjm1xZYwb+/bQ=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "8544a89fdbf2cf0ad9da7a6cfb02e4b28c2c3a86",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "8544a89fdbf2cf0ad9da7a6cfb02e4b28c2c3a86",
+        "type": "github"
+      }
+    },
     "nixpkgs-immich": {
       "locked": {
         "lastModified": 1783776592,
@@ -1775,6 +1791,7 @@
         "nixpkgs": "nixpkgs_9",
         "nixpkgs-android": "nixpkgs-android",
         "nixpkgs-fork": "nixpkgs-fork",
+        "nixpkgs-headscale": "nixpkgs-headscale",
         "nixpkgs-immich": "nixpkgs-immich",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "screenening": "screenening",
