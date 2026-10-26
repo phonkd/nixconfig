@@ -1,6 +1,6 @@
 # oCIS sharing/traversal remediation
 
-**Repo(s):** nixconfig   **Status:** draft — containment and migration not approved
+**Repo(s):** nixconfig   **Status:** in-progress — containment prepared/approved; rollout pending, migration draft
 
 ## Goal and boundaries
 
@@ -39,8 +39,8 @@ must not change without explicit agreement.
 
 ### Configured exposure, not a live inventory
 
-`modules/homelab/apps/ocis.nix` exposes `ocis.w.phonkd.net` publicly through
-201's Traefik, with `auth = false; ipfilter = false;`. oCIS still has its own
+At the PR base, `modules/homelab/apps/ocis.nix` exposes `ocis.w.phonkd.net` publicly
+through 201's Traefik, with `auth = false; ipfilter = false;`. oCIS still has its own
 authentication. The service runs on 203, listens on `0.0.0.0:9200`, uses
 `/mnt/solo-sata/ocis`, and has no explicit package selection.
 
@@ -54,7 +54,13 @@ against requests forwarded by the public router. Traefik's header-alias mitigati
 does not repair oCIS authorization. Live version, active links, external storage
 overrides, federation and backup availability remain unverified.
 
-## Temporary access options — decision required
+## Temporary access options — IP filter approved, rollout pending
+
+The user approved preparing the existing LAN/Headscale IP filter after the impact
+was explained. This branch now sets only the oCIS route's `ipfilter = true`, with
+a comment linking this plan. No deployment or live access change has occurred.
+Hostname, oCIS URL, outer auth setting and shared middleware ranges are unchanged.
+Other options below remain alternatives, not authorization to implement them.
 
 | Option | Native change / owner action | Effect and limits |
 |---|---|---|
@@ -198,13 +204,20 @@ target, successful restore rehearsal and access-boundary tests are recorded.
 
 - [x] Reverify advisories, pinned package/module sources and configured exposure.
 - [x] Prepare containment options, phased migration, backup/rollback and test gates.
-- [ ] User chooses temporary access policy (recommend existing IP filter).
+- [x] User approves temporary access policy: existing LAN/Headscale IP filter.
+- [x] Prepare the route-only configuration change in the isolated worktree.
+- [ ] Coordinate integration into PR #63 without unrelated session changes.
+- [ ] User rolls out 201 and verifies outside denial plus permitted client access.
 - [ ] Choose maintained packaging route and resolve final-hop guidance.
 - [ ] Pin/verify every transit artifact; review native module compatibility.
 - [ ] User completes backup/restore rehearsal and staged rollout.
 - [ ] User verifies running fixed version and approves public reopening.
 
-Only this plan is changed in this workstream. The historical CVE audit and shared
-security plan remain untouched to avoid concurrent edit conflicts. No finding is
-marked resolved; no Nix/config/lock change, host evaluation, build, activation,
-secret access or live security test was performed.
+This workstream changes this plan and the oCIS route's IP-filter setting only.
+The historical CVE audit, shared security plan and lock remain untouched to avoid
+concurrent edit conflicts. Source review confirms the registry option attaches
+the existing `ip-filter` middleware and preserves its ranges. The changed Nix
+file passes `nix-instantiate --parse`; whitespace checks pass. No finding is marked
+resolved; no host evaluation, build, activation, secret access or live security
+test was performed. Containment is not effective until the user rolls it out and
+verifies it; it does not fix authorization for clients still allowed through.
