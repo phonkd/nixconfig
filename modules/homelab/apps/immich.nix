@@ -24,11 +24,20 @@
           dashboard.enable = true;
           traefik = {
             enable = true;
-            domain = "immich.w.phonkd.net";
+            domain = "immich.home.phonkd.net";
             auth = false;
-            ipfilter = false;
+            ipfilter = true;
+            extraMiddlewares = [ "immich-tailnet-only" ];
           };
         };
+
+        # The shared ip-filter also permits LAN/legacy VPN clients. Require
+        # a tailnet peer address for Immich, even if the public ingress is
+        # contacted with the new Host header. Use the socket peer address,
+        # not client-controlled X-Forwarded-For (no ipStrategy configured).
+        services.traefik.dynamicConfigOptions.http.middlewares.immich-tailnet-only.ipAllowList.sourceRange = [
+          "100.64.0.0/10"
+        ];
       })
 
       (lib.mkIf (noughtyLib.hostHasTag "media-server") {

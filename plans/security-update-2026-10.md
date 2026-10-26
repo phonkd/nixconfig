@@ -135,3 +135,24 @@ SELECT name, timestamp FROM kysely_migrations ORDER BY name DESC LIMIT 5;
 [Upstream backup guidance](https://docs.immich.app/administration/backup-and-restore/) requires both database and asset files and recommends stopping the server for consistency. Its Docker-specific/destructive restore commands are not a runbook for this shared native PostgreSQL installation.
 
 Review validation: `git diff --check` and parsing `flake.nix` / `modules/homelab/apps/immich.nix` passed; the lock parses and has the unstable root input without the obsolete Immich input. No Nix configuration was edited. These syntax/source checks do not replace a restore rehearsal or runtime verification.
+
+## Immich tailnet containment — 2026-10-26
+
+**Status:** prepared in the isolated worktree; not integrated or deployed. The user requested tailnet-only access after the focused review. Deployment/activation remains user-owned and is not authorized in this session.
+
+Approach: move the router to `immich.home.phonkd.net`, using the existing wildcard DNS and Headscale split-DNS route to `100.64.0.5`. Add an app-scoped native Traefik `ipAllowList` middleware accepting only `100.64.0.0/10`, wired through the registry's existing `extraMiddlewares`. Keep the shared internal filter too, but do not rely on it alone: it also accepts LAN and legacy VPN ranges. Leave other apps, Headscale, DNS, the Immich package, backend and persisted settings unchanged. Remove the old public hostname from the router rather than keeping a public redirect/alias.
+
+- [x] Implement the app-scoped router/middleware in `modules/homelab/apps/immich.nix` only.
+- [x] Parse the changed Nix, check source-level wiring and whitespace, and record user-run verification.
+- [ ] User integrates/deploys the routing change on 201 and verifies tailnet access plus public/LAN denial. Do not activate 203 merely for this routing mitigation; deploying the entire security PR there also starts the separate application upgrade/migrations.
+
+Compatibility: update mobile/CLI server URLs, bookmarks and shared links to `https://immich.home.phonkd.net`. Shared-link recipients must join/connect to the tailnet; outside-tailnet access is intentionally removed. Immich UI-managed external-domain/OAuth settings were not inspected; review/update these privately if they still reference the public origin. Keep Immich's own login enabled (`auth = false` means no added Authelia gate, not anonymous access to all photos). This is reachability containment, not a patch: the underlying gaps still matter to trusted/compromised tailnet clients and local/SSRF paths. Reverting this containment reopens public exposure and is not a safe security rollback.
+
+Validation: the edited app module passes `nix-instantiate --parse`; `git diff --check` passes. Registry/source inspection confirms `extraMiddlewares` reaches the Immich router, `dynamicConfigOptions` is a native mergeable Traefik option, and the dedicated middleware does not alter other apps' allowlists. Traefik's default IP strategy uses the socket peer (`RemoteAddr`), not `X-Forwarded-For`; no custom strategy or trusted-proxy relaxation was added. Dashboard links follow the new registry domain automatically. No full evaluation/build or live test was performed.
+
+User verification after a routing-only activation on 201:
+
+- From a connected tailnet client, `immich.home.phonkd.net` resolves to `100.64.0.5`; TLS, login, mobile sync, a controlled upload and existing assets work. Confirm normal requests reach the `immich` router with a `100.64.0.x` peer address.
+- From outside the tailnet, the **old hostname must no longer serve Immich**. Also explicitly connect to the public ingress using the **new** hostname/SNI (e.g. curl's `--resolve`) and expect the IP filter to deny the request before the Immich backend. Spoofing a tailnet `X-Forwarded-For` value must not change that denial. A missing DNS record alone does not prove isolation.
+- With Tailscale disconnected, a direct LAN connection to 201 using the new hostname must also be denied. Reconnect Tailscale and confirm normal access returns. Verify no alternate public Immich router or public forwarding to backend port 2283 exists; ML remains loopback-only.
+- If access fails, inspect routing, peer addresses, Headscale ACLs, DNS and certificates; do not widen the allowlist to public/LAN ranges as a workaround. The new name uses the existing DNS-01 resolver and wildcard split-DNS setup; no live certificate/DNS change was made here.
