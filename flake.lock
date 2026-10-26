@@ -198,23 +198,6 @@
         "url": "https://git.clan.lol/clan/clan-core/archive/26.05.tar.gz"
       }
     },
-    "claude-codex": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1786243721,
-        "narHash": "sha256-ymjZYT8cvdksgw5f2RH9QVyetRcPvW/QQRvAoEg1rRk=",
-        "owner": "fcakyon",
-        "repo": "claude-code-with-codex",
-        "rev": "af0d615053243ebe3b60c65faf9d6f4306540b01",
-        "type": "github"
-      },
-      "original": {
-        "owner": "fcakyon",
-        "ref": "v0.3.1",
-        "repo": "claude-code-with-codex",
-        "type": "github"
-      }
-    },
     "data-mesher": {
       "inputs": {
         "flake-parts": [
@@ -1739,7 +1722,6 @@
         "betterbird-theme": "betterbird-theme",
         "caelestia": "caelestia",
         "clan-core": "clan-core",
-        "claude-codex": "claude-codex",
         "deploy-rs": "deploy-rs",
         "flake-parts": "flake-parts",
         "hermes-agent": "hermes-agent",
