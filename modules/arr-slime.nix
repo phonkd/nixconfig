@@ -388,6 +388,9 @@
 
             jellyfin = {
               enable = true;
+              # 12.2 fixes the legacy HLS directory boundary. The database was
+              # migrated offline before selecting it (see the migration plan).
+              package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.jellyfin;
               apiKey._secret = "/run/secrets/jellyfin-api-key";
               users.phonkd = {
                 password._secret = "/run/secrets/jellyfin-admin-password";
@@ -463,6 +466,13 @@
                 incomplete = "/mnt/solo-sata/nixflix/downloads/slskd/incomplete";
               };
             };
+          };
+
+          # The Seerr settings endpoint tests Jellyfin's authenticated API.
+          # Wait for Jellyfin's ExecStartPost readiness before configuring it.
+          systemd.services.seerr-jellyfin = {
+            after = [ "jellyfin.service" ];
+            requires = [ "jellyfin.service" ];
           };
 
           # Upstream nixflix bug: seerr-sonarr.service hard-codes a Requires

@@ -8,6 +8,9 @@
     # backend 'bw' not found". Re-check `secretspec --version` if you re-pin.
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs-fork.url = "github:phonkd/nixpkgs/master";
+    # Headscale 0.29.6 + Go 1.27.3 security fixes, scoped to observability.
+    # Stable and our unstable pin predate the complete HTTP/2 dependency fix.
+    nixpkgs-headscale.url = "github:nixos/nixpkgs/8544a89fdbf2cf0ad9da7a6cfb02e4b28c2c3a86";
     # nix-on-droid (modules/hosts/android.nix). PINNED as a pair, load-bearing
     # -- current nixpkgs/home-manager don't work on Android. Verified working
     # on the phone in April 2026 (nixpkgs-unstable 2026-01-21); must be the
