@@ -38,6 +38,27 @@ The user subsequently requested building/deploying the broad security update aft
 
 Read-only preflight confirms native Jellyfin 12.2 on 203 without drop-ins and Headscale 0.29.6 on observability. This Linux laptop is off-LAN; verified LAN SSH to 201 via 203 and to 203 via 201 avoids restarting the target's own tunnel. Public SSH on port 5432 works for observability and ext-mail with `ProxyCommand=none`. Laptop/desktop activation is not part of the six deploy-rs server targets.
 
+#### Activation record (live update)
+
+After the user clarified the intended Immich change was routing-only, **203 activation is held**. Its draft package upgrade still selects 3.3.5 and must not be activated without separately resolving backup/migration readiness. Integrate the other session's reviewed `immich.home.phonkd.net` tailnet-only routing on 201, without starting/stopping or migrating Immich on 203. Routing-only changes do not require an Immich database backup.
+
+Server rollout base: `d4f01a1760fc5a9515c48d50b637931dc798c6da` on `rollout/security-2026-10-26`. The additional reviewed Immich routing is in `477ea0c` on `rollout/security-ingress-2026-10-26`; that is the deployed source for 201. These branches are isolated; the shared security branch/main and remote PR remain unchanged.
+
+| Host | Outcome | Running system / evidence |
+|---|---|---|
+| 201-mono | Built, dry-activated, activated and confirmed with normal rollback protections via LAN SSH/203 jump | `/nix/store/jhyjc8qm24qfkdlsgfq08lmsyflpsil1-nixos-system-201-mono-26.05.20261025.1f607aa`; running process resolves to native Traefik 3.7.15, whose binary reports Go 1.26.10. Tailscale reports 1.104.2 / Go 1.27.3; Nix 2.34.9. Traefik, Tailscale, Authelia, Paperless web, Garage and Alloy active; no failed units; checked services have zero restarts. |
+| observability | Built, dry-activated, activated and confirmed with normal rollback protections via public SSH:5432 | `/nix/store/7cp9qhasq9qgyxsyldadn4qmm1n0x0xg-nixos-system-observability-26.05.20261025.1f607aa`; existing Headscale 0.29.6 / Go 1.27.3 preserved and not restarted by this switch. Tailscale 1.104.2 / Go 1.27.3, Nix 2.34.9; Headscale, Tailscale, Grafana, Loki, Mimir and Alloy active, no failed units. Grafana local health 200; Headscale public `/health` and `/derp/probe` both 200 over HTTP/2. |
+| ext-mail | Built, dry-activated, activated and confirmed with normal rollback protections via public SSH:5432 | `/nix/store/rkdia9wrlyrshq0xxk3wj0b2dphqyc16-nixos-system-ext-mail-26.05.20261025.1f607aa`; Nix 2.34.9, Tailscale 1.104.2 / Go 1.27.3. Postfix, Dovecot, Rspamd, nginx, Synapse, PostgreSQL, Radicale, Tailscale and Alloy active; no failed units. Native Synapse 1.163.2 has zero restarts; public Matrix versions endpoint returns 200 over HTTP/2; SMTP/SMTPS/IMAPS/HTTPS listeners present. Initial transfer reset was resolved by retry before activation. Immediate post-switch direct public SSH from this laptop reset, but fresh tailnet SSH and public SSH through 203 both succeeded; no SSH/firewall settings were changed as a workaround. |
+| 204-agent | Build/dry-activation pending | Refreshed Hermes dependency tree is being built; no activation yet. |
+| 205-builder | Built and dry-activated successfully; activation pending | Preserve the builder until 204's outstanding build has completed. |
+| 203-media | Held; no activation or data migration | Jellyfin remains healthy 12.2; Immich still runs 3.0.2. SABnzbd/Seerr/Immich package updates in the draft are therefore **not deployed on 203**. |
+
+201 verification used normal unauthenticated requests, not crash payloads or credential reads. The generated static config retains `aliasHeadersStrategy = "delete"`; generated dynamic config gives oCIS `ip-filter`, and Immich both `ip-filter` and `immich-tailnet-only` (`100.64.0.0/10`, no header-based strategy). From ext-mail's public path oCIS now returns **403** (baseline **200**), while a tailnet request returns **200**. Immich's old public hostname now returns **404**; its new hostname through the public ingress and through a direct LAN connection from 203 each return **403**, while a tailnet request returns **200 over HTTP/2 with normal TLS verification**. The new certificate was issued successfully by native ACME DNS-01 shortly after activation. Authelia's public portal returns 200; the protected dashboard without login returns 302. Authenticated login/mobile/upload and canonical identity/API-header acceptance still need user checks; these status checks are not a complete regression or exploit test.
+
+The first 201 dry run built/copied successfully but could not run SSH dry activation because deploy-rs splits a quoted multiword `ProxyCommand` incorrectly. Native `ProxyJump=203-media` resolved it; the corrected ingress dry run and activation both passed. No custom SSH wrapper or deploy glue was added.
+
+No host was rebooted. Kernel **6.18.57** is selected/staged by the new systems, but 201 still runs **6.18.56** and observability/ext-mail still run **6.18.54**; activation does not apply a new kernel to the running system. Schedule reboots separately rather than claiming the running kernels were updated. Full authenticated mail/client and application regression tests remain user acceptance work.
+
 ## Native changes and verified versions
 
 Root nixpkgs advances from `a033e66` to `1f607aa` (2026-10-25); unstable advances from `55bfb4d` to `3ec6363` (2026-10-23). Version claims come from these exact locked package sources, not branch names.
