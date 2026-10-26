@@ -25,6 +25,19 @@ Follow-up: prefer unstable packages over local overrides where they actually pro
 
 No host activation or data migration during this work. oCIS and other major application upgrades require backup and migration review; package rollback alone does not undo database/schema changes. Tailscale updates require non-tailnet management paths during rollout. Full host evaluations/builds are excluded by repository guidance; syntax/source checks are not runtime validation. Preserve explicitly paired Android inputs and avoid unrelated feature changes.
 
+### Rollout authorization update
+
+The user subsequently requested building/deploying the broad security update after the completed Jellyfin migration, with temporary `ocis.traefik.ipfilter = true`. Work is isolated on `rollout/security-2026-10-26`; the shared security checkout, local main and remote PR are not updated by this rollout integration. Preserve main's already deployed native Jellyfin 12.2, Seerr readiness ordering and Headscale 0.29.6 package/input. Select native unstable Traefik 3.7.15 while preserving alias deletion. No package overrides, custom units or glue.
+
+- [x] Integrate completed main changes and the existing reviewed oCIS containment without reverting other sessions' work.
+- [x] Select Traefik 3.7.15 and parse/check the integrated changes.
+- [ ] Build via native `deploy` dry activation, inspecting each host's activation changes; no separate full-host evaluation/build checks.
+- [ ] Activate the six declared server targets one at a time over management paths independent of the target's tailscaled, checking health after each. Review 201's service changes before activation; keep builder upgrades last.
+- [ ] Gate 203 activation on Immich backup/migration readiness: its live server is still 3.0.2 and the draft selects 3.3.5. Jellyfin completion does not establish this independent gate. No Immich backup was found under `/mnt/solo-sata/backups`; other backup locations/restore testing remain unverified. Do not migrate or assume safe automatic rollback across this schema boundary without resolving the gate.
+- [ ] Record actual activation outcomes and remaining application acceptance checks. No push or integration into shared branches without coordination.
+
+Read-only preflight confirms native Jellyfin 12.2 on 203 without drop-ins and Headscale 0.29.6 on observability. This Linux laptop is off-LAN; verified LAN SSH to 201 via 203 and to 203 via 201 avoids restarting the target's own tunnel. Public SSH on port 5432 works for observability and ext-mail with `ProxyCommand=none`. Laptop/desktop activation is not part of the six deploy-rs server targets.
+
 ## Native changes and verified versions
 
 Root nixpkgs advances from `a033e66` to `1f607aa` (2026-10-25); unstable advances from `55bfb4d` to `3ec6363` (2026-10-23). Version claims come from these exact locked package sources, not branch names.
@@ -41,7 +54,7 @@ Root nixpkgs advances from `a033e66` to `1f607aa` (2026-10-25); unstable advance
 | SABnzbd | 5.1.2 | 5.1.3 from unstable | Fixes critical API bypass and malicious archive RCE; beta-only XSS fixes remain separate |
 | Seerr | 3.2.0 | 3.5.0 from unstable | Includes avatar traversal and credential/user-data disclosure fixes |
 | Immich server + ML | 3.0.2 | 3.3.5 from unstable | Removes obsolete fixed input; includes reviewed XSS, sharing, vault and ML fixes |
-| Traefik | 3.7.13, aliases kept | 3.7.13, aliases deleted | Enables native `entryPoints.websecure.http.aliasHeadersStrategy` mitigation |
+| Traefik | 3.7.13, aliases kept | 3.7.15 from unstable, aliases deleted | Native Go 1.26.10 / x/net 0.60.0 fixes GO-2026-6617; retains `entryPoints.websecure.http.aliasHeadersStrategy` mitigation |
 | Hermes | 2026-10-15 input | `05d7b5a` | Its own uv.lock advances Pillow to 13.0.0, certifi to 2026.10.19 and MCP to 2.3.0 |
 | Claude Code / Codex | 2.1.304 / 0.163.0 | 2.1.310 / 0.164.0 | Updated llm-agents input; Claude Linux sandbox fixes and Codex TLS dependency updates |
 | claude-codex router | 0.3.1 | Removed | Removes the unused router, source input, package and GUI shell integration at the user's request |
