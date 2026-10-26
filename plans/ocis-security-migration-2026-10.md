@@ -1,6 +1,6 @@
 # oCIS sharing/traversal remediation
 
-**Repo(s):** nixconfig   **Status:** in-progress — containment prepared/approved; rollout pending, migration draft
+**Repo(s):** nixconfig   **Status:** in-progress — containment prepared/approved; rollout pending, migration deferred pending maintained native packages
 
 ## Goal and boundaries
 
@@ -110,12 +110,13 @@ defaults if external provisioning is used, and 8.2.1/8.2.2 release notes too.
 
 **Packaging is a blocker, not an implemented solution.** Prefer upstream native
 sequential packages selected through `services.ocis.package`. Reviving upstream
-packaging needs all transit versions, not just 8.2.2. If unavailable, user must
-choose between waiting with containment, an upstream-image deployment using
-native `virtualisation.oci-containers` (separate storage/UID/network review), or
-explicitly approving temporary local packages/overrides. A container conversion
-is not a drop-in package change. No such code, image pins, custom units or
-migration wrappers are included here; no publication of upstream PRs is authorized.
+packaging needs all transit versions, not just 8.2.2. The user chose to **wait for
+maintained native packages and keep `ipfilter = true` meanwhile**. Do not prepare
+a container conversion or local packages/overrides under the migration request.
+The existing filter means trusted LAN/VPN/Headscale access, not localhost-only.
+No image pins, custom units or migration wrappers are included here; no
+publication of upstream PRs is authorized. Revisit the staged migration only when
+native packages cover the required upgrade sequence and guidance gaps are resolved.
 
 ## Backup and restore gate — user-run, before any hop
 
@@ -208,7 +209,8 @@ target, successful restore rehearsal and access-boundary tests are recorded.
 - [x] Prepare the route-only configuration change in the isolated worktree.
 - [ ] Coordinate integration into PR #63 without unrelated session changes.
 - [ ] User rolls out 201 and verifies outside denial plus permitted client access.
-- [ ] Choose maintained packaging route and resolve final-hop guidance.
+- [x] User chooses maintained native packages only; defer migration until available.
+- [ ] Recheck native sequential-package availability and resolve final-hop guidance.
 - [ ] Pin/verify every transit artifact; review native module compatibility.
 - [ ] User completes backup/restore rehearsal and staged rollout.
 - [ ] User verifies running fixed version and approves public reopening.
