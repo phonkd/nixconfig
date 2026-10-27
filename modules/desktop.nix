@@ -43,9 +43,11 @@
         # Visual disk-usage analyzer -- "squirreldisk" is dead weight in nixpkgs
         # (unfree, marked broken, dropped from unstable); maintained stand-in.
         qdirstat
-        # Daily-updated agent CLIs from llm-agents.nix (see flake.nix).
+        # Daily-updated agent apps from llm-agents.nix (see flake.nix).
         inputs.llm-agents.packages.${pkgs.system}.claude-code
         inputs.llm-agents.packages.${pkgs.system}.codex
+        # Official desktop app, with NixOS fixes for its downloaded agent runtime.
+        inputs.llm-agents.packages.${pkgs.system}.chatgpt
         # REA's native analysis provider needs Ghidra 12.1 and a full JDK.
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.ghidra
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jdk21
