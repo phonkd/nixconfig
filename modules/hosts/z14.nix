@@ -178,17 +178,6 @@
       # store, not about bedag.
       noughty.work.displaylink.enable = true;
 
-      # Citrix Workspace: same requireFile shape as displaylink, but the
-      # tarball isn't fetched yet (deliberately) -- next rebuild stops with
-      # the package's own message naming the exact file and download page
-      # (Citrix's click-through can't be scripted ahead of time). Fetch it
-      # and rebuild:
-      #
-      #     nix-prefetch-url "file://$PWD/linuxx64-<version>.tar.gz"
-      #
-      # Drop this line to get a building config while that download waits.
-      noughty.work.citrix.enable = true;
-
       # See acpMixerPaths above. asDropin because both units come from
       # packages via systemd.packages -- a plain definition would replace the
       # packaged unit wholesale instead of adding one line to it.
