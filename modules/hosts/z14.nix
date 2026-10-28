@@ -137,6 +137,14 @@
       # itself -- see plans/auto-brightness-z14.md.
       hardware.sensor.iio.enable = true;
 
+      # The MT7922 supports LE Audio; PipeWire already includes the LC3 codec.
+      # Enable BlueZ's experimental interfaces and only the kernel ISO socket
+      # feature needed for BAP audio streams.
+      hardware.bluetooth.settings.General = {
+        Experimental = true;
+        KernelExperimental = "6fbaf188-05e0-496a-9885-d6ddfdb4e03e";
+      };
+
       # CPU temperature. This Ryzen AI 7 445 (family 1Ah model 68h) has a
       # data-fabric F3 device 1022:114b that no k10temp knows yet -- not 6.18,
       # not upstream 7.3-rc5 -- so the driver never binds and there's no
