@@ -7,10 +7,10 @@
 # plans/headscale-mesh.md.
 #
 # Wired into modules/builder.nix alwaysImport; `deploy` a host to enrol it.
-{ ... }:
+{ inputs, ... }:
 {
   flake.nixosModules.tailnet =
-    { config, lib, ... }:
+    { config, lib, pkgs, ... }:
     let
       # Hosts allowed to use an exit node and drive tailscale without sudo.
       # A list, not `host.name == "z14"`, so a second laptop is one line.
@@ -23,6 +23,9 @@
 
       services.tailscale = {
         enable = true;
+        # TS-2026-013: stable still has 1.98.10; this input supplies
+        # 1.104.2 built with Go 1.27.3 and the compromised-CA mitigation.
+        package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.tailscale;
         openFirewall = true; # udp/41641 for direct peer-to-peer
         authKeyFile = config.sops.secrets.headscale_authkey.path;
         extraUpFlags = [

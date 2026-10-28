@@ -16,6 +16,9 @@
 
       # Match z14's mail client; Owl is Betterbird's Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
+      # Windows is firmware entry 0000; BootNext leaves the normal boot order intact.
+      home-manager.users.phonkd.programs.zsh.shellAliases.reboot-windows =
+        "sudo ${lib.getExe pkgs.efibootmgr} --bootnext 0000 && systemctl reboot";
       services.flatpak.packages = [
         {
           appId = "eu.betterbird.Betterbird";
@@ -41,9 +44,17 @@
       networking.nat.externalInterface = lib.mkForce "enp9s0";
 
       boot.loader.systemd-boot.enable = false;
+      # Always wait for an explicit choice between NixOS and Windows.
+      boot.loader.timeout = null;
       boot.loader.limine = {
         enable = true;
         secureBoot.enable = true;
+        # Windows shares the EFI system partition mounted at /boot.
+        extraEntries = ''
+          /Windows
+            protocol: efi
+            path: boot():///EFI/Microsoft/Boot/bootmgfw.efi
+        '';
       };
       boot.loader.efi.canTouchEfiVariables = true;
 

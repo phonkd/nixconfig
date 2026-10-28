@@ -182,6 +182,8 @@
 
       services.traefik = {
         enable = true;
+        # GO-2026-6617: native 3.7.15 uses fixed Go 1.26.10 / x/net 0.60.0.
+        package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.traefik;
         environmentFiles = [ "${config.sops.secrets.CF_DNS_API_TOKEN.path}" ];
         staticConfigOptions = {
           # OTLP log export is still experimental in traefik 3.7 and must be
@@ -202,6 +204,10 @@
               transport.respondingTimeouts.readTimeout = "12h";
               http = {
                 tls = { };
+                # CVE-2026-88011: remove dot/underscore aliases before routing
+                # so backends cannot confuse them with Authelia's Remote-*
+                # identity headers. Canonical API/auth headers are preserved.
+                aliasHeadersStrategy = "delete";
               };
               forwardedHeaders = {
                 trustedIPs = [

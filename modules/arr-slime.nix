@@ -336,6 +336,8 @@
 
             usenetClients.sabnzbd = {
               enable = true;
+              # 5.1.3 fixes the 5.1.2 API-auth bypass and archive/PAR2 RCE.
+              package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.sabnzbd;
               settings.misc.port = 8080;
               settings.misc.host_whitelist = "sabnzbd.home.phonkd.net";
               # SABnzbd's own `inet_exposure` guard (default 0 = no external
@@ -373,6 +375,8 @@
 
             seerr = {
               enable = true;
+              # 3.5.0 includes the avatar traversal and credential-disclosure fixes.
+              package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.seerr;
               apiKey._secret = "/run/secrets/seerr-api-key";
               sonarr.main = {
                 apiKey._secret = "/run/secrets/sonarr-api-key";
