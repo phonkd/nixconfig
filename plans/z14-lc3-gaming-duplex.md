@@ -1,6 +1,6 @@
 # Persistent LC3 gaming duplex on z14
 
-**Repo:** nixconfig  **Status:** done
+**Repo:** nixconfig  **Status:** in-progress (cold-boot validation pending)
 
 ## Goal
 Preserve E's proven simultaneous 48 kHz LC3 playback and microphone audio across
@@ -54,3 +54,19 @@ selection unchanged unless the new context option is set. Deploy z14 locally wit
 nixos-rebuild switch --flake .#z14 --impure; no kernel rebuild or reboot needed.
 Audio restarts briefly interrupt playback. Keep the known working LC3 parameters
 in /tmp/z14-le-diag for diagnosis; do not fall back to AAC or the laptop microphone.
+
+## Cold-boot follow-up
+The user's next rebuild/boot retained the patched kernel and correct gaming QoS,
+but both BAP transports stayed idle. The trace shows successful CIG configuration
+and ASE Enable followed by HCI LE Create CIS returning Command Disallowed (0x0c).
+Disconnect/reconnect did not clear it. Native adapter power off/on restored audio,
+confirmed by the user; both gaming-context transports became active.
+
+The greeter (UID 988) ran WirePlumber and registered/removed BAP endpoints just
+before phonkd's session. Add ConditionUser=!greeter to the existing WirePlumber
+user unit so the text login screen does not negotiate Bluetooth audio. This is a
+boot-race mitigation, not a verified controller fix. A subsequent cold boot still
+needs validation. Matching upstream report: https://github.com/bluez/bluez/issues/2496.
+If the controller wedges again, `bluetoothctl power off` followed by
+`bluetoothctl power on` and reconnecting E is the verified recovery. No re-pairing
+or manual endpoint settings are required.

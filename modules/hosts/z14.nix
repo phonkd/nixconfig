@@ -261,6 +261,10 @@
       };
       systemd.user.services.wireplumber = {
         overrideStrategy = "asDropin";
+        # tuigreet needs no audio session. Its early BAP registration/removal
+        # precedes the real user's endpoints and can leave MT7922 CIS creation
+        # stuck at Command Disallowed until the adapter is power-cycled.
+        unitConfig.ConditionUser = "!greeter";
         environment.ACP_PATHS_DIR = "${acpMixerPaths}";
       };
 
