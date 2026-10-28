@@ -29,7 +29,9 @@
             enable = true;
             domain = "ocis.w.phonkd.net";
             auth = false;
-            ipfilter = false;
+            # Temporary LAN/Headscale containment while oCIS 5 remains
+            # vulnerable; staged migration: plans/ocis-security-migration-2026-10.md.
+            ipfilter = true;
           };
         };
       })
