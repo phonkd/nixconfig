@@ -143,6 +143,17 @@
       # >=6.3 (we're on 6.18) -- lets the CPU scale itself vs acpi-cpufreq.
       boot.kernelParams = [ "amd_pstate=active" ];
 
+      # Experimental MT7922 LE Audio microphone fix. Linux 6.18.57 lacks
+      # bluetooth-next's October 2026 ISO receive/parser and transfer-size
+      # fixes; our trace contains empty/lost microphone SDUs. Keep this
+      # scoped to z14 and remove once the kernel carries the three commits.
+      boot.kernelPatches = [
+        {
+          name = "z14-btmtk-iso-reception";
+          patch = ../../patches/z14-btmtk-iso-reception.patch;
+        }
+      ];
+
       # Real ambient light sensor (IIO `als`, HID usage 200041) behind the AMD
       # sensor-fusion hub -- readings sat at a flat 0 because nothing held the
       # device open (in_illuminance_raw only updates once something polls it).
