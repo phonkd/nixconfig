@@ -91,6 +91,9 @@
     lib.mkIf (config.noughty.host.name == "z14") {
       home-manager.users.phonkd.imports = [ self.homeModules.z14-blur-rule ];
 
+      # Keep EasyEffects off while investigating interference with LC3 duplex.
+      home-manager.users.phonkd.services.easyeffects.enable = lib.mkForce false;
+
       # GPG needs an explicit pinentry path for private-key imports and signing.
       home-manager.users.phonkd.services.gpg-agent.pinentry.package = pkgs.pinentry-curses;
 
