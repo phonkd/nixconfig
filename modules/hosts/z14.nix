@@ -153,6 +153,9 @@
       # transport fixes while investigating distorted LC3 playback.
       services.pipewire.package =
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pipewire;
+      # WirePlumber loads the Bluetooth SPA plugins from its linked PipeWire.
+      services.pipewire.wireplumber.package =
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.wireplumber;
 
       # CPU temperature. This Ryzen AI 7 445 (family 1Ah model 68h) has a
       # data-fabric F3 device 1022:114b that no k10temp knows yet -- not 6.18,
