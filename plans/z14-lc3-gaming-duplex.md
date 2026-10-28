@@ -1,6 +1,6 @@
 # Persistent LC3 gaming duplex on z14
 
-**Repo:** nixconfig  **Status:** in-progress
+**Repo:** nixconfig  **Status:** done
 
 ## Goal
 Preserve E's proven simultaneous 48 kHz LC3 playback and microphone audio across
@@ -22,9 +22,31 @@ Lua-only fix was insufficient: the native handler also replaced each child.
 - [x] Build and activate PipeWire patch and E rule (3315d2a).
 - [x] Check codec defaults, gaming selection, context masking and preset fallback.
 - [x] Verify native reconfiguration: 48 kHz, gaming context, valid microphone audio.
-- [ ] Retain/reuse WirePlumber's disconnected SPA device and validate its lifecycle.
-- [ ] Build, activate and verify normal reconnect without endpoint commands.
-- [ ] Confirm playback with user and preserve final evidence.
+- [x] Retain/reuse WirePlumber's disconnected SPA device and validate its lifecycle.
+- [x] Build, activate and verify normal reconnect without endpoint commands.
+- [x] Confirm playback with user and preserve final evidence.
+
+## Verification (2026-10-28)
+Activated and saved generation
+`/nix/store/6fi075q2z1xmvwqxdimhp49mn0hgy41q-nixos-system-z14-26.05.20261025.1f607aa`.
+PipeWire's 52 package tests passed. Optimized codec checks cover default/zero
+context, gaming 48 kHz, available-context masking, overflow, unsupported presets
+and null-settings capability probes. Lua/native lifecycle checks cover retaining
+Bluetooth children, single handler registration, removal and other factories.
+
+Final normal BlueZ Device1 disconnect/connect selected bap-duplex automatically,
+without SetConfiguration or Reconfigure calls: context 8, 48 kHz, 10 ms,
+240-byte stereo output and 120-byte mono input, CIG 2/CIS 0, RTN 5, latency 20 ms,
+presentation delay 40 ms. Zen remained linked to E; the user confirmed "Yes,
+normal". Simultaneous microphone capture after reconnect produced 480000 samples,
+476987 nonzero, RMS 933.29 (s16). Both default devices point to E; EasyEffects is
+stopped. Evidence is in `/tmp/z14-le-diag/gaming-final-*.json` (no PCM retained).
+
+BlueZ crashed once while cleaning up the earlier experimental session. After
+its restart, automatic LC3 negotiation and the next normal disconnect/connect
+succeeded; BlueZ PID 31225 and WirePlumber PID 30921 stayed alive. No claim that
+the BlueZ cleanup crash is fixed. Reboot has not been tested, but the running and
+boot-default system profile both point to the activated generation above.
 
 ## Risks / rollout
 Local patches need review when PipeWire or WirePlumber changes. Keep normal codec
