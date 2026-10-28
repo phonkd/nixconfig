@@ -169,6 +169,10 @@
         Experimental = true;
         KernelExperimental = "6fbaf188-05e0-496a-9885-d6ddfdb4e03e";
       };
+      # 5.87 includes BAP endpoint-configuration and ASE control-point fixes;
+      # test these alongside the newer PipeWire for E's silent LC3 microphone.
+      hardware.bluetooth.package =
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.bluez;
 
       # Use unstable's PipeWire (1.6.9 at the current pin) for its Bluetooth
       # transport fixes while investigating distorted LC3 playback.
