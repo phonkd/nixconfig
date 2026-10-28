@@ -10,12 +10,14 @@ rollout, not the current checkout. SABnzbd **5.1.3 is now deployed and verified*
 203 (zero restarts, preserved history, API-denial checks and all four *arr client
 tests passing); details are in
 [`security-main-sabnzbd-2026-10.md`](security-main-sabnzbd-2026-10.md).
-Immich server/ML are explicitly held at the existing 3.0.2 native package pin;
-Seerr stays on stable 3.2.0. Their reviewed upgrades remain deferred rather than
-being activated as a side effect of the SABnzbd deployment. Ingress containment
-and completed Jellyfin/Headscale/Traefik fixes are preserved.
-203 now runs the security base too; its Immich server/ML were not restarted or
-migrated. All six servers have received the base update, but staged kernel
+Immich server/ML subsequently received their separately authorized **3.3.5 upgrade**,
+after a consistent separate-disk backup, checksum verification, an old-version
+restore rehearsal and a successful isolated migration rehearsal; see
+[`immich-upgrade-2026-10-28.md`](immich-upgrade-2026-10-28.md). Production migrations
+completed with no schema drift and checked data counts preserved. Tailnet-only
+containment remains; native dependency coverage gaps remain open. Seerr stays on
+stable 3.2.0. Completed Jellyfin/Headscale/Traefik fixes are preserved.
+203 now runs the security base too. All six servers have received the base update, but staged kernel
 updates still require separately scheduled reboots. The broader effort remains
 in-progress because deferred upgrades and dependency gaps are not resolved.
 

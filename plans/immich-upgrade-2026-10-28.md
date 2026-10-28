@@ -1,6 +1,6 @@
 # Immich backed-up upgrade
 
-**Repo:** nixconfig   **Status:** in-progress
+**Repo:** nixconfig   **Status:** done
 
 ## Goal
 Execute the user-authorized native Immich 3.0.2 → 3.3.5 upgrade on 203-media, with a consistent database/media backup and retained rollback artifacts. Keep tailnet containment.
@@ -10,7 +10,7 @@ Execute the user-authorized native Immich 3.0.2 → 3.3.5 upgrade on 203-media, 
 - [x] Retain old generation/config; stop Immich writers, dump its database and back up media/state to a protected separate disk with sufficient headroom.
 - [x] Verify copied files and restore the dump into an isolated database with compatible extensions; record limits of rehearsal.
 - [x] Select native target server/ML, parse/check and commit only this effort's files on main.
-- [ ] Deploy 203 through deploy-rs, supervise migrations and verify versions, health, counts, ML and exposure; record remaining functional checks.
+- [x] Deploy 203 through deploy-rs, supervise migrations and verify versions, health, counts, ML and exposure; record remaining functional checks.
 
 ## Risks / rollout
 PostgreSQL is shared with AFFiNE: use an Immich-scoped logical backup/restore and leave the shared cluster running. Verify deploy scope against the live generation before activation. Preserve the old closure against GC. A schema migration is not undone by deploy-rs automatic generation rollback: guard Immich startup during activation and start the new services explicitly after successful activation. If migration fails, stop Immich and restore paired database/media before running old binaries. Native Node/Brotli/Pillow coverage gaps from the earlier review remain; this upgrade is not complete security remediation. Backups contain sensitive data and must not enter git or tool output. Other agents' shared plan edits are excluded from this effort.
@@ -20,7 +20,7 @@ PostgreSQL is shared with AFFiNE: use an Immich-scoped logical backup/restore an
 - PostgreSQL 17.11, pgvector 0.8.2, VectorChord 1.1.1; Immich DB 169 MB. Media 28,355,792,896 bytes, ML cache about 1.6 GB, empty auxiliary `/var/lib/immich`. No external libraries/assets, out-of-tree original paths or media symlinks.
 - Separate disk `/mnt/Shares` has approximately 1.4 TB free; root has 175 GB. Backup destination: `/mnt/Shares/.immich-backups/2026-10-28-pre-3.3.5`, root-only. Same-host separate disk protects this migration but is not an off-host disaster-recovery copy.
 - Target remains the reviewed unstable revision `3ec636362e1816bc2f0888fa0fa2c69f1bc9e504`: server 3.3.5 and its matching ML passthru. Root nixpkgs stays `1f607aa79b6356ed45d3cd3c8079c196e79efa2c`; no lock changes. Old Immich input retained solely as a recovery source reference.
-- Initial live media copy started before downtime; final synchronization and database dump will happen with Immich writers stopped. Old system/profile have explicit GC roots.
+- Initial live media copy started before downtime; final synchronization and database dump completed with Immich writers stopped. Old system/profile have explicit GC roots.
 
 ## Backup and deployment preparation
 - Commit `22cd2d6` parsed and passed whitespace checks. Native `deploy 203 22cd2d6 --dry-activate` completed over LAN via 201; only Immich server/ML stop/start and D-Bus reload are proposed. Target system: `/nix/store/dhzkn2039na0k9gj0inr94xnflmayswg-nixos-system-203-media-26.05.20261025.1f607aa`.
@@ -35,4 +35,12 @@ PostgreSQL is shared with AFFiNE: use an Immich-scoped logical backup/restore an
 - `deploy 203 22cd2d6` completed and confirmed successfully. Runtime guards held both Immich services inactive throughout activation; removed only those guard drop-ins afterwards and started the new services. The dedicated Redis instance restarted during activation; the existing Ollama model-loader oneshot was also started by normal NixOS activation.
 - API and microservices both report migrations finished and no schema drift. Production now has 101 migrations and matches all rehearsed data counts. API reports 3.3.5; server and matching ML are active with zero systemd restarts. PostgreSQL, AFFiNE, SABnzbd and Jellyfin remain active; no failed units.
 - Verified HTTPS through tailnet: UI 200, version 3.3.5, unauthenticated `/api/users/me` 401. Retired public hostname returns 404; new hostname through direct LAN ingress returns 403. ML listens only at 127.0.0.1:3003 and `/ping` returns `pong`. pgvector/VectorChord remain 0.8.2/1.1.1.
-- ML's Gunicorn 26 attempts an optional control socket under `/var/empty/.gunicorn`, logging a nonfatal permissions error. Verified its native `--no-control-socket` option and package wrapper's Gunicorn execution; set `services.immich.machine-learning.environment.GUNICORN_CMD_ARGS` to disable this unused socket. Follow-up native deployment required.
+- ML's Gunicorn 26 attempted an optional control socket under `/var/empty/.gunicorn`, logging a nonfatal permissions error. Verified its native `--no-control-socket` option and package wrapper's Gunicorn execution; set `services.immich.machine-learning.environment.GUNICORN_CMD_ARGS` to disable this unused socket. Follow-up commit `fe486f8` passed parsing/whitespace checks and native dry activation (ML restart and D-Bus reload only), then deployed and confirmed successfully.
+- Final deployed system: `/nix/store/6w6jsq4b4pmwi9mr9p919qm1bcwy0xs2-nixos-system-203-media-26.05.20261025.1f607aa`. Deployment logs are `/tmp/opencode/immich-20261028-{dry-activate,activate,ml-dry-activate,ml-activate}.log` on the operator host; protected backup and rehearsal evidence remain inside the backup directory on 203.
+- Final checks: server and ML active, zero systemd restarts, no guard drop-ins left, no failed units, no ML startup error after the control-socket fix. The follow-up did not restart the server. Synthetic CLIP text inference using the existing `ViT-B-32__openai` cache succeeded both before and after the ML-only restart; its serialized output parsed to 512 numeric dimensions.
+- Removed the disposable rehearsal database after both startup/migration rehearsals. Namespace processes/mounts and writable tmpfs overlays were automatically discarded. Production uses its existing original media path; backup remains intact. Backup parent/directory permissions verified root:root 0700, dump/config archive 0600.
+
+## Recovery and remaining acceptance
+- Retain `/mnt/Shares/.immich-backups/2026-10-28-pre-3.3.5` and GC roots `/nix/var/nix/gcroots/immich-pre-3.3.5-20261028` and `/nix/var/nix/gcroots/immich-pre-3.3.5-profile-20261028`. Old configuration archive is from `bbdfa82`; old running system is recorded in `old-system-path` and `old-profile-path` inside the backup. No off-host copy was created.
+- If rollback is required, stop/guard Immich and its dedicated Redis, preserve post-upgrade state, and explicitly resolve newer writes before restoring. Restore only the Immich DB from `immich.dump`, paired `media/`, `state/` and `redis/`, then select the retained old application/system. Do not restore the shared PostgreSQL cluster or start 3.0.2 against the migrated DB. Backup ML cache is available but regenerable.
+- Authenticated mobile login/upload, viewing representative photos/videos, and account/share authorization regressions still require user acceptance; no credentials/session tokens were read or manufactured. The isolated API rehearsal and direct synthetic ML inference do not substitute for those checks. Existing Node/Brotli, SVG/ImageMagick and Pillow findings remain as documented in the security plan; this rollout preserves strict tailnet ingress and does not claim complete dependency remediation.
