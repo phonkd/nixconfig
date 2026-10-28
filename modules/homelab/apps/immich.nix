@@ -52,9 +52,9 @@
 
         services.immich = {
           enable = true;
-          # Keep the running 3.0.2 server/ML while its independent backup and
-          # schema migration gate is unresolved. Tailnet containment stays on.
-          package = inputs.nixpkgs-immich.legacyPackages.${pkgs.system}.immich;
+          # The native module takes ML from this package's matching passthru.
+          # Backup/migration evidence: plans/immich-upgrade-2026-10-28.md.
+          package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
           host = "0.0.0.0";
           mediaLocation = "/mnt/solo-sata/immich";
         };
