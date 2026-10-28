@@ -157,6 +157,19 @@
       services.pipewire.wireplumber.package =
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.wireplumber;
 
+      # E sounds robotic with the automatic 7.5 ms high-reliability preset.
+      # 48_4_1 is listener-tested: 48 kHz stereo, 10 ms, 96 kbit/s per channel.
+      # Its 240-byte SDUs also avoid the EMSGSIZE failure seen with 48_6_2
+      # (310-byte SDUs versus a 155-byte kernel limit on this MT7922 setup).
+      services.pipewire.wireplumber.extraConfig."90-e-lc3" = {
+        "monitor.bluez.rules" = [
+          {
+            matches = [ { "device.name" = "bluez_card.E4_58_BC_BE_26_6A"; } ];
+            actions.update-props."bluez5.bap.preset" = "48_4_1";
+          }
+        ];
+      };
+
       # CPU temperature. This Ryzen AI 7 445 (family 1Ah model 68h) has a
       # data-fabric F3 device 1022:114b that no k10temp knows yet -- not 6.18,
       # not upstream 7.3-rc5 -- so the driver never binds and there's no
