@@ -1,6 +1,12 @@
 # oCIS sharing/traversal remediation
 
-**Repo(s):** nixconfig   **Status:** in-progress — containment prepared/approved; rollout pending, migration deferred pending maintained native packages
+**Repo(s):** nixconfig   **Status:** in-progress — containment deployed; migration deferred pending maintained native packages
+
+**Current status (2026-10-28):** the 201 rollout recorded in
+`plans/security-update-2026-10.md` deployed the approved IP filter and verified
+external HTTP 403 / tailnet HTTP 200. This change and the migration decision are
+now integrated into local main. Older prepared-only/integration-pending notes
+below are historical. oCIS itself remains 5.0.9; containment is not a package fix.
 
 ## Goal and boundaries
 
@@ -207,8 +213,8 @@ target, successful restore rehearsal and access-boundary tests are recorded.
 - [x] Prepare containment options, phased migration, backup/rollback and test gates.
 - [x] User approves temporary access policy: existing LAN/Headscale IP filter.
 - [x] Prepare the route-only configuration change in the isolated worktree.
-- [ ] Coordinate integration into PR #63 without unrelated session changes.
-- [ ] User rolls out 201 and verifies outside denial plus permitted client access.
+- [x] Integrate the containment and migration decision into local main (user requested local consolidation, no push).
+- [x] Roll out 201 and verify outside denial plus permitted tailnet reachability (recorded 2026-10-26; authenticated sync acceptance remains separate).
 - [x] User chooses maintained native packages only; defer migration until available.
 - [ ] Recheck native sequential-package availability and resolve final-hop guidance.
 - [ ] Pin/verify every transit artifact; review native module compatibility.

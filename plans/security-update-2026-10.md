@@ -2,6 +2,17 @@
 
 **Repo(s):** nixconfig   **Status:** in-progress
 
+**Current integration (2026-10-28):** the deployed ingress/server rollout, all six
+security workstreams and unrelated shared-checkout changes are now consolidated
+on local `main`. The ordinary checkout is on `main`; nothing was pushed. The
+historical branch/integration-pending statements below describe the earlier
+rollout, not the current checkout. SABnzbd rollout is being completed in
+[`security-main-sabnzbd-2026-10.md`](security-main-sabnzbd-2026-10.md).
+Immich server/ML are explicitly held at the existing 3.0.2 native package pin;
+Seerr stays on stable 3.2.0. Their reviewed upgrades remain deferred rather than
+being activated as a side effect of the SABnzbd deployment. Ingress containment
+and completed Jellyfin/Headscale/Traefik fixes are preserved.
+
 ## Goal
 
 Prepare one pull request addressing the current-config findings in `plans/cve-audit-2026-10-26.md`. The user explicitly requested subagents and a PR and retains responsibility for deployment; this supersedes the usual local-main/no-push/deploy workflow for this effort.
