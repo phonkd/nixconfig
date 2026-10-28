@@ -55,6 +55,9 @@
           # The native module takes ML from this package's matching passthru.
           # Backup/migration evidence: plans/immich-upgrade-2026-10-28.md.
           package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
+          # Gunicorn 26 otherwise tries ~/.gunicorn under the service user's
+          # unwritable /var/empty home. ML does not use its control socket.
+          machine-learning.environment.GUNICORN_CMD_ARGS = "--no-control-socket";
           host = "0.0.0.0";
           mediaLocation = "/mnt/solo-sata/immich";
         };
