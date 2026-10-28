@@ -337,7 +337,16 @@
             usenetClients.sabnzbd = {
               enable = true;
               # 5.1.3 fixes the 5.1.2 API-auth bypass and archive/PAR2 RCE.
-              package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.sabnzbd;
+              package =
+                let
+                  sabnzbdPkgs = import inputs.nixpkgs-unstable {
+                    system = pkgs.stdenv.hostPlatform.system;
+                    # This package set does not inherit the host's license
+                    # policy. SABnzbd's native wrapper requires unrar.
+                    config.allowUnfreePredicate = pkg: lib.getName pkg == "unrar";
+                  };
+                in
+                sabnzbdPkgs.sabnzbd;
               settings.misc.port = 8080;
               settings.misc.host_whitelist = "sabnzbd.home.phonkd.net";
               # SABnzbd's own `inet_exposure` guard (default 0 = no external

@@ -22,7 +22,7 @@ held schema migration cannot start. Keep the deployed Jellyfin 12.2, Headscale
 
 - [x] Commit the shared checkout's unrelated Bluetooth change without discarding work.
 - [x] Integrate security branches and unrelated shared-checkout commits into main.
-- [ ] Keep Immich at 3.0.2 and verify syntax, lock preservation and merged source.
+- [x] Keep Immich at 3.0.2 and verify syntax, lock preservation and merged source.
 - [ ] Build/dry-activate 203 through native deploy and review all service changes.
 - [ ] Quiesce SABnzbd and take/verify a protected consistent state backup.
 - [ ] Activate 203 over a non-tailnet management path and verify SABnzbd 5.1.3,
@@ -38,3 +38,17 @@ state and the old generation and reintroduces the old archive/API vulnerabilitie
 Keep Jellyfin's existing migration backups; never boot its old binary against the
 12.2 database. Use a management path via 201 to avoid the target's Tailscale
 restart interrupting deploy-rs. No custom glue, package override or new unit.
+
+## Integration evidence
+
+The deployed ingress rollout and shared security branch, including the unrelated
+desktop and z14 Bluetooth changes, are merged on local main. The restored Immich
+input is byte-for-byte the old native package pin; all existing rollout lock nodes
+and input references, including Android's paired pins, are unchanged. Seerr stays
+on stable 3.2.0 for this rollout; its reviewed unstable 3.5.0 upgrade remains deferred.
+
+The first native deploy dry run stopped before building/activation because the
+unstable SABnzbd package's mandatory unrar dependency was disallowed by that
+package set's default license policy. Use the repository's existing scoped-import
+pattern, permitting only unrar in this SABnzbd package set. This changes no native
+derivation, adds no overlay and does not blanket-enable unfree packages.
