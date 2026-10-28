@@ -1,13 +1,13 @@
-Retain and reuse disconnected Bluetooth SPA devices, as WirePlumber 0.5.14 did.
+Retain Bluetooth SPA device settings across connection property updates.
 
-0.5.18 creates a fresh SPA device for each connection event, but only stores it
-once connected. Releasing the disconnected device clears PipeWire's device
-settings before BAP SelectProperties, causing E to negotiate default LC3 QoS
-and conversational context instead of its configured gaming context/preset.
-Retain the device before activation and reuse it across connection transitions.
-Signal handlers are installed only once, when the SPA device is first created.
+The 0.5.18 monitor only stores connected devices. Its native object-info
+handler also destroys an existing child before emitting each connection update.
+Retain disconnected devices in Lua and preserve api.bluez5.device children on
+property updates in the native handler. Real object removal still releases them,
+and all other SPA factories keep their existing replacement behavior.
+Reuse the retained device and install its signal handlers only once.
 
-Local fix against 0.5.18; remove when upstream restores equivalent lifetime.
+Local fix against 0.5.18; remove when upstream provides equivalent lifetime.
 
 --- a/src/scripts/monitors/bluez/create-device.lua
 +++ b/src/scripts/monitors/bluez/create-device.lua
@@ -98,3 +98,19 @@ Local fix against 0.5.18; remove when upstream restores equivalent lifetime.
            -- Push event to create loopbacks if needed*/
            local e = source:call ("create-event", "create-bluez-device-loopback-node", device, nil)
            EventDispatcher.push_event (e)
+--- a/lib/wp/device.c
++++ b/lib/wp/device.c
+@@ -623,7 +623,12 @@
+     wp_debug_object (self, "object info: id:%u type:%s factory:%s",
+         id, type, factory_name);
+ 
+-    if (id < self->managed_objs->len &&
++    /* BlueZ reports connection changes on the existing device object. Keep
++     * its SPA handle alive so codec settings remain available to negotiation;
++     * the Bluetooth monitor updates activation on the create-object signal.
++     */
++    if (g_strcmp0 (factory_name, "api.bluez5.device") != 0 &&
++        id < self->managed_objs->len &&
+         g_ptr_array_index (self->managed_objs, id) != NULL) {
+       wp_debug_object (self, "object already exists, removing");
+       g_signal_emit (self, spa_device_signals[SIGNAL_OBJECT_REMOVED], 0, id);

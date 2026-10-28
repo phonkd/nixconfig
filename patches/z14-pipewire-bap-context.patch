@@ -7,7 +7,12 @@ playback and microphone audio with gaming context (0x0008), 10 ms frames and
 The context is still masked against the remote endpoint's available contexts.
 An unsupported explicit preset still follows the normal selection fallback.
 
-Local patch: remove when upstream provides equivalent context/preset control.
+Reconnect also exposed a null-settings capability probe in codec_select_config.
+Use an empty dictionary there, and avoid an old asynchronously destroyed SPA
+device clearing the replacement device's settings.
+
+Local patch: remove when upstream provides equivalent context/preset control
+and settings lifetime/null-probe handling.
 
 --- a/spa/plugins/bluez5/bap-codec-lc3.c
 +++ b/spa/plugins/bluez5/bap-codec-lc3.c
@@ -48,14 +53,46 @@ Local patch: remove when upstream provides equivalent context/preset control.
  		context = BAP_CONTEXT_CONVERSATIONAL;
  	else
  		context = BAP_CONTEXT_MEDIA;
-@@ -845,6 +857,10 @@
- 
+@@ -846,6 +858,10 @@
  	if (!settings)
  		return;
-+
+ 
 +	if (spa_atou32(spa_dict_lookup(settings, "bluez5.bap.context"), &value, 0) &&
 +			value <= UINT16_MAX)
 +		s->context = value;
- 
++
  	if ((str = spa_dict_lookup(settings, "bluez5.bap.preset")))
  		s->qos_name = strdup(str);
+ 
+@@ -922,6 +938,7 @@
+ 	struct ltv_writer writer = LTV_WRITER(config, A2DP_MAX_CAPS_SIZE);
+ 	const void *metadata = NULL;
+ 	uint32_t metadata_len = 0;
++	const struct spa_dict empty_settings = SPA_DICT_INIT(NULL, 0);
+ 
+ 	if (caps == NULL)
+ 		return -EINVAL;
+@@ -929,6 +946,10 @@
+ 	d = calloc(1, sizeof(*d));
+ 	if (!d)
+ 		return -ENOMEM;
++
++	/* Capability probes can run before the session manager supplies settings. */
++	if (settings == NULL)
++		settings = &empty_settings;
+ 
+ 	parse_settings(&d->settings, settings, &debug_ctx);
+ 
+--- a/spa/plugins/bluez5/bluez5-device.c
++++ b/spa/plugins/bluez5/bluez5-device.c
+@@ -3291,7 +3291,9 @@
+ 
+ 	free(this->supported_codecs);
+ 	if (this->bt_dev) {
+-		this->bt_dev->settings = NULL;
++		/* An asynchronously replaced device may already own newer settings. */
++		if (this->bt_dev->settings == &this->setting_dict)
++			this->bt_dev->settings = NULL;
+ 		spa_hook_remove(&this->bt_dev_listener);
+ 	}
+ 

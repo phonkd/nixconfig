@@ -12,8 +12,11 @@ Add an opt-in PipeWire BAP context setting and honor its explicit preset before
 the normal TMAP duplex rate preference. Configure only E with context 8 and CIG 2.
 WirePlumber must load the same patched PipeWire. Reconnect testing exposed a
 WirePlumber 0.5.18 lifecycle regression: disconnected SPA devices are not retained,
-losing per-device codec settings before BlueZ negotiates. Restore the previous
-retain/reuse behavior in its existing monitor, without a reconnect helper.
+losing per-device codec settings before BlueZ negotiates. Retain/reuse disconnected devices in its existing monitor, and preserve native
+Bluetooth child objects during connection property updates. Real object removal
+still releases them. Also guard PipeWire capability probes without settings and
+prevent a replaced SPA device from clearing its successor's settings. The first
+Lua-only fix was insufficient: the native handler also replaced each child.
 
 ## Steps
 - [x] Build and activate PipeWire patch and E rule (3315d2a).
