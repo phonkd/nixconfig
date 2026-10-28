@@ -70,3 +70,10 @@ needs validation. Matching upstream report: https://github.com/bluez/bluez/issue
 If the controller wedges again, `bluetoothctl power off` followed by
 `bluetoothctl power on` and reconnecting E is the verified recovery. No re-pairing
 or manual endpoint settings are required.
+
+Guard built and installed with `nixos-rebuild boot --impure` as generation
+`/nix/store/l5aj7czgyyfp2cbfh2r6g8ifsqy7f9cd-nixos-system-z14-26.05.20261025.1f607aa`;
+the generated drop-in contains ConditionUser=!greeter. Deliberately staged for
+the next boot, so the recovered live audio session is not restarted. Playback was
+user-confirmed and the post-reset mic check returned 239626 nonzero samples out
+of 240000. Capture: `/tmp/z14-le-diag/after-rebuild.btsnoop` (private).
