@@ -6,12 +6,18 @@
 security workstreams and unrelated shared-checkout changes are now consolidated
 on local `main`. The ordinary checkout is on `main`; nothing was pushed. The
 historical branch/integration-pending statements below describe the earlier
-rollout, not the current checkout. SABnzbd rollout is being completed in
+rollout, not the current checkout. SABnzbd **5.1.3 is now deployed and verified** on
+203 (zero restarts, preserved history, API-denial checks and all four *arr client
+tests passing); details are in
 [`security-main-sabnzbd-2026-10.md`](security-main-sabnzbd-2026-10.md).
 Immich server/ML are explicitly held at the existing 3.0.2 native package pin;
 Seerr stays on stable 3.2.0. Their reviewed upgrades remain deferred rather than
 being activated as a side effect of the SABnzbd deployment. Ingress containment
 and completed Jellyfin/Headscale/Traefik fixes are preserved.
+203 now runs the security base too; its Immich server/ML were not restarted or
+migrated. All six servers have received the base update, but staged kernel
+updates still require separately scheduled reboots. The broader effort remains
+in-progress because deferred upgrades and dependency gaps are not resolved.
 
 ## Goal
 
