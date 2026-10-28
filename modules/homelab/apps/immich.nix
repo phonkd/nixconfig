@@ -52,9 +52,9 @@
 
         services.immich = {
           enable = true;
-          # Stable still carries 2.x. Use the maintained unstable input for
-          # the 3.x server and its matching machine-learning package.
-          package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.immich;
+          # Keep the running 3.0.2 server/ML while its independent backup and
+          # schema migration gate is unresolved. Tailnet containment stays on.
+          package = inputs.nixpkgs-immich.legacyPackages.${pkgs.system}.immich;
           host = "0.0.0.0";
           mediaLocation = "/mnt/solo-sata/immich";
         };

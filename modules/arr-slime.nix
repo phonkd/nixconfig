@@ -376,7 +376,9 @@
             seerr = {
               enable = true;
               # 3.5.0 includes the avatar traversal and credential-disclosure fixes.
-              package = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.seerr;
+              # Hold the current 3.2.0 during the SABnzbd-only application
+              # rollout; the reviewed unstable 3.5.0 upgrade remains separate.
+              package = pkgs.seerr;
               apiKey._secret = "/run/secrets/seerr-api-key";
               sonarr.main = {
                 apiKey._secret = "/run/secrets/sonarr-api-key";

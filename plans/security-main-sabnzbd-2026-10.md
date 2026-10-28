@@ -20,8 +20,8 @@ held schema migration cannot start. Keep the deployed Jellyfin 12.2, Headscale
 
 ## Steps
 
-- [ ] Commit the shared checkout's unrelated Bluetooth change without discarding work.
-- [ ] Integrate security branches and unrelated shared-checkout commits into main.
+- [x] Commit the shared checkout's unrelated Bluetooth change without discarding work.
+- [x] Integrate security branches and unrelated shared-checkout commits into main.
 - [ ] Keep Immich at 3.0.2 and verify syntax, lock preservation and merged source.
 - [ ] Build/dry-activate 203 through native deploy and review all service changes.
 - [ ] Quiesce SABnzbd and take/verify a protected consistent state backup.
