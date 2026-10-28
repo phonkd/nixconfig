@@ -184,9 +184,11 @@
       # PipeWire 1.6.9 plus opt-in gaming context for E's working LC3 duplex.
       services.pipewire.package = pipewireGaming;
       # WirePlumber loads the Bluetooth SPA plugins from its linked PipeWire.
-      services.pipewire.wireplumber.package = unstableAudio.wireplumber.override {
-        pipewire = pipewireGaming;
-      };
+      services.pipewire.wireplumber.package =
+        (unstableAudio.wireplumber.override { pipewire = pipewireGaming; }).overrideAttrs (old: {
+          # Retain device rules before BlueZ negotiates on reconnect (0.5.18 regression).
+          patches = (old.patches or [ ]) ++ [ ../../patches/z14-wireplumber-bluez-device-lifetime.patch ];
+        });
 
       # E sounds robotic with the automatic 7.5 ms high-reliability preset.
       # 48_4_1 is listener-tested: 48 kHz stereo, 10 ms, 96 kbit/s per channel.

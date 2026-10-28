@@ -1,0 +1,100 @@
+Retain and reuse disconnected Bluetooth SPA devices, as WirePlumber 0.5.14 did.
+
+0.5.18 creates a fresh SPA device for each connection event, but only stores it
+once connected. Releasing the disconnected device clears PipeWire's device
+settings before BAP SelectProperties, causing E to negotiate default LC3 QoS
+and conversational context instead of its configured gaming context/preset.
+Retain the device before activation and reuse it across connection transitions.
+Signal handlers are installed only once, when the SPA device is first created.
+
+Local fix against 0.5.18; remove when upstream restores equivalent lifetime.
+
+--- a/src/scripts/monitors/bluez/create-device.lua
++++ b/src/scripts/monitors/bluez/create-device.lua
+@@ -35,39 +35,45 @@
+           return
+         end
+ 
+-        -- Create the BT device
+-        local device = SpaDevice (factory, properties)
++        -- Keep the SPA device while disconnected: its lifetime owns PipeWire's
++        -- per-device codec settings, which BlueZ needs before profile negotiation.
++        local device = monitor:get_managed_object (id)
+         if device == nil then
+-          log:warning ("Failed to create '" .. factory .. "' device")
+-          transition:advance ()
+-          event:stop_processing ()
+-          return
++          -- Create the BT device
++          device = SpaDevice (factory, properties)
++          if device == nil then
++            log:warning ("Failed to create '" .. factory .. "' device")
++            transition:advance ()
++            event:stop_processing ()
++            return
++          end
++
++          -- Handle create-object signal
++          device:connect ("create-object", function (parent, id, type, factory, properties)
++            local e = source:call ("create-event", "create-bluez-device-node", parent, nil)
++            e:set_data ("node-properties", properties)
++            e:set_data ("type", type)
++            e:set_data ("factory", factory)
++            e:set_data ("node-sub-id", id)
++            EventDispatcher.push_event (e)
++          end)
++
++          -- Handle object-removed signal
++          device:connect ("object-removed", function (parent, id)
++            local e = source:call ("create-event", "remove-bluez-device-node", parent, nil)
++            e:set_data ("node-sub-id", id)
++            EventDispatcher.push_event (e)
++          end)
++
++          -- Handle params-changed signal
++          device:connect ("params-changed", function (spa_device, param_name)
++            if param_name == "Profile" or param_name == "EnumProfile" then
++              local e = source:call ("create-event", "create-bluez-device-loopback-node", spa_device, nil)
++              EventDispatcher.push_event (e)
++            end
++          end)
++          monitor:store_managed_object (id, device)
+         end
+-
+-        -- Handle create-object signal
+-        device:connect ("create-object", function (parent, id, type, factory, properties)
+-          local e = source:call ("create-event", "create-bluez-device-node", parent, nil)
+-          e:set_data ("node-properties", properties)
+-          e:set_data ("type", type)
+-          e:set_data ("factory", factory)
+-          e:set_data ("node-sub-id", id)
+-          EventDispatcher.push_event (e)
+-        end)
+-
+-        -- Handle object-removed signal
+-        device:connect ("object-removed", function (parent, id)
+-          local e = source:call ("create-event", "remove-bluez-device-node", parent, nil)
+-          e:set_data ("node-sub-id", id)
+-          EventDispatcher.push_event (e)
+-        end)
+-
+-        -- Handle params-changed signal
+-        device:connect ("params-changed", function (spa_device, param_name)
+-          if param_name == "Profile" or param_name == "EnumProfile" then
+-            local e = source:call ("create-event", "create-bluez-device-loopback-node", spa_device, nil)
+-            EventDispatcher.push_event (e)
+-          end
+-        end)
+ 
+         log:info (monitor, string.format("%d, %s (%s): %s",
+             id, properties["device.description"],
+@@ -94,9 +100,6 @@
+ 
+           log:info (monitor, "Activated SPA device " .. properties["device.name"])
+ 
+-          -- Store the device as managed object in the monitor
+-          monitor:store_managed_object (id, device)
+-
+           -- Push event to create loopbacks if needed*/
+           local e = source:call ("create-event", "create-bluez-device-loopback-node", device, nil)
+           EventDispatcher.push_event (e)
