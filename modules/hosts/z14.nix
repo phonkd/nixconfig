@@ -11,7 +11,11 @@
 #
 # tlp stays off: it and power-profiles-daemon (enabled in modules/desktop.nix)
 # fight over the same CPU governor.
-{ self, ... }:
+{
+  self,
+  inputs,
+  ...
+}:
 {
   flake.nixosModules.z14 =
     {
@@ -144,6 +148,11 @@
         Experimental = true;
         KernelExperimental = "6fbaf188-05e0-496a-9885-d6ddfdb4e03e";
       };
+
+      # Use unstable's PipeWire (1.6.9 at the current pin) for its Bluetooth
+      # transport fixes while investigating distorted LC3 playback.
+      services.pipewire.package =
+        inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pipewire;
 
       # CPU temperature. This Ryzen AI 7 445 (family 1Ah model 68h) has a
       # data-fabric F3 device 1022:114b that no k10temp knows yet -- not 6.18,
