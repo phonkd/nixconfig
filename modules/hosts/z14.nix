@@ -25,6 +25,13 @@
       ...
     }:
     let
+      unstableAudio = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+      # E requires gaming context for working LE Audio duplex. Keep the
+      # opt-in codec patch local to z14 and share it with WirePlumber's SPA loader.
+      pipewireGaming = unstableAudio.pipewire.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ../../patches/z14-pipewire-bap-context.patch ];
+      });
+
       # Spotifast v0.12.0: current settings plus src/milkdrop/engine.rs defaults.
       # Share its downloaded presets/textures; seed a writable config so the
       # standalone player's settings UI can still save later adjustments.
@@ -174,23 +181,30 @@
       hardware.bluetooth.package =
         inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.bluez;
 
-      # Use unstable's PipeWire (1.6.9 at the current pin) for its Bluetooth
-      # transport fixes while investigating distorted LC3 playback.
-      services.pipewire.package =
-        inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.pipewire;
+      # PipeWire 1.6.9 plus opt-in gaming context for E's working LC3 duplex.
+      services.pipewire.package = pipewireGaming;
       # WirePlumber loads the Bluetooth SPA plugins from its linked PipeWire.
-      services.pipewire.wireplumber.package =
-        inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.wireplumber;
+      services.pipewire.wireplumber.package = unstableAudio.wireplumber.override {
+        pipewire = pipewireGaming;
+      };
 
       # E sounds robotic with the automatic 7.5 ms high-reliability preset.
       # 48_4_1 is listener-tested: 48 kHz stereo, 10 ms, 96 kbit/s per channel.
       # Its 240-byte SDUs also avoid the EMSGSIZE failure seen with 48_6_2
       # (310-byte SDUs versus a 155-byte kernel limit on this MT7922 setup).
       services.pipewire.wireplumber.extraConfig."90-e-lc3" = {
+        "wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
         "monitor.bluez.rules" = [
           {
             matches = [ { "device.name" = "bluez_card.E4_58_BC_BE_26_6A"; } ];
-            actions.update-props."bluez5.bap.preset" = "48_4_1";
+            actions.update-props = {
+              "bluez5.bap.preset" = "48_4_1";
+              # Same context and CIG in both directions: 240-byte stereo out,
+              # 120-byte mono in. Conversational context produced silent RX.
+              "bluez5.bap.context" = 8;
+              "bluez5.bap.cig" = 2;
+              "bluez5.bap.force-target-latency" = "low-latency";
+            };
           }
         ];
       };

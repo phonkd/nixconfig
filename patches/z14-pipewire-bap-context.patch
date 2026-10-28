@@ -1,0 +1,61 @@
+Allow an opt-in BAP streaming context and its explicit duplex preset.
+
+PipeWire 1.6.9 selects conversational context and prefers 16/32 kHz in duplex.
+Bose E was silent in conversational context but delivered simultaneous 48 kHz
+playback and microphone audio with gaming context (0x0008), 10 ms frames and
+48_4_1 QoS. Add bluez5.bap.context, leaving zero/unset behavior unchanged.
+The context is still masked against the remote endpoint's available contexts.
+An unsupported explicit preset still follows the normal selection fallback.
+
+Local patch: remove when upstream provides equivalent context/preset control.
+
+--- a/spa/plugins/bluez5/bap-codec-lc3.c
++++ b/spa/plugins/bluez5/bap-codec-lc3.c
+@@ -48,6 +48,7 @@
+ 	uint32_t channel_allocation;
+ 	uint16_t supported_context;
+ 	uint16_t available_context;
++	uint16_t context; /* 0 keeps the automatic TMAP context selection */
+ 	bool sink;
+ 	bool duplex;
+ 	char *qos_name;
+@@ -669,7 +670,16 @@
+ 	 * Frame length is not limited by ISO MTU, as kernel will fragment
+ 	 * and reassemble SDUs as needed.
+ 	 */
+-	if (pac->settings->duplex) {
++	/* An explicit context/preset pair may describe a non-TMAP duplex stream,
++	 * e.g. 48 kHz gaming audio. Try that preset before the TMAP rate preference.
++	 * Keep the usual fallback if the peer cannot support the requested preset.
++	 */
++	if (pac->settings->context && pac->settings->qos_name)
++		found = select_bap_qos(&bap_qos, pac->settings, rate_mask,
++				duration_mask, framelen_min, framelen_max) &&
++			spa_streq(bap_qos.name, pac->settings->qos_name);
++
++	if (!found && pac->settings->duplex) {
+ 		/* 16KHz input is mandatory in BAP v1.0.1 Table 3.5, and 32KHz in TMAP,
+ 		 * so prefer those for now for input rate in duplex configuration.
+ 		 *
+@@ -761,7 +771,9 @@
+ 	 * disconnect if LIVE is set, Samsung Galaxy Buds fail on microphone Enable if
+ 	 * CONVERSATIONAL is not set.
+ 	 */
+-	if (settings->sink || settings->duplex)
++	if (settings->context)
++		context = settings->context;
++	else if (settings->sink || settings->duplex)
+ 		context = BAP_CONTEXT_CONVERSATIONAL;
+ 	else
+ 		context = BAP_CONTEXT_MEDIA;
+@@ -845,6 +857,10 @@
+ 
+ 	if (!settings)
+ 		return;
++
++	if (spa_atou32(spa_dict_lookup(settings, "bluez5.bap.context"), &value, 0) &&
++			value <= UINT16_MAX)
++		s->context = value;
+ 
+ 	if ((str = spa_dict_lookup(settings, "bluez5.bap.preset")))
+ 		s->qos_name = strdup(str);
