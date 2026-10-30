@@ -142,6 +142,14 @@
       noughty.proxy.protonReddit.enable = true;
       networking.hostName = "z14";
 
+      # 20 GiB on the LUKS-backed ext4 root; no separate partition needed.
+      swapDevices = [
+        {
+          device = "/swapfile";
+          size = 20 * 1024; # MiB
+        }
+      ];
+
       # limine (not systemd-boot): the g14-stopgap rebuild already installed
       # limine to this disk. No secureBoot -- that's blac's, which has
       # enrolled keys.
