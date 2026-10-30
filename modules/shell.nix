@@ -76,8 +76,8 @@
           unset STARSHIP_KUBE_RECENT
 
           _starship_kube_track() {
-            # $2 has aliases expanded, including k, kgp and kgpw.
-            local kube_command='(^|[;&|])[[:space:]]*((command|sudo|watch)[[:space:]]+)*(kubectl|kubecolor|kubectx|kubens|kgi)([[:space:]]|$)'
+            # $2 expands aliases, including kubectl to a Nix store kubecolor path.
+            local kube_command='(^|[;&|])[[:space:]]*((command|sudo|watch)[[:space:]]+)*([^[:space:];&|]*/)?(kubectl|kubecolor|kubectx|kubens|kgi)([[:space:]]|$)'
             if [[ $2 =~ $kube_command ]]; then
               _starship_kube_last_used=$EPOCHSECONDS
             fi
