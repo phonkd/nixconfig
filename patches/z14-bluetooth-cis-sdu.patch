@@ -1,0 +1,36 @@
+Bluetooth: preserve central CIS SDU limits on establishment
+
+Local experimental fix against Linux 6.18.57.
+
+The central supplies Max_SDU_C_To_P and Max_SDU_P_To_C through LE Set CIG
+Parameters, using conn->iso_qos. LE CIS Established instead reports Max_PDU
+in c_mtu/p_mtu. Replacing the configured SDU limits with these values rejects
+valid SDUs spanning more than one radio PDU in iso_send_frame.
+
+On z14's MT7922, 248 kb/s stereo LC3 negotiates a 310-byte SDU, while the
+controller reports a 155-byte Max_PDU with BN=2. Every 310-byte send then
+fails with EMSGSIZE, despite successful CIS establishment.
+
+Retain the central's configured SDU sizes for enabled directions. Preserve
+the existing zero-BN behavior and leave the peripheral path unchanged.
+No packet-size bypass or assumed PDU-to-SDU multiplier is required.
+
+--- a/net/bluetooth/hci_event.c
++++ b/net/bluetooth/hci_event.c
+@@ -6939,8 +6939,14 @@
+ 		qos->ucast.in.latency =
+ 			DIV_ROUND_CLOSEST(get_unaligned_le24(ev->p_latency),
+ 					  1000);
+-		qos->ucast.out.sdu = ev->c_bn ? le16_to_cpu(ev->c_mtu) : 0;
+-		qos->ucast.in.sdu = ev->p_bn ? le16_to_cpu(ev->p_mtu) : 0;
++		/* The central configured Max_SDU in LE Set CIG Parameters.
++		 * c_mtu/p_mtu report Max_PDU, which can be smaller than an
++		 * SDU. Keep the configured limits for enabled directions.
++		 */
++		if (!ev->c_bn)
++			qos->ucast.out.sdu = 0;
++		if (!ev->p_bn)
++			qos->ucast.in.sdu = 0;
+ 		qos->ucast.out.phy = ev->c_phy;
+ 		qos->ucast.in.phy = ev->p_phy;
+ 		break;

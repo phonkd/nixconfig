@@ -162,6 +162,12 @@
           name = "z14-btmtk-iso-reception";
           patch = ../../patches/z14-btmtk-iso-reception.patch;
         }
+        {
+          # Preserve the negotiated SDU limit when the controller uses smaller
+          # radio PDUs; otherwise 310-byte LC3 frames fail with EMSGSIZE.
+          name = "z14-bluetooth-cis-sdu";
+          patch = ../../patches/z14-bluetooth-cis-sdu.patch;
+        }
       ];
 
       # Real ambient light sensor (IIO `als`, HID usage 200041) behind the AMD
