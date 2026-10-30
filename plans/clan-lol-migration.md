@@ -252,6 +252,10 @@ reach anyway.) Neither is a prerequisite for the next steps.
   exactly the old and new recipient. Encrypted payload, MAC, timestamp and
   version match the committed baseline. SOPS also materialized its default
   `_unencrypted` suffix metadata. No secret values or machine links changed.
+- Committed as `0968f5b`. The agent's 205-builder pilot was stopped during
+  the build, before activation, after the user reported a concurrent
+  `deploy --all`. The user's run was building the same 205 derivation;
+  activation and fleet health remain unverified by this migration session.
 - Keep the existing shared recipient until an offline recovery copy has been
   made and checked. The recovery destination is pending user input. Do not
   migrate `mail-secret` while the shared key remains an admin recipient.
