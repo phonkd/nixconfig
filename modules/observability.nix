@@ -31,8 +31,74 @@
       mimirHttpPort = 9009;
       mimirGrpcPort = 9095;
       grafanaPort = 3000;
+
+      # Provision first, then follow plans/observability-hetzner-s3.md.
+      # This switch stays off until the buckets, secrets and Mimir copy exist.
+      objectStorage = {
+        enable = false;
+        region = "hel1";
+        lokiFrom = null; # Explicit future YYYY-MM-DD (00:00 UTC), set at cutover.
+        buckets = {
+          loki = "phonkd-loki";
+          blocks = "phonkd-mimir-blocks";
+          ruler = "phonkd-mimir-ruler";
+          alertmanager = "phonkd-mimir-alertmanager";
+        };
+      };
+      s3Connection = {
+        endpoint = "${objectStorage.region}.your-objectstorage.com";
+        region = objectStorage.region;
+        access_key_id = "\${OBS_S3_ACCESS_KEY_ID}";
+        secret_access_key = "\${OBS_S3_SECRET_ACCESS_KEY}";
+        insecure = false;
+      };
+      mimirStorage =
+        bucket: directory:
+        if objectStorage.enable then
+          {
+            backend = "s3";
+            s3 = s3Connection // {
+              bucket_name = bucket;
+              bucket_lookup_type = "path";
+            };
+          }
+        else
+          {
+            backend = "filesystem";
+            filesystem.dir = directory;
+          };
     in
     lib.mkIf (noughtyLib.hostHasTag "observability-server") {
+      assertions = lib.optionals objectStorage.enable [
+        {
+          assertion =
+            objectStorage.lokiFrom != null
+            && builtins.match "[0-9]{4}-[0-9]{2}-[0-9]{2}" objectStorage.lokiFrom != null
+            && objectStorage.lokiFrom > "2024-01-01";
+          message = "Set objectStorage.lokiFrom to a future UTC date before enabling Hetzner S3; see plans/observability-hetzner-s3.md.";
+        }
+        {
+          assertion = builtins.length (lib.unique (builtins.attrValues objectStorage.buckets)) == 4;
+          message = "Use four distinct Hetzner S3 buckets for Loki and Mimir blocks/ruler/Alertmanager.";
+        }
+      ];
+
+      sops.secrets."observability-s3-access-key-id" = lib.mkIf objectStorage.enable { };
+      sops.secrets."observability-s3-secret-access-key" = lib.mkIf objectStorage.enable { };
+      sops.templates."observability-s3.env" = lib.mkIf objectStorage.enable {
+        content = ''
+          OBS_S3_ACCESS_KEY_ID=${config.sops.placeholder."observability-s3-access-key-id"}
+          OBS_S3_SECRET_ACCESS_KEY=${config.sops.placeholder."observability-s3-secret-access-key"}
+        '';
+        restartUnits = [
+          "loki.service"
+          "mimir.service"
+        ];
+      };
+      systemd.services.loki.serviceConfig.EnvironmentFile =
+        lib.mkIf objectStorage.enable
+          config.sops.templates."observability-s3.env".path;
+
       # Override the hetzner-vm default UUIDs — the observability disk has
       # different UUIDs (changed when a private network interface was attached).
       fileSystems."/" = lib.mkForce {
@@ -46,9 +112,11 @@
       };
 
       # ── Loki ────────────────────────────────────────────────────────────────
-      # Single-binary, filesystem-backed. State lives under /var/lib/loki.
+      # Single-binary. Historical filesystem periods remain readable after S3
+      # cutover; WAL, active index and caches still live under /var/lib/loki.
       services.loki = {
         enable = true;
+        extraFlags = lib.optionals objectStorage.enable [ "-config.expand-env=true" ];
         configuration = {
           auth_enabled = false;
           analytics.reporting_enabled = false;
@@ -81,7 +149,26 @@
                 period = "24h";
               };
             }
+          ]
+          ++ lib.optionals objectStorage.enable [
+            {
+              from = objectStorage.lokiFrom;
+              store = "tsdb";
+              object_store = "s3";
+              schema = "v13";
+              index = {
+                prefix = "index_";
+                period = "24h";
+              };
+            }
           ];
+
+          storage_config = lib.mkIf objectStorage.enable {
+            aws = s3Connection // {
+              bucketnames = objectStorage.buckets.loki;
+              s3forcepathstyle = true;
+            };
+          };
 
           # Keep logs forever for now; tune once disk usage is understood.
           limits_config = {
@@ -93,18 +180,21 @@
       };
 
       # ── Mimir ───────────────────────────────────────────────────────────────
-      # Monolithic single-node ("target = all") with filesystem block storage.
-      # Modelled on Grafana's canonical single-process example; state under
-      # /var/lib/mimir.
+      # Monolithic single-node. Object stores move together after copying the
+      # existing objects; TSDB/WAL, sync cache and compactor remain on disk.
       #
       # Ordered after network-online as well as pinning its addresses (see the
       # comment at compactor below), in case a future version detects one more.
       systemd.services.mimir = {
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
+        serviceConfig.EnvironmentFile =
+          lib.mkIf objectStorage.enable
+            config.sops.templates."observability-s3.env".path;
       };
       services.mimir = {
         enable = true;
+        extraFlags = lib.optionals objectStorage.enable [ "-config.expand-env=true" ];
         configuration = {
           multitenancy_enabled = false;
           usage_stats.enabled = false;
@@ -119,9 +209,7 @@
             log_level = "warn";
           };
 
-          blocks_storage = {
-            backend = "filesystem";
-            filesystem.dir = "/var/lib/mimir/blocks";
+          blocks_storage = mimirStorage objectStorage.buckets.blocks "/var/lib/mimir/blocks" // {
             bucket_store.sync_dir = "/var/lib/mimir/tsdb-sync";
             tsdb.dir = "/var/lib/mimir/tsdb";
           };
@@ -169,10 +257,7 @@
           # by an external process and 500s on API writes because the directory
           # ends up root-owned (created by an activation script) while Mimir
           # runs as a dynamic, non-root service user that can't write into it.
-          ruler_storage = {
-            backend = "filesystem";
-            filesystem.dir = "/var/lib/mimir/ruler-storage";
-          };
+          ruler_storage = mimirStorage objectStorage.buckets.ruler "/var/lib/mimir/ruler-storage";
 
           # Tell the ruler where to send firing alerts — Mimir's own bundled
           # Alertmanager (included in target=all), reached on the same port.
@@ -183,10 +268,7 @@
           # entirely through Grafana's Alerting UI once pointed at the
           # "Mimir Alertmanager" datasource below — no receiver config or
           # secrets need to live in this repo.
-          alertmanager_storage = {
-            backend = "filesystem";
-            filesystem.dir = "/var/lib/mimir/alertmanager-storage";
-          };
+          alertmanager_storage = mimirStorage objectStorage.buckets.alertmanager "/var/lib/mimir/alertmanager-storage";
         };
       };
 
