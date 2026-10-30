@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — builder migration complete for the active fleet; next: separate admin and machine keys, then migrate mail-secret
+**Repo(s):** nixconfig   **Status:** in-progress — separate admin key added; offline recovery copy pending before machine-key rollout and mail-secret
 
 ## Why
 
@@ -236,6 +236,36 @@ reach anyway.) Neither is a prerequisite for the next steps.
   keypairs, the headscale pre-auth key). The opaque third-party API keys can
   stay in the store — vars has no importer for them, prompts can't be piped,
   and there is no `sops.templates` equivalent.
+
+**2026-10-30 continuation — staged admin rotation:**
+
+- The pinned Clan revision is now `b6bc5c752cddce61b19ccf833360a6783c2270a0`.
+  Its native `clan secrets users add-key` can add a second admin recipient
+  without removing the shared recipient. Use `CLAN_NO_COMMIT=1` to review and
+  validate the complete change before committing it.
+- [x] Generated the new admin identity separately on z14 at
+  `~/.config/sops/age/clan-admin.txt` (mode 0600), using
+  `SOPS_AGE_KEY_FILE` with `clan secrets key generate`. Its public key is
+  `age1gn37c8sq9ugh6yqs82n8f4gkgyz7cyg399lupsjna9chwz4ewyvqkrg6ap`.
+- [x] Added the new public key to `phonkd` through native `users add-key`.
+  All 59 secrets decrypt successfully with each identity separately; each has
+  exactly the old and new recipient. Encrypted payload, MAC, timestamp and
+  version match the committed baseline. SOPS also materialized its default
+  `_unencrypted` suffix metadata. No secret values or machine links changed.
+- Keep the existing shared recipient until an offline recovery copy has been
+  made and checked. The recovery destination is pending user input. Do not
+  migrate `mail-secret` while the shared key remains an admin recipient.
+- Live preflight: 205-builder is reachable over `100.64.0.2`, has the existing
+  shared key, and has no `/var/lib/sops-nix/key.txt` yet. Local SSH rejects the
+  current Home Manager SSH config ownership; explicit `ssh -F /dev/null` with
+  the existing known-hosts database works for this check.
+- Native machine-key generation currently skips machines already registered
+  under `sops/machines/`; it will not rotate these shared registrations just
+  by running `clan vars generate`. The native SOPS vars backend stores machine
+  identities as `<machine>-age.key` and uploads `key.txt` under
+  `/var/lib/sops-nix`. The explicit shared `sops.age.keyFile` in
+  `modules/homelab/sops.nix` overrides Clan's default, so changing that setting
+  belongs in each host's later key rollout, after upload and decryption checks.
 
 Watch for: `migrateFact` no longer exists; the vars sops name changed
 between 26.05 and main (`vars/<gen>/<file>` → `vars/per-machine/…`); upstream
