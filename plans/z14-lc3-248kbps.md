@@ -1,6 +1,6 @@
 # LC3 playback at 248 kb/s on z14
 
-**Repo:** nixconfig  **Status:** in-progress
+**Repo:** nixconfig  **Status:** in-progress (built and staged; reboot/listening test pending)
 
 ## Goal
 Test E at 48 kHz stereo, 10 ms, 155 bytes per channel (248 kb/s total).
@@ -20,7 +20,7 @@ Do not infer SDU size by multiplying PDU size by burst number.
 - [x] Add a z14-only patch through boot.kernelPatches, retaining the MediaTek fix.
 - [x] Check application against 6.18.57 and regression cases for playback,
       duplex, disabled directions, and the unchanged peripheral path.
-- [ ] Commit on local main and build with parallel compilation; stage next boot.
+- [x] Commit on local main and build with parallel compilation; stage next boot.
 - [ ] After reboot, trace 310-byte sends and ask for a listening check.
 - [ ] Check established duplex again before offering persistent profile choices.
 
@@ -31,8 +31,24 @@ C harness (GCC, -O2 -Wall -Wextra -Werror): nine cases, four expected failures
 before and zero after. Covers the captured 310/155 split, existing 240/120
 duplex, fragmentation in both directions, disabled directions, preserving a
 configured limit smaller than Max_PDU, and unchanged peripheral behavior.
-Harness: /tmp/z14-cis-sdu-regression.py. Nix parse and git diff --check passed.
+Harness: /tmp/z14-cis-sdu-regression.py. Nix parse and whitespace checks passed
+(space-before-tab checking disabled for the unified patch's context markers).
 This validates the limit update, not actual radio transmission or audible output.
+
+## Build and staging (2026-10-30)
+Implementation committed as a313c80 on local main, not pushed. Full 6.18.57
+kernel, all 7296 modules, and the dependent evdi/DisplayLink packages built
+successfully on 205-builder. Observed make -j12 and concurrent compiler workers;
+both hci_event.o and btmtk.o compiled successfully.
+
+`nixos-rebuild boot` exited successfully and Limine installation completed.
+The next-boot system profile is
+`/nix/store/5gv1r3x1jzjlmzg6f6vmhhjq2mcmvkp1-nixos-system-z14-26.05.20261025.1f607aa`,
+with kernel `/nix/store/h3mc05kdv76nvkl9y57idz0lim88jwiy-linux-6.18.57/bzImage`.
+The running kernel remains the previous `42scrrgvrqp17hr5k2yz727nqdr09zb5`
+build. No reboot or post-patch radio/listening test has happened.
+Log: /tmp/z14-lc3-248-kernel-build.log. Retain 48_4_1 in the saved configuration;
+retry the manual playback-only 310-byte SDU test after booting the patched kernel.
 
 ## Risks / rollout
 This is a local experimental Bluetooth core fix, not an upstream backport.
