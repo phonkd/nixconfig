@@ -169,9 +169,10 @@ from that period unreadable. Prefer fixing S3 connectivity/credentials in place.
 
 Separate existing issue: Mimir was already hitting its default 150,000-series
 tenant limit before activation (confirmed in the old process's logs). This
-causes rejected samples; the storage migration does not change that limit.
+caused rejected samples; the initial storage migration did not change that limit.
 After the verification flush, the head held 138,689 series. Investigate
 cardinality/capacity separately rather than treating this as an S3 failure.
+The user-requested follow-up sets `limits.max_global_series_per_user = 400000`.
 
 - [Backblaze endpoint and credential mapping](https://www.backblaze.com/docs/en/cloud-storage-get-started-with-a-backblaze-integration)
 - [Backblaze S3 delete/version semantics](https://www.backblaze.com/apidocs/s3-delete-object)
