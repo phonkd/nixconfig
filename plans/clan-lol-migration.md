@@ -1,6 +1,6 @@
 # clan.lol migration
 
-**Repo(s):** nixconfig   **Status:** in-progress — separate admin key added; offline recovery copy pending before machine-key rollout and mail-secret
+**Repo(s):** nixconfig   **Status:** in-progress — separate admin key added and recovery copy verified; next: machine-key rollout, then mail-secret
 
 ## Why
 
@@ -256,9 +256,17 @@ reach anyway.) Neither is a prerequisite for the next steps.
   the build, before activation, after the user reported a concurrent
   `deploy --all`. The user's run was building the same 205 derivation;
   activation and fleet health remain unverified by this migration session.
-- Keep the existing shared recipient until an offline recovery copy has been
-  made and checked. The recovery destination is pending user input. Do not
-  migrate `mail-secret` while the shared key remains an admin recipient.
+- [x] Offline recovery copy made and checked on 2026-10-31. The user supplied
+  the SHARGE enclosure (WD_BLACK SN770M 1TB, serial `2338FP402283`) with an
+  empty 431.5 GiB partition at `/dev/sda1`. Formatted that partition as ext4,
+  label `SHARGE`, UUID `8ae00e23-0cec-4e3e-b79c-4297ebcf2736`; left the
+  partition table and remaining unallocated space unchanged. The filesystem
+  is not encrypted. Saved `clan-recovery/clan-admin.txt` with mode 0600 inside
+  a 0700 directory, flushed it, remounted and verified byte-for-byte equality
+  with z14's identity, then unmounted and powered off the disk through UDisks.
+- The shared recipient is still present. Recovery is now secured for its
+  staged removal; do not migrate `mail-secret` while the shared key remains
+  an admin recipient.
 - Live preflight: 205-builder is reachable over `100.64.0.2`, has the existing
   shared key, and has no `/var/lib/sops-nix/key.txt` yet. Local SSH rejects the
   current Home Manager SSH config ownership; explicit `ssh -F /dev/null` with
