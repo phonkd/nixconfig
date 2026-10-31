@@ -1,6 +1,6 @@
 # Observability on Backblaze B2
 
-**Repo:** nixconfig  **Status:** in-progress — migration started 2026-10-31; Loki cutover scheduled for 2026-11-01 00:00 UTC
+**Repo:** nixconfig  **Status:** in-progress — Mimir migrated and verified; Loki S3 period scheduled for 2026-11-01 00:00 UTC (01:00 Europe/Zurich)
 
 ## Goal
 
@@ -10,7 +10,8 @@ bucket access and the data migration are verified.
 
 ## Approach
 
-- Keep the storage switch disabled until buckets and SOPS credentials exist.
+- Storage is enabled with SOPS credentials; Mimir uses B2 immediately and Loki
+  selects S3 for log timestamps from 2026-11-01 00:00 UTC onward.
 - Use two private buckets: `phonkd-loki` and `phonkd-mimir`. Mimir's stores use
   distinct `storage_prefix` values: `blocks`, `ruler`, and `alertmanager`.
 - Keep Loki's original filesystem schema and append an S3 schema with an explicit
@@ -29,7 +30,10 @@ bucket access and the data migration are verified.
 - [x] User supplied encrypted credentials and confirmed both bucket names and endpoint.
 - [x] Verified SOPS decryption and authenticated `HeadBucket` for both B2 buckets.
 - [x] Validate credentials and bucket list/put/get/delete operations.
-- [ ] Copy Mimir object stores, activate S3 and verify old and new data.
+- [x] Copy and byte-verify Mimir object stores, deploy S3, and verify historical queries.
+- [x] Verify a fresh Mimir block upload and unchanged rule/Alertmanager configuration.
+- [x] Deploy Loki's future S3 schema and verify existing log history.
+- [ ] After 2026-11-01 00:00 UTC, verify new Loki objects and queries spanning the boundary.
 
 ## Open decisions
 
@@ -127,17 +131,47 @@ from that period unreadable. Prefer fixing S3 connectivity/credentials in place.
 
 ## Validation and references
 
-Preparation: `nix-instantiate --parse modules/observability.nix` and
-`git diff --check` pass. Native `extraFlags` and systemd environment injection were
-checked against pinned nixpkgs modules; S3 fields against Loki 3.7.8 source and
-Mimir 3.0.8 CLI help/config reference. No full NixOS evaluation/build was run,
-per repository guidance. On 2026-10-31, SOPS decryption and authenticated S3
-`HeadBucket` calls succeeded for both confirmed B2 buckets. SSH also confirmed
-Loki/Mimir active and approximately 8.6 GiB of Mimir blocks, 407 MiB of TSDB state
-and 922 MiB of Loki state. List/write/read/delete tests, data copy and live S3
-activation remain pending; no production data has been moved.
-The preparation leaves the storage switch disabled and does not require a live
-deployment; deploy only during the provisioned cutover above.
+2026-10-31 rollout evidence:
+
+- `nix-instantiate --parse` and `git diff --check` passed. The pinned Loki binary
+  accepted the generated config with `-verify-config`; Mimir parsed its generated
+  config with `-modules`. Both tests used dummy credential values.
+- Both buckets were empty/private, with no lifecycle configuration. Disposable
+  put/get/byte-compare/delete checks passed in both. Mimir's native bucket
+  validator passed ten-object create/overwrite/list/read/delete checks. Test
+  versions and delete markers were subsequently removed.
+- `deploy observability --dry-activate --ssh-opts '-F /dev/null -o BatchMode=yes
+  -o ConnectTimeout=10'` built and staged the configuration before downtime.
+  The same command without `--dry-activate` then activated it successfully with
+  deploy-rs confirmation. Deployment commit: `09aa246`.
+- Blocks were pre-copied while Mimir ran. Mimir was then stopped, local state
+  backed up, and all three prefixes reconciled using `rclone sync`. Download
+  verification found **zero differences**: 348 block files (8.55 GiB), 6 ruler
+  files and 2 Alertmanager files. Mimir was paused for final sync, verification
+  and activation only.
+- Protected recovery artifacts are on observability under
+  `/var/lib/observability-migration-20261031/`: the previous system path, API
+  configuration snapshots, before/after query results, and a 106 MiB compressed
+  backup of local Mimir state. Blocks and disposable caches are excluded from
+  that archive; the original filesystem object stores remain untouched in place.
+- Both historical metric checks returned the same 23 `up` series; the fixed
+  historical log query returned the same 21,676 lines. Rule and Alertmanager
+  API configurations matched byte-for-byte. Current metric queries also work.
+- Loki/Mimir readiness returned HTTP 200; Grafana and `mimir-rules-sync` are
+  active, with the rule synchronization unit reporting success.
+- Mimir's native `/ingester/flush?wait=true` uploaded a fresh block to B2:
+  `cortex_ingester_shipper_uploads_total = 1`, upload failures = 0. The new
+  block objects were also confirmed through the B2 S3 API.
+- The temporary root-only rclone credential file under `/run` was removed;
+  services use the SOPS-rendered environment file (mode 0400, root-owned).
+- Loki's S3 period is deployed but its scheduled boundary has not arrived.
+  New S3 log objects and queries across that boundary remain to be verified.
+
+Separate existing issue: Mimir was already hitting its default 150,000-series
+tenant limit before activation (confirmed in the old process's logs). This
+causes rejected samples; the storage migration does not change that limit.
+After the verification flush, the head held 138,689 series. Investigate
+cardinality/capacity separately rather than treating this as an S3 failure.
 
 - [Backblaze endpoint and credential mapping](https://www.backblaze.com/docs/en/cloud-storage-get-started-with-a-backblaze-integration)
 - [Backblaze S3 delete/version semantics](https://www.backblaze.com/apidocs/s3-delete-object)
