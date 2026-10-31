@@ -1,11 +1,12 @@
-# Observability on Hetzner Object Storage
+# Observability on Backblaze B2
 
-**Repo:** nixconfig  **Status:** in-progress — preparation; purchase and cutover pending
+**Repo:** nixconfig  **Status:** in-progress — buckets and credentials supplied; validation and cutover pending
 
 ## Goal
 
 Move Loki's new log chunks/indexes and Mimir's blocks, rules and Alertmanager
-configuration to Hetzner S3. Keep ingestion working while the buckets do not exist.
+configuration to Backblaze B2's S3-compatible API. Keep ingestion working until
+bucket access and the data migration are verified.
 
 ## Approach
 
@@ -25,14 +26,18 @@ configuration to Hetzner S3. Keep ingestion working while the buckets do not exi
 - [x] Prepare disabled configuration and migration instructions.
 - [x] Parse changed Nix and review native module/upstream configuration fields.
 - [x] Commit preparation to local main; no push.
-- [ ] Purchase/create buckets and supply credentials.
+- [x] User supplied encrypted credentials and confirmed both bucket names and endpoint.
+- [x] Verified SOPS decryption and authenticated `HeadBucket` for both B2 buckets.
+- [ ] Validate credentials and bucket list/put/get/delete operations.
 - [ ] Copy Mimir object stores, activate S3 and verify old and new data.
 
 ## Open decisions
 
-Provisional location: Helsinki (`hel1`); choose the VM's location when purchasing.
-Bucket names below are suggestions and must be available. Keep existing unlimited
-retention for now; setting a retention policy is a separate decision.
+Confirmed endpoint: `s3.eu-central-003.backblazeb2.com`, region `eu-central-003`.
+Confirmed bucket names: `phonkd-loki` and `phonkd-mimir`. Keep existing unlimited
+current-object retention for now. Decide a noncurrent-version cleanup period
+before production use: B2's S3 deletes create delete markers, so old versions
+otherwise continue consuming storage even after compaction.
 
 ## Risks / rollout
 
@@ -44,18 +49,22 @@ blindly disabling the switch would hide new data.
 
 ## Provisioning and cutover runbook
 
-1. In Hetzner Console, create two **private** buckets, with Object Lock and
-   automatic expiration disabled. Proposed names in `modules/observability.nix`:
-   `phonkd-loki` and `phonkd-mimir`. Use the same location for both and update
-   `objectStorage.region` and names if necessary. No buckets have been purchased.
-2. Generate S3 credentials for that project. Using the SOPS editor, add
-   `observability-s3-access-key-id` and `observability-s3-secret-access-key` to
-   `modules/homelab/global-secrets/secret.yaml`. Never paste keys into Nix or the
+1. In Backblaze Console, verify `phonkd-loki` and `phonkd-mimir` are **private**,
+   with Object Lock and expiration of current objects disabled. Both buckets use
+   `s3.eu-central-003.backblazeb2.com`. Noncurrent-version cleanup is a separate
+   lifecycle policy; do not expire current metric/log objects behind the services.
+2. Use a standard Backblaze application key with list/read/write/delete access
+   to both buckets and no prefix restriction. The S3 API does not accept the
+   master application key. In `modules/homelab/global-secrets/secret.yaml`, the
+   supplied SOPS entries must map as follows:
+   `observability-s3-access-key-id` = **keyID**;
+   `observability-s3-secret-access-key` = **applicationKey**.
+   Never paste keys into Nix or the
    runbook. The conditional SOPS template supplies both existing services via a
    root-readable environment file and restarts them on credential changes.
 3. Configure an S3 CLI (for example rclone) with those credentials outside the
-   repository. Use TLS, endpoint `https://hel1.your-objectstorage.com`, region
-   `hel1` (adjust both to the purchased location). Test list/put/get/delete in each
+   repository. Use TLS, endpoint `https://s3.eu-central-003.backblazeb2.com`, region
+   `eu-central-003`. Test list/put/get/delete in each
    bucket using a disposable object, then remove it. Keep credentials out of
    shell arguments/history. Run `mimirtool bucket-validation --help` and use its
    bucket checks against the new Mimir bucket before copying production data.
@@ -119,13 +128,17 @@ Preparation: `nix-instantiate --parse modules/observability.nix` and
 `git diff --check` pass. Native `extraFlags` and systemd environment injection were
 checked against pinned nixpkgs modules; S3 fields against Loki 3.7.8 source and
 Mimir 3.0.8 CLI help/config reference. No full NixOS evaluation/build was run,
-per repository guidance. No bucket access, data copy or live activation is
-possible yet; enabled-mode runtime validation is pending provisioning.
+per repository guidance. On 2026-10-31, SOPS decryption and authenticated S3
+`HeadBucket` calls succeeded for both confirmed B2 buckets. SSH also confirmed
+Loki/Mimir active and approximately 8.6 GiB of Mimir blocks, 407 MiB of TSDB state
+and 922 MiB of Loki state. List/write/read/delete tests, data copy and live S3
+activation remain pending; no production data has been moved.
 The preparation leaves the storage switch disabled and does not require a live
 deployment; deploy only during the provisioned cutover above.
 
-- [Hetzner endpoints and billing](https://docs.hetzner.com/storage/object-storage/overview/)
-- [Creating private buckets](https://docs.hetzner.com/storage/object-storage/getting-started/creating-a-bucket/)
+- [Backblaze endpoint and credential mapping](https://www.backblaze.com/docs/en/cloud-storage-get-started-with-a-backblaze-integration)
+- [Backblaze S3 delete/version semantics](https://www.backblaze.com/apidocs/s3-delete-object)
+- [Backblaze lifecycle configuration](https://www.backblaze.com/apidocs/s3-put-lifecycle-configuration)
 - [Loki schema changes and UTC cutover](https://grafana.com/docs/loki/latest/operations/storage/schema/)
 - [Mimir object storage and bucket separation](https://grafana.com/docs/mimir/latest/configure/configure-object-storage-backend/)
 - [Mimir 3.0 configuration fields](https://archive.grafana.com/docs/mimir/v3.0.x/configure/configuration-parameters/)

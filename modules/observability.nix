@@ -32,11 +32,11 @@
       mimirGrpcPort = 9095;
       grafanaPort = 3000;
 
-      # Provision first, then follow plans/observability-hetzner-s3.md.
+      # Provision first, then follow plans/observability-s3.md.
       # This switch stays off until the buckets, secrets and Mimir copy exist.
       objectStorage = {
         enable = false;
-        region = "hel1";
+        region = "eu-central-003";
         lokiFrom = null; # Explicit future YYYY-MM-DD (00:00 UTC), set at cutover.
         buckets = {
           loki = "phonkd-loki";
@@ -44,7 +44,7 @@
         };
       };
       s3Connection = {
-        endpoint = "${objectStorage.region}.your-objectstorage.com";
+        endpoint = "s3.${objectStorage.region}.backblazeb2.com";
         region = objectStorage.region;
         access_key_id = "\${OBS_S3_ACCESS_KEY_ID}";
         secret_access_key = "\${OBS_S3_SECRET_ACCESS_KEY}";
@@ -75,11 +75,11 @@
             objectStorage.lokiFrom != null
             && builtins.match "[0-9]{4}-[0-9]{2}-[0-9]{2}" objectStorage.lokiFrom != null
             && objectStorage.lokiFrom > "2024-01-01";
-          message = "Set objectStorage.lokiFrom to a future UTC date before enabling Hetzner S3; see plans/observability-hetzner-s3.md.";
+          message = "Set objectStorage.lokiFrom to a future UTC date before enabling Backblaze B2; see plans/observability-s3.md.";
         }
         {
           assertion = objectStorage.buckets.loki != objectStorage.buckets.mimir;
-          message = "Use separate Hetzner S3 buckets for Loki and Mimir.";
+          message = "Use separate Backblaze B2 buckets for Loki and Mimir.";
         }
       ];
 
