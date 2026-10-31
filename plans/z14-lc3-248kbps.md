@@ -1,6 +1,6 @@
 # LC3 playback at 248 kb/s on z14
 
-**Repo:** nixconfig  **Status:** in-progress (248 kb/s playback confirmed; mode selector pending)
+**Repo:** nixconfig  **Status:** done (248 kb/s tested; user chose AAC/duplex profiles)
 
 ## Goal
 Test E at 48 kHz stereo, 10 ms, 155 bytes per channel (248 kb/s total).
@@ -22,7 +22,7 @@ Do not infer SDU size by multiplying PDU size by burst number.
       duplex, disabled directions, and the unchanged peripheral path.
 - [x] Commit on local main and build with parallel compilation; stage next boot.
 - [x] After reboot, trace 310-byte sends and ask for a listening check.
-- [ ] Check established duplex again before offering persistent profile choices.
+- [x] Check established duplex again before offering persistent profile choices.
 
 ## Source validation
 Patch applies with zero fuzz against upstream v6.18.57 hci_event.c. Compiled
@@ -91,6 +91,34 @@ the declared Nix configuration still contains the established 48_4_1/context-8
 duplex settings. Remove the temporary override when implementing the permanent
 mode selection, otherwise it will override the declarative settings. No
 playback/duplex selector or post-patch duplex listening test is completed yet.
+
+## AAC and duplex profiles (2026-10-31)
+The user reported less sub-bass below 40 Hz on LC3 than USB-C audio and
+confirmed it returned with AAC. An offline liblc3 1.1.3 encode/decode check at
+124 kb/s per channel preserved steady-tone amplitude at 20-1000 Hz within
+0.001 dB; this does not measure E's decoder/DSP or perceptual music quality.
+The user now wants AAC playback and the established LC3 duplex mode selectable
+in pavucontrol, replacing the planned 248 kb/s playback/duplex selector.
+
+Removed the temporary user override (saved at
+/tmp/z14-aac-comparison-working.conf). Both native profile families are exposed
+when Classic A2DP and LE Audio are connected. A direct a2dp-sink -> bap-duplex
+switch negotiated 48_4_1, context 8, CIG 2, 10 ms, SDUs 240/120. The user
+confirmed normal playback; a five-second microphone read delivered 237600
+nonzero samples (RMS 1123, peak 7377), without saving microphone audio.
+Switching back to a2dp-sink activated AAC and left both LC3 transports idle.
+Spotify paused during the switch and was resumed afterwards.
+
+Added per-device bluez5.auto-connect for a2dp_sink, bap_sink and bap_source to
+reconnect both profile families automatically. Automatic headset profile
+switching stays disabled, so the user chooses the mode in pavucontrol.
+Committed configuration as eb00357 and activated system xfs7pa1ikcp9w4g2r15rqaal2636fx4g
+from committed main, excluding unrelated worktree changes. The kernel is unchanged.
+A normal Device1 Disconnect/Connect restored both AAC and bap-duplex as available,
+without bearer-specific or ConnectProfile calls. Switching to duplex again retained
+the exact 10 ms, context-8, CIG-2, 240/120-byte settings. Switched back to AAC,
+routed Spotify to E and resumed playback. No reboot required. A full headset
+power-cycle/cold-boot test was not repeated in this profile-selection check.
 
 ## Risks / rollout
 This is a local experimental Bluetooth core fix, not an upstream backport.
