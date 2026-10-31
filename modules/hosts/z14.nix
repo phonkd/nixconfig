@@ -209,14 +209,16 @@
 
       # E sounds robotic with the automatic 7.5 ms high-reliability preset.
       # 48_4_1 is listener-tested: 48 kHz stereo, 10 ms, 96 kbit/s per channel.
-      # Its 240-byte SDUs also avoid the EMSGSIZE failure seen with 48_6_2
-      # (310-byte SDUs versus a 155-byte kernel limit on this MT7922 setup).
+      # Keep this tested duplex preset; use AAC for playback-only in pavucontrol.
       services.pipewire.wireplumber.extraConfig."90-e-lc3" = {
         "wireplumber.settings"."bluetooth.autoswitch-to-headset-profile" = false;
         "monitor.bluez.rules" = [
           {
             matches = [ { "device.name" = "bluez_card.E4_58_BC_BE_26_6A"; } ];
             actions.update-props = {
+              # Connect both audio bearers so pavucontrol offers AAC and LC3
+              # duplex after reconnecting, without manual ConnectProfile calls.
+              "bluez5.auto-connect" = [ "a2dp_sink" "bap_sink" "bap_source" ];
               "bluez5.bap.preset" = "48_4_1";
               # Same context and CIG in both directions: 240-byte stereo out,
               # 120-byte mono in. Conversational context produced silent RX.
