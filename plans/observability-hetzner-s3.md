@@ -10,7 +10,8 @@ configuration to Hetzner S3. Keep ingestion working while the buckets do not exi
 ## Approach
 
 - Keep the storage switch disabled until buckets and SOPS credentials exist.
-- Use four private buckets: Loki, Mimir blocks, Mimir ruler, Mimir Alertmanager.
+- Use two private buckets: `phonkd-loki` and `phonkd-mimir`. Mimir's stores use
+  distinct `storage_prefix` values: `blocks`, `ruler`, and `alertmanager`.
 - Keep Loki's original filesystem schema and append an S3 schema with an explicit
   future UTC date. Old logs remain on disk and queryable; this is not an automatic
   migration of historical Loki objects.
@@ -43,10 +44,9 @@ blindly disabling the switch would hide new data.
 
 ## Provisioning and cutover runbook
 
-1. In Hetzner Console, create four **private** buckets, with Object Lock and
+1. In Hetzner Console, create two **private** buckets, with Object Lock and
    automatic expiration disabled. Proposed names in `modules/observability.nix`:
-   `phonkd-loki`, `phonkd-mimir-blocks`, `phonkd-mimir-ruler`,
-   `phonkd-mimir-alertmanager`. Use the same location for all four and update
+   `phonkd-loki` and `phonkd-mimir`. Use the same location for both and update
    `objectStorage.region` and names if necessary. No buckets have been purchased.
 2. Generate S3 credentials for that project. Using the SOPS editor, add
    `observability-s3-access-key-id` and `observability-s3-secret-access-key` to
@@ -58,7 +58,7 @@ blindly disabling the switch would hide new data.
    `hel1` (adjust both to the purchased location). Test list/put/get/delete in each
    bucket using a disposable object, then remove it. Keep credentials out of
    shell arguments/history. Run `mimirtool bucket-validation --help` and use its
-   bucket checks against the new blocks bucket before copying production data.
+   bucket checks against the new Mimir bucket before copying production data.
 4. Before the maintenance window, record representative historical Loki and
    Mimir queries and results, rule groups, and Alertmanager configuration in a
    protected backup. Check local disk capacity, dataset size, and Alloy remote
@@ -70,18 +70,19 @@ blindly disabling the switch would hide new data.
    state. DynamicUser may place the real directory under `/var/lib/private/mimir`;
    resolve the `/var/lib/mimir` symlink and access it as root.
 6. Copy the **contents** of each following directory to the corresponding empty
-   bucket root, preserving every relative key (including tenant prefixes,
+   prefix in the Mimir bucket, preserving every relative key (including tenant prefixes,
    metadata and deletion markers):
 
-   | Local object store | Bucket |
+   | Local object store | S3 destination |
    | --- | --- |
-   | `/var/lib/mimir/blocks/` | `phonkd-mimir-blocks` |
-   | `/var/lib/mimir/ruler-storage/` | `phonkd-mimir-ruler` |
-   | `/var/lib/mimir/alertmanager-storage/` | `phonkd-mimir-alertmanager` |
+   | `/var/lib/mimir/blocks/` | `s3://phonkd-mimir/blocks/` |
+   | `/var/lib/mimir/ruler-storage/` | `s3://phonkd-mimir/ruler/` |
+   | `/var/lib/mimir/alertmanager-storage/` | `s3://phonkd-mimir/alertmanager/` |
 
    Use native `rclone copy` followed by `rclone check --download` for each pair
-   while Mimir remains stopped. Do not introduce an extra `blocks/`, `ruler/` or
-   `alertmanager/` prefix. Empty source stores are fine; investigate missing
+   while Mimir remains stopped. Include each configured prefix exactly once;
+   preserve the original keys beneath it. Set `storage_prefix` without a slash;
+   Mimir adds the path separator. Empty source stores are fine; investigate missing
    directories rather than silently assuming there is no data. Do not upload
    `/var/lib/mimir/tsdb`, `tsdb-sync` or `compactor`; preserve them on the VM.
 7. Set `objectStorage.lokiFrom` to an explicit future date (`YYYY-MM-DD`, midnight

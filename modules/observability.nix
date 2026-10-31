@@ -40,9 +40,7 @@
         lokiFrom = null; # Explicit future YYYY-MM-DD (00:00 UTC), set at cutover.
         buckets = {
           loki = "phonkd-loki";
-          blocks = "phonkd-mimir-blocks";
-          ruler = "phonkd-mimir-ruler";
-          alertmanager = "phonkd-mimir-alertmanager";
+          mimir = "phonkd-mimir";
         };
       };
       s3Connection = {
@@ -53,12 +51,14 @@
         insecure = false;
       };
       mimirStorage =
-        bucket: directory:
+        prefix: directory:
         if objectStorage.enable then
           {
             backend = "s3";
+            # Each Mimir store gets its own namespace in the shared bucket.
+            storage_prefix = prefix;
             s3 = s3Connection // {
-              bucket_name = bucket;
+              bucket_name = objectStorage.buckets.mimir;
               bucket_lookup_type = "path";
             };
           }
@@ -78,8 +78,8 @@
           message = "Set objectStorage.lokiFrom to a future UTC date before enabling Hetzner S3; see plans/observability-hetzner-s3.md.";
         }
         {
-          assertion = builtins.length (lib.unique (builtins.attrValues objectStorage.buckets)) == 4;
-          message = "Use four distinct Hetzner S3 buckets for Loki and Mimir blocks/ruler/Alertmanager.";
+          assertion = objectStorage.buckets.loki != objectStorage.buckets.mimir;
+          message = "Use separate Hetzner S3 buckets for Loki and Mimir.";
         }
       ];
 
@@ -209,7 +209,7 @@
             log_level = "warn";
           };
 
-          blocks_storage = mimirStorage objectStorage.buckets.blocks "/var/lib/mimir/blocks" // {
+          blocks_storage = mimirStorage "blocks" "/var/lib/mimir/blocks" // {
             bucket_store.sync_dir = "/var/lib/mimir/tsdb-sync";
             tsdb.dir = "/var/lib/mimir/tsdb";
           };
@@ -257,7 +257,7 @@
           # by an external process and 500s on API writes because the directory
           # ends up root-owned (created by an activation script) while Mimir
           # runs as a dynamic, non-root service user that can't write into it.
-          ruler_storage = mimirStorage objectStorage.buckets.ruler "/var/lib/mimir/ruler-storage";
+          ruler_storage = mimirStorage "ruler" "/var/lib/mimir/ruler-storage";
 
           # Tell the ruler where to send firing alerts — Mimir's own bundled
           # Alertmanager (included in target=all), reached on the same port.
@@ -268,7 +268,7 @@
           # entirely through Grafana's Alerting UI once pointed at the
           # "Mimir Alertmanager" datasource below — no receiver config or
           # secrets need to live in this repo.
-          alertmanager_storage = mimirStorage objectStorage.buckets.alertmanager "/var/lib/mimir/alertmanager-storage";
+          alertmanager_storage = mimirStorage "alertmanager" "/var/lib/mimir/alertmanager-storage";
         };
       };
 
