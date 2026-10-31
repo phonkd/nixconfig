@@ -1,6 +1,6 @@
 # Observability on Backblaze B2
 
-**Repo:** nixconfig  **Status:** in-progress — buckets and credentials supplied; validation and cutover pending
+**Repo:** nixconfig  **Status:** in-progress — migration started 2026-10-31; Loki cutover scheduled for 2026-11-01 00:00 UTC
 
 ## Goal
 
@@ -28,7 +28,7 @@ bucket access and the data migration are verified.
 - [x] Commit preparation to local main; no push.
 - [x] User supplied encrypted credentials and confirmed both bucket names and endpoint.
 - [x] Verified SOPS decryption and authenticated `HeadBucket` for both B2 buckets.
-- [ ] Validate credentials and bucket list/put/get/delete operations.
+- [x] Validate credentials and bucket list/put/get/delete operations.
 - [ ] Copy Mimir object stores, activate S3 and verify old and new data.
 
 ## Open decisions
@@ -73,7 +73,9 @@ blindly disabling the switch would hide new data.
    protected backup. Check local disk capacity, dataset size, and Alloy remote
    write WAL/retry capacity; the metric senders must tolerate the copy downtime.
    Complete the build/preflight before stopping Mimir where possible.
-5. Stop `mimir-rules-sync.service`, then `mimir.service` on observability. Keep
+5. Pre-copy blocks while Mimir runs to reduce downtime. Build and dry-activate the
+   new configuration before the final sync. Stop `mimir-rules-sync.service`, then
+   `mimir.service` on observability. Keep
    Mimir stopped until the copy is verified and the S3 configuration is activated.
    Back up its full state directory including TSDB/WAL and Alertmanager local
    state. DynamicUser may place the real directory under `/var/lib/private/mimir`;
@@ -88,7 +90,8 @@ blindly disabling the switch would hide new data.
    | `/var/lib/mimir/ruler-storage/` | `s3://phonkd-mimir/ruler/` |
    | `/var/lib/mimir/alertmanager-storage/` | `s3://phonkd-mimir/alertmanager/` |
 
-   Use native `rclone copy` followed by `rclone check --download` for each pair
+   Use native `rclone sync` to reconcile the pre-copy with the stopped source,
+   followed by `rclone check --download` for each pair
    while Mimir remains stopped. Include each configured prefix exactly once;
    preserve the original keys beneath it. Set `storage_prefix` without a slash;
    Mimir adds the path separator. Empty source stores are fine; investigate missing

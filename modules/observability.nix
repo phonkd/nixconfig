@@ -33,11 +33,11 @@
       grafanaPort = 3000;
 
       # Provision first, then follow plans/observability-s3.md.
-      # This switch stays off until the buckets, secrets and Mimir copy exist.
+      # Keep the local stores for recovery; Loki's historical schema needs them.
       objectStorage = {
-        enable = false;
+        enable = true;
         region = "eu-central-003";
-        lokiFrom = null; # Explicit future YYYY-MM-DD (00:00 UTC), set at cutover.
+        lokiFrom = "2026-11-01"; # 00:00 UTC; never move this after cutover.
         buckets = {
           loki = "phonkd-loki";
           mimir = "phonkd-mimir";
