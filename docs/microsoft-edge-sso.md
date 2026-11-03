@@ -201,6 +201,25 @@ authentication path accepts NixOS; authenticated renewal remains a manual test.
 
 ## Validation record
 
+### NVIDIA rendering failure on blac (2026-11-03)
+
+Edge reported `4ulu5` because broker 3.0.2 exited with Wayland protocol error
+71 when opening its WebKitGTK sign-in window. Disabling DMA-BUF alone avoided
+the crash but left the page blank. An independent WebKit test loaded the login
+form and scripts but failed to paint them, reporting a GBM buffer allocation
+error. Proxy checks successfully fetched the public login page and its scripts.
+
+On NVIDIA work desktops, the per-user D-Bus service description now launches
+only the broker with `GDK_BACKEND=x11`, `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
+`WEBKIT_DISABLE_COMPOSITING_MODE=1` and `LIBGL_ALWAYS_SOFTWARE=1`. This uses
+software rendering for the authentication window; Edge and Teams retain their
+normal rendering settings. See [WebKit bug 280210](https://bugs.webkit.org/show_bug.cgi?id=280210).
+
+The user confirmed successful Edge sign-in. The broker reported a PRT before
+and after a restart through the saved D-Bus launcher. The matching user file
+was installed live; a full NixOS switch was not performed because sudo requires
+a password. The initial session-wide renderer workaround was removed.
+
 ### First interactive test: fixed missing TLS provider
 
 The initial deployment successfully activated both broker components. Edge
