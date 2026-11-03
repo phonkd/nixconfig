@@ -292,6 +292,7 @@ in
     in
     {
       home.packages = [
+        pkgs.obsidian
         (pkgs.appimageTools.wrapType2 {
           inherit pname version src;
           # Under Hyprland Electron finds no keyring backend and falls back
