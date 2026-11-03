@@ -2,6 +2,7 @@
 import contextlib
 import importlib.util
 import json
+import io
 import os
 from pathlib import Path
 import shutil
@@ -10,7 +11,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 spec = importlib.util.spec_from_file_location('chat_sync', Path(__file__).with_name('chat-sync.py'))
 sync = importlib.util.module_from_spec(spec)
@@ -318,6 +319,115 @@ class ChatSyncTests(unittest.TestCase):
         self.add_session_context_tables(self.b, 'b')
         with self.assertRaisesRegex(sync.SyncError, 'peer-only tables: session_context_epoch, session_input'):
             self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
+
+    def test_interactive_file_conflict_keeps_selected_device(self):
+        rel = '.local/share/opencode/snapshot/repo/hooks/applypatch-msg.sample'
+        sync.atomic(self.a / rel, b'z14 hook')
+        sync.atomic(self.b / rel, b'blac hook')
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        resolver = sync.ConflictResolver('z14', 'blac', self.root)
+        output = io.StringIO()
+        with patch.object(sys.stdin, 'isatty', return_value=True), patch('builtins.input', return_value='2'), contextlib.redirect_stdout(output):
+            sync.merge(left, right, self.root / 'absent', self.root / 'merged', resolver)
+        self.assertEqual((self.root / 'merged' / rel).read_bytes(), b'blac hook')
+        self.assertIn('z14 (local)', output.getvalue())
+        self.assertIn('blac (peer)', output.getvalue())
+        self.assertEqual((self.a / rel).read_bytes(), b'z14 hook')
+
+    def test_choose_local_for_remaining_conflicts_prompts_once(self):
+        for name in ('one', 'two'):
+            sync.atomic(self.a / '.claude/plans' / name, b'local')
+            sync.atomic(self.b / '.claude/plans' / name, b'peer')
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        resolver = sync.ConflictResolver('z14', 'blac', self.root)
+        with patch.object(sys.stdin, 'isatty', return_value=True), patch('builtins.input', return_value='l') as ask, contextlib.redirect_stdout(io.StringIO()):
+            sync.merge(left, right, self.root / 'absent', self.root / 'merged', resolver)
+        self.assertEqual(ask.call_count, 1)
+        for name in ('one', 'two'):
+            self.assertEqual((self.root / 'merged/.claude/plans' / name).read_bytes(), b'local')
+
+    def test_conflict_prompt_abort_and_noninteractive_fail_closed(self):
+        resolver = sync.ConflictResolver('z14', 'blac', self.root)
+        with patch.object(sys.stdin, 'isatty', return_value=True), patch('builtins.input', return_value=''), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(sync.SyncError, 'aborted'):
+                sync.choose('left', 'right', None, 'test', resolver)
+        with patch.object(sys.stdin, 'isatty', return_value=False):
+            with self.assertRaisesRegex(sync.SyncError, 'Run in a terminal'):
+                sync.choose('left', 'right', None, 'test', resolver)
+        self.assertEqual(resolver.choices, {})
+
+    def test_session_choice_rebuilds_transcript_and_uses_whole_session(self):
+        transcript = '.codex/sessions/session.jsonl'
+        header = b'{"type":"session_meta","payload":{"id":"x"}}\n'
+        for home, title, content in ((self.a, 'left', header), (self.b, 'right', header + b'{"extra":1}\n')):
+            self.db(home, [('x', title)])
+            sync.atomic(home / transcript, content)
+            with sqlite3.connect(home / REL) as db:
+                db.execute('INSERT INTO thread_dynamic_tools VALUES (?,?,?)', ('x', 0, title))
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        resolver = sync.ConflictResolver('z14', 'blac', self.root)
+        with patch.object(sys.stdin, 'isatty', return_value=True), patch('builtins.input', return_value='1') as ask, contextlib.redirect_stdout(io.StringIO()):
+            sync.merge(left, right, self.root / 'absent', self.root / 'merged', resolver)
+        self.assertEqual(ask.call_count, 1)
+        self.assertEqual(self.rows(self.root / 'merged'), [('x', 'left')])
+        self.assertEqual(self.rows(self.root / 'merged', 'thread_dynamic_tools'), [('x', 0, 'left')])
+        self.assertEqual((self.root / 'merged' / transcript).read_bytes(), header)
+
+    def test_push_applies_only_peer_and_checks_source_unchanged(self):
+        local, remote = Mock(), Mock()
+        local.before = {'source': 'original'}
+        local.call.return_value = local.before
+        result = {'merged': 'both histories'}
+        remote.call.side_effect = ['peer-backup', result]
+        with contextlib.redirect_stdout(io.StringIO()):
+            sync.apply_merged(local, remote, result, 'push')
+        self.assertEqual([call.args[0] for call in local.call.call_args_list], ['verify'])
+        self.assertEqual([call.args[0] for call in remote.call.call_args_list], ['apply', 'verify'])
+
+    def test_two_way_applies_and_verifies_both(self):
+        local, remote = Mock(), Mock()
+        result = {'merged': 'both histories'}
+        local.call.side_effect = ['local-backup', result]
+        remote.call.side_effect = ['peer-backup', result]
+        with contextlib.redirect_stdout(io.StringIO()):
+            sync.apply_merged(local, remote, result, 'both')
+        for endpoint in (local, remote):
+            self.assertEqual([call.args[0] for call in endpoint.call.call_args_list], ['apply', 'verify'])
+
+    def test_push_rejects_changed_source_on_verification(self):
+        local, remote = Mock(), Mock()
+        local.before = {'source': 'original'}
+        local.call.return_value = {'source': 'changed'}
+        result = {'merged': 'both histories'}
+        remote.call.side_effect = ['peer-backup', result]
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(sync.SyncError, 'verification failed'):
+            sync.apply_merged(local, remote, result, 'push')
+
+    def test_push_fixture_preserves_source_and_peer_only_sessions(self):
+        self.db(self.a, [('a', 'z14')], 'z14-secret')
+        self.db(self.b, [('b', 'blac')], 'blac-secret')
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        out = self.merged(left, right)
+        manifest = sync.read_manifest(out)
+        manifest['home'] = str(self.b)
+        sync.atomic(out / 'manifest.json', sync.json_bytes(manifest))
+        local, remote = sync.Endpoint(self.a), sync.Endpoint(self.b)
+        original_db = (self.a / REL).read_bytes()
+        try:
+            local.call('snapshot')
+            remote.call('snapshot')
+            shutil.copytree(out, remote.run / 'merged')
+            with contextlib.redirect_stdout(io.StringIO()):
+                sync.apply_merged(local, remote, manifest, 'push')
+            self.assertEqual((self.a / REL).read_bytes(), original_db)
+            self.assertEqual(self.rows(self.a), [('a', 'z14')])
+            self.assertEqual(self.rows(self.b), [('a', 'z14'), ('b', 'blac')])
+            self.assertEqual(list((local.state / 'backups').glob('*')), [])
+            self.assertTrue(list((remote.state / 'backups').glob('*/manifest.json')))
+            self.assertEqual(self.rows(self.b, 'remote_control_enrollments'), [('auth', 'blac-secret')])
+        finally:
+            local.close()
+            remote.close()
 
 
 if __name__ == '__main__':

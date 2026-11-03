@@ -1,8 +1,9 @@
 # Sync local coding-agent chats between laptop and blac
 
 `scripts/chat-sync.py` merges Claude Code, Codex and OpenCode chat data over SSH.
-It is an **offline, two-way sync**, run manually from the laptop each time.
-Both machines receive the merged history. It does not sync your Git repositories;
+It is an **offline sync**, run manually from the laptop each time. By default,
+both machines receive the merged history; `--direction push` updates only blac.
+It does not sync your Git repositories;
 copy those separately, preserving their absolute paths.
 
 ## Requirements
@@ -31,6 +32,12 @@ python3 scripts/chat-sync.py sync blac --dry-run
 # Merge both ways, back up each host, apply and verify.
 python3 scripts/chat-sync.py sync blac
 
+# Explicitly update both machines (the default).
+python3 scripts/chat-sync.py sync blac --direction both
+
+# z14 -> blac only. z14's app data stays unchanged; blac-only chats stay on blac.
+python3 scripts/chat-sync.py sync blac --direction push
+
 # List backups on this machine.
 python3 scripts/chat-sync.py backups
 
@@ -40,7 +47,10 @@ python3 scripts/chat-sync.py restore ~/.local/state/chat-sync/backups/TIMESTAMP-
 
 You can use `phonkd@blac` or an SSH alias instead of `blac`, but keep using the
 same alias. Keep the laptop as coordinator; its baseline records the last
-successful sync. To initiate from blac, SSH into the laptop and run the command
+successful two-way sync. Push does not advance that shared baseline. Both modes
+download a comparison snapshot under `~/.local/state/chat-sync/runs/`; this does
+not install blac's history into z14's apps. Push applies the merged result only on
+blac, retaining its existing independent chats. To initiate from blac, SSH into the laptop and run the command
 there. The worker lock prevents overlapping syncs on either endpoint.
 
 Afterward, open the relevant project and use `claude --resume`,
@@ -82,13 +92,13 @@ can change; unrecognised tables, database versions and event types stop the run.
 - New sessions from either side are added to both machines.
 - After the first sync, a session changed on only one side replaces that session's
   old data on the other side. Related row removals within that session follow it.
-- If both sides changed the same database session differently, the run stops
-  before applying. It never interleaves two branches of a conversation.
+- If both sides changed the same database session differently, the terminal asks
+  which device's session version to keep. It never interleaves the two branches.
 - On the first sync there is no baseline: different versions of an overlapping
-  database session also stop the run. Identical sessions and independent sessions
+  database session also prompt for a choice. Identical sessions and independent sessions
   merge normally. There is intentionally no automatic "latest timestamp wins".
 - A JSONL transcript that strictly extends the other copy is accepted. Other file
-  changes use the baseline; incompatible changes stop the run.
+  changes use the baseline; incompatible changes prompt for a choice.
 - Prompt-recall history is unioned; Codex's display-name index keeps the most recent
   entry per thread. Display metadata is not the conversation itself.
 - Shared project metadata keeps the newest project record and unions OpenCode's
@@ -96,10 +106,21 @@ can change; unrecognised tables, database versions and event types stop the run.
 - Deleting a whole chat or file on one machine **does not delete it on the other**;
   syncing can bring it back. This is history preservation, not deletion mirroring.
 
-On conflict, the error identifies the file or session key. Both snapshots remain
-under the printed run directory. Resolve the conversation in the apps (for example,
-preserve divergent work as distinct sessions), close them, then retry. Do not
-force-copy whole databases to resolve a conflict.
+On conflict, the prompt names the file/session, both device hostnames, and the
+original snapshot locations. Choose `1` for local (z14), `2` for peer (blac),
+`l`/`r` to keep that device for all remaining conflicts, or `q`/Enter to abort.
+Choosing one version replaces the other version of that conflicting item on the
+hosts being updated; independent chats are kept. Choices are saved in
+`conflict-choices.json` in that run directory. Codex transcript and database
+choices for a session are tied together; staging restarts if necessary so a late
+database choice also applies to its transcript.
+
+Nothing is applied until all conflicts have been resolved and the merge has
+validated. Aborting leaves app data unchanged. Without an interactive terminal,
+unresolved conflicts stop the run. Dry runs also ask for conflict choices, but
+do not apply them. Both original snapshots remain available, and the pre-apply
+backups retain any replaced data. Schema mismatches still stop the run; choosing
+a device cannot safely resolve a difference in database format.
 
 After an app upgrade, both schemas must match. If the saved baseline uses an old
 schema, the script also stops rather than guessing a migration. Keep its backup

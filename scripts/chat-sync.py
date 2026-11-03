@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shlex
 import shutil
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -49,6 +50,48 @@ DATABASES = {
 
 class SyncError(Exception):
     pass
+
+
+class RestartMerge(Exception):
+    """Rebuild staged output after a user selects a consistent session version."""
+
+
+class ConflictResolver:
+    def __init__(self, local_name, peer_name, run):
+        self.local_name, self.peer_name, self.run = local_name, peer_name, run
+        self.choices = {}
+        self.remaining = None
+
+    def resolve(self, key, label):
+        if key in self.choices:
+            return self.choices[key]
+        side = self.remaining
+        if side is None:
+            if not sys.stdin.isatty():
+                raise SyncError(f'Conflict: {label}. Run in a terminal to choose '
+                                f'{self.local_name} or {self.peer_name}; no app data was applied.')
+            print(f'\nConflict: {label}\nKeep which device\'s version?')
+            print(f'  1: {self.local_name} (local)\n  2: {self.peer_name} (peer)')
+            print('  l: local for all remaining conflicts\n  r: peer for all remaining conflicts\n  q: abort [default]')
+            print(f'Original snapshots: {self.run / "before"} and {self.run / "remote"}')
+            while True:
+                try:
+                    answer = input('Choice [1/2/l/r/q]: ').strip().lower()
+                except (EOFError, KeyboardInterrupt):
+                    answer = 'q'
+                if answer in ('', 'q'):
+                    raise SyncError('Sync aborted; no app data was applied.')
+                if answer in ('1', '2', 'l', 'r'):
+                    side = 'left' if answer in ('1', 'l') else 'right'
+                    if answer in ('l', 'r'):
+                        self.remaining = side
+                    break
+                print('Enter 1, 2, l, r or q.')
+        self.choices[key] = side
+        atomic(self.run / 'conflict-choices.json', json_bytes({
+            'local': self.local_name, 'peer': self.peer_name, 'choices': self.choices}))
+        # A later DB conflict can affect an already-staged transcript or another DB.
+        raise RestartMerge()
 
 
 def digest(data):
@@ -218,23 +261,41 @@ def read_manifest(root):
     return json.loads((root / 'manifest.json').read_text())
 
 
-def choose(a, b, base, label):
+def choose(a, b, base, label, resolver=None, key=None):
     # Absence is never a deletion request. Deleted chats are restored by sync.
     if a == b or b is None:
         return a
     if a is None:
         return b
+    key = key or label
+    if resolver and key in resolver.choices:
+        return a if resolver.choices[key] == 'left' else b
     if base is not None:
         if a == base:
             return b
         if b == base:
             return a
+    if resolver:
+        side = resolver.resolve(key, label)
+        return a if side == 'left' else b
     raise SyncError(f'Conflict: {label}. Neither copy was overwritten; inspect the saved snapshots.')
 
 
-def merge_file(rel, a, b, base):
+def merge_file(rel, a, b, base, resolver=None):
+    key = rel
+    if rel.startswith(('.codex/sessions/', '.codex/archived_sessions/')) and rel.endswith('.jsonl'):
+        ids = set()
+        for data in (a, b):
+            if data:
+                first = json.loads(data.splitlines()[0])
+                if first.get('type') == 'session_meta':
+                    ids.add(first['payload']['id'])
+        if len(ids) == 1:
+            key = 'codex:session:' + next(iter(ids))
+    if resolver and key in resolver.choices and a is not None and b is not None:
+        return a if resolver.choices[key] == 'left' else b
     if a == b or a is None or b is None:
-        return choose(a, b, base, rel)
+        return choose(a, b, base, rel, resolver, key)
     if rel in ('.claude/history.jsonl', '.codex/history.jsonl'):
         # Prompt recall is a set of independent records, not conversation order.
         records = {}
@@ -261,7 +322,7 @@ def merge_file(rel, a, b, base):
             return b
         if b.endswith(b'\n') and a.startswith(b):
             return a
-    return choose(a, b, base, rel)
+    return choose(a, b, base, rel, resolver, key)
 
 
 def conversation_groups(db, rel):
@@ -302,7 +363,7 @@ def project_metadata(db, table, left, right):
     return tuple(result)
 
 
-def merge_db(a, b, base, out, rel):
+def merge_db(a, b, base, out, rel, resolver=None):
     present = [p for p in (a, b) if p is not None]
     shutil.copyfile(present[0], out)
     if len(present) == 1:
@@ -327,9 +388,16 @@ def merge_db(a, b, base, out, rel):
         ga, gb = conversation_groups(left, rel), conversation_groups(right, rel)
         gc = conversation_groups(old, rel) if old else {}
         winners = {}
-        for key in ga.keys() & gb.keys():
-            winner = choose(ga[key], gb[key], gc.get(key), f'{rel}: session {key}')
-            winners[key] = 'left' if winner == ga[key] else 'right'
+        for key in ga.keys() | gb.keys():
+            choice_key = ('codex' if rel.startswith('.codex/') else rel) + ':session:' + str(key)
+            if resolver and choice_key in resolver.choices:
+                winners[key] = resolver.choices[choice_key]
+                continue
+            if key not in ga or key not in gb:
+                continue
+            winner = choose(ga[key], gb[key], gc.get(key), f'{rel}: session {key}', resolver, choice_key)
+            winners[key] = resolver.choices.get(choice_key) if resolver else None
+            winners[key] = winners[key] or ('left' if winner == ga[key] else 'right')
         dst = stack.enter_context(contextlib.closing(sqlite3.connect(out)))
         for table in sorted(tables(left) & DATABASES[rel]):
             ra, rb = rowmap(left, table), rowmap(right, table)
@@ -343,7 +411,7 @@ def merge_db(a, b, base, out, rel):
                 elif table in ('project', 'projects') and key in ra and key in rb and ra[key] != rb[key]:
                     row = project_metadata(left, table, ra[key], rb[key])
                 else:
-                    row = choose(ra.get(key), rb.get(key), rc.get(key), f'{rel}: {table} key {key}')
+                    row = choose(ra.get(key), rb.get(key), rc.get(key), f'{rel}: {table} key {key}', resolver)
                 if row is not None:
                     merged.append(row)
             dst.execute(f'DELETE FROM {quote(table)}')
@@ -355,7 +423,15 @@ def merge_db(a, b, base, out, rel):
         validate_db(dst, rel)
 
 
-def merge(left, right, baseline, output):
+def merge(left, right, baseline, output, resolver=None):
+    while True:
+        try:
+            return merge_attempt(left, right, baseline, output, resolver)
+        except RestartMerge:
+            continue
+
+
+def merge_attempt(left, right, baseline, output, resolver):
     ma, mb = read_manifest(left), read_manifest(right)
     mc = read_manifest(baseline) if (baseline / 'manifest.json').exists() else {'files': {}, 'databases': {}}
     if ma['home'] != mb['home']:
@@ -365,7 +441,7 @@ def merge(left, right, baseline, output):
     for rel in sorted(ma['files'].keys() | mb['files'].keys()):
         values = [(safe_path(root, rel).read_bytes() if rel in manifest['files'] else None)
                   for root, manifest in ((left, ma), (right, mb), (baseline, mc))]
-        data = merge_file(rel, *values)
+        data = merge_file(rel, *values, resolver)
         atomic(safe_path(output, rel), data)
         result['files'][rel] = digest(data)
     for rel in sorted(ma['databases'].keys() | mb['databases'].keys()):
@@ -373,7 +449,7 @@ def merge(left, right, baseline, output):
                  for root, manifest in ((left, ma), (right, mb), (baseline, mc))]
         dst = safe_path(output, rel)
         dst.parent.mkdir(parents=True, exist_ok=True)
-        merge_db(*paths, dst, rel)
+        merge_db(*paths, dst, rel, resolver)
         result['databases'][rel] = db_digest(dst, rel)
     atomic(output / 'manifest.json', json_bytes(result))
     return result
@@ -467,7 +543,7 @@ class Endpoint:
     def call(self, command, **args):
         if command == 'info':
             check_idle()
-            return {'home': str(self.home), 'run': str(self.run)}
+            return {'home': str(self.home), 'run': str(self.run), 'hostname': socket.gethostname()}
         if command == 'snapshot':
             check_idle()
             self.before = snapshot(self.home, self.run / 'before')
@@ -521,13 +597,26 @@ def transfer(source, destination):
     subprocess.run(['rsync', '-rlt', '--protect-args', '--', source + '/', destination + '/'], check=True)
 
 
-def sync(peer, dry_run):
+def apply_merged(local, remote, result, direction):
+    print('Peer backup:', remote.call('apply'))
+    if direction == 'both':
+        print('Local backup:', local.call('apply'))
+    expected_local = result if direction == 'both' else local.before
+    if remote.call('verify') != result or local.call('verify') != expected_local:
+        raise SyncError('Post-sync verification failed; baseline not advanced. Backups retained.')
+
+
+def sync(peer, dry_run, direction='both'):
     local = Endpoint(Path.home())
     remote = None
     try:
         li = local.call('info')
         remote = Remote(peer)
         ri = remote.call('info')
+        local_name, peer_name = li['hostname'], ri['hostname']
+        print(f'Direction: {local_name} ' + ('<-> ' if direction == 'both' else '-> ') + peer_name)
+        if direction == 'push':
+            print(f'Only {peer_name} app data will change; peer-only chats are preserved.')
         if li['home'] != ri['home']:
             raise SyncError('Both machines must use the same absolute home/project paths')
         peer_file = local.state / 'peer.json'
@@ -542,7 +631,9 @@ def sync(peer, dry_run):
         # Recover a crash between the two atomic baseline renames.
         if not baseline.exists() and previous.exists():
             previous.rename(baseline)
-        result = merge(local.run / 'before', local.run / 'remote', baseline, local.run / 'merged')
+        print(f'Comparison snapshots: {local.run} (not installed into local app data)')
+        resolver = ConflictResolver(local_name, peer_name, local.run)
+        result = merge(local.run / 'before', local.run / 'remote', baseline, local.run / 'merged', resolver)
         print(f'Merged {len(result["files"])} files and {len(result["databases"])} databases.')
         print(f'Review snapshots: {local.run}')
         if dry_run:
@@ -550,10 +641,11 @@ def sync(peer, dry_run):
             return
         transfer(str(local.run / 'merged'), peer + ':' + ri['run'] + '/merged')
         # Apply peer first; a network failure never advances the coordinator baseline.
-        print('Peer backup:', remote.call('apply'))
-        print('Local backup:', local.call('apply'))
-        if remote.call('verify') != result or local.call('verify') != result:
-            raise SyncError('Post-sync verification failed; baseline not advanced. Backups retained.')
+        apply_merged(local, remote, result, direction)
+        atomic(peer_file, json_bytes(identity))
+        if direction == 'push':
+            print(f'Verified: {peer_name} updated; {local_name} app data unchanged. Shared baseline retained.')
+            return
         next_baseline = local.state / 'baseline.next'
         if next_baseline.exists():
             shutil.rmtree(next_baseline)
@@ -563,7 +655,6 @@ def sync(peer, dry_run):
         if baseline.exists():
             baseline.rename(previous)
         next_baseline.rename(baseline)
-        atomic(peer_file, json_bytes(identity))
         print('Verified: both hosts have the same selected chat data.')
     finally:
         if remote:
@@ -593,6 +684,8 @@ def main():
     sp = sub.add_parser('sync', help='Two-way sync; run from the same coordinator each time')
     sp.add_argument('peer', nargs='?', default='blac')
     sp.add_argument('--dry-run', action='store_true', help='Snapshot and merge without changing app data')
+    sp.add_argument('--direction', choices=('both', 'push'), default='both',
+                    help='both: update both hosts (default); push: update only the peer, preserving peer-only chats')
     sub.add_parser('backups', help='List local pre-sync backups')
     rp = sub.add_parser('restore', help='Restore local chat data; back up the current state first')
     rp.add_argument('backup', help='Backup directory printed by sync/backups')
@@ -601,7 +694,7 @@ def main():
         if args.worker:
             worker()
         elif args.command == 'sync':
-            sync(args.peer, args.dry_run)
+            sync(args.peer, args.dry_run, args.direction)
         elif args.command == 'backups':
             for path in sorted((Path.home() / '.local/state/chat-sync/backups').glob('*/manifest.json')):
                 print(path.parent)
