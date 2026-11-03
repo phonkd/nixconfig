@@ -1,6 +1,6 @@
 # Sync local coding-agent chats between laptop and blac
 
-`scripts/chat-sync.py` merges Claude Code, Codex and OpenCode chat data over SSH.
+`scripts/chat-sync.py` merges Claude Code and Codex chat data over SSH.
 It is an **offline sync**, run manually from the laptop each time. By default,
 both machines receive the merged history; `--direction push` updates only blac.
 It does not sync your Git repositories;
@@ -11,9 +11,8 @@ copy those separately, preserving their absolute paths.
 - Linux, Python 3 with SQLite support, SSH and rsync on both machines.
 - The same home path (`/home/phonkd`) and project paths on both machines.
 - Matching database schemas: use the same versions of each app on both machines.
-- Default data locations. Custom `CODEX_HOME`, `CLAUDE_CONFIG_DIR` and
-  `XDG_DATA_HOME` are rejected when visible to the script.
-- Stop **all three apps and their daemons on both machines** before syncing.
+- Default data locations. Custom `CODEX_HOME` and `CLAUDE_CONFIG_DIR` are rejected when visible to the script.
+- Stop **Claude Code and Codex, including their daemons, on both machines** before syncing.
   Keep them closed until verification finishes. The script checks processes and
   rechecks snapshot fingerprints, but cannot prevent an app from being restarted.
 - Working noninteractive SSH: `ssh -o BatchMode=yes blac true`.
@@ -56,8 +55,8 @@ not install blac's history into z14's apps. Push applies the merged result only 
 blac, retaining its existing independent chats. To initiate from blac, SSH into the laptop and run the command
 there. The worker lock prevents overlapping syncs on either endpoint.
 
-Afterward, open the relevant project and use `claude --resume`,
-`codex resume --all`, or OpenCode's session picker. Logging in remains separate.
+Afterward, open the relevant project and use `claude --resume` or
+`codex resume --all`. Logging in remains separate.
 The script does not start the apps or send any prompts.
 
 ## Data included
@@ -66,18 +65,15 @@ The script does not start the apps or send any prompts.
 | --- | --- |
 | Claude Code | `projects/` (transcripts, subagents, tool results and project memory), `file-history/`, `plans/`, `paste-cache/`, `uploads/`, `history.jsonl` |
 | Codex | `sessions/`, `archived_sessions/`, prompt history, session index, conversation/project tables in `state_5.sqlite`, and `thread_history_1.sqlite` |
-| OpenCode | Conversation/project/event tables in **both** `opencode.db` and `opencode-stable.db`, legacy `storage/`, tool outputs and snapshots |
 
-The two OpenCode databases remain separate; this does not convert sessions between
-stable and development versions. A chat appears in the app version that uses its
-database. Runtime jobs, pending queues, authentication tables, remote-control
-enrollments, permissions and app configuration are not exchanged. Codex's separate
-generated memory database is not a chat database and is not synced.
+OpenCode is excluded entirely: its databases, Git snapshot cache, tool outputs and
+legacy storage are not read, transferred, merged or restored. Existing OpenCode
+files and old backups remain untouched. OpenCode entries in older sync manifests
+are ignored, so no cleanup or baseline reset is needed. OpenCode can remain running.
 
-OpenCode's `session_context_epoch` and already-promoted `session_input` records
-are included in the session's history and conflict detection. If an input has not
-yet been promoted, sync stops: finish or discard that queued input in OpenCode
-first so copying it cannot cause the prompt to run on a second machine.
+Runtime jobs, authentication tables, remote-control enrollments, permissions and
+app configuration are not exchanged. Codex's separate generated memory database
+is not synced.
 
 For a schema mismatch, the error lists differing tables and columns. Install the
 same app versions on both hosts and open each app normally so its own migrations
@@ -87,8 +83,8 @@ keep the error details for an adapter update; do not delete a database to match 
 
 Referenced files outside these locations (repositories, OS temporary attachments,
 external images) must be transferred separately. Symlinks in selected data paths
-are rejected rather than followed. Internal database schemas and event formats
-can change; unrecognised tables, database versions and event types stop the run.
+are rejected rather than followed. Internal database schemas
+can change; unrecognised tables and database versions stop the run.
 
 ## Merge and conflict behaviour
 
@@ -104,8 +100,7 @@ can change; unrecognised tables, database versions and event types stop the run.
   changes use the baseline; incompatible changes prompt for a choice.
 - Prompt-recall history is unioned; Codex's display-name index keeps the most recent
   entry per thread. Display metadata is not the conversation itself.
-- Shared project metadata keeps the newest project record and unions OpenCode's
-  sandbox paths, so different project activity timestamps do not block new chats.
+- Shared project metadata keeps the newest project record.
 - Deleting a whole chat or file on one machine **does not delete it on the other**;
   syncing can bring it back. This is history preservation, not deletion mirroring.
 
@@ -128,7 +123,7 @@ a device cannot safely resolve a difference in database format.
 `--prefer-local` preselects local for every conflict, including in a noninteractive
 terminal. It applies in either direction mode. It does not delete peer-only chats,
 override schema checks, or replace a non-conflicting continuation just because it
-was written on the peer. OpenCode remains included with this option.
+was written on the peer. OpenCode is excluded regardless of this option.
 
 After an app upgrade, both schemas must match. If the saved baseline uses an old
 schema, the script also stops rather than guessing a migration. Keep its backup

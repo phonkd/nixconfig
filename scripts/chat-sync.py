@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Conservative, offline, two-way Claude/Codex/OpenCode chat sync. See docs/chat-sync.md."""
+"""Conservative, offline, two-way Claude/Codex chat sync. See docs/chat-sync.md."""
 
 import argparse
 import base64
@@ -25,26 +25,18 @@ TREES = (
     '.claude/projects', '.claude/file-history', '.claude/plans',
     '.claude/paste-cache', '.claude/uploads',
     '.codex/sessions', '.codex/archived_sessions',
-    '.local/share/opencode/storage', '.local/share/opencode/tool-output',
-    '.local/share/opencode/snapshot',
 )
 FILES = ('.claude/history.jsonl', '.codex/history.jsonl', '.codex/session_index.jsonl')
 CODEX_STATE = set('threads thread_dynamic_tools thread_spawn_edges thread_sections projects '
                   'project_roots project_idempotency_keys thread_attachments guardian_review_feedback'.split())
 CODEX_HISTORY = set('thread_turns thread_items thread_history_projection_state thread_realtime_items'.split())
-OPENCODE = set('project project_directory message part session todo event_sequence event workspace '
-               'session_message session_v2 session_context_epoch session_input '
-               'instruction_blob instruction_entry instruction_state worktree'.split())
 SKIP = set('_sqlx_migrations sqlite_sequence backfill_state remote_control_enrollments '
            'external_agent_config_imports rollout_migration_state rollout_migration_skipped_rollouts '
-           'thread_read_receipts __drizzle_migrations account account_state control_account credential '
-           'permission session_share migration kv session_pending session_inbox data_migration'.split())
-MIGRATIONS = {'_sqlx_migrations', '__drizzle_migrations', 'migration', 'data_migration'}
+           'thread_read_receipts'.split())
+MIGRATIONS = {'_sqlx_migrations'}
 DATABASES = {
     '.codex/state_5.sqlite': CODEX_STATE,
     '.codex/thread_history_1.sqlite': CODEX_HISTORY,
-    '.local/share/opencode/opencode.db': OPENCODE,
-    '.local/share/opencode/opencode-stable.db': OPENCODE,
 }
 
 
@@ -151,14 +143,14 @@ def check_idle():
             args = (entry / 'cmdline').read_bytes().split(b'\0')
             # Inspect executable/script positions, not shell command strings or prompts.
             names = [Path(os.fsdecode(arg)).name.lower() for arg in args[:3]]
-            if (any(comm.startswith(x) for x in ('codex', 'claude', 'opencode')) or
-                    any(n in ('codex', 'claude', 'opencode', 'codex-app-server') or
-                        n.startswith(('codex-', 'opencode-')) for n in names)):
+            if (any(comm.startswith(x) for x in ('codex', 'claude')) or
+                    any(n in ('codex', 'claude', 'codex-app-server') or
+                        n.startswith('codex-') for n in names)):
                 active.append(entry.name)
         except (FileNotFoundError, ProcessLookupError):
             continue
     if active:
-        raise SyncError('Close Claude Code, Codex and OpenCode, including daemons; active PIDs: ' + ', '.join(active))
+        raise SyncError('Close Claude Code and Codex, including daemons; active PIDs: ' + ', '.join(active))
 
 
 def quote(name):
@@ -184,13 +176,6 @@ def validate_db(db, rel):
         raise SyncError(f'{rel}: unsupported tables: {", ".join(sorted(unknown))}; update adapter first')
     if db.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
         raise SyncError(f'{rel}: SQLite integrity check failed')
-    if 'session_input' in tables(db):
-        if db.execute('SELECT 1 FROM session_input WHERE promoted_seq IS NULL LIMIT 1').fetchone():
-            raise SyncError(f'{rel}: pending OpenCode session inputs; finish or discard them in OpenCode before syncing')
-    if 'event' in tables(db):
-        kinds = [row[0] for row in db.execute('SELECT DISTINCT type FROM event')]
-        if any(not str(kind).startswith(('session.', 'message.', 'part.', 'project.')) for kind in kinds):
-            raise SyncError(f'{rel}: unsupported event types; review adapter before transferring event data')
 
 
 def copy_db(source, target):
@@ -237,7 +222,7 @@ def snapshot(home, dest, *, private=False):
         shutil.copyfile(path, target)
         manifest['files'][rel] = digest(target.read_bytes())
     # Do not silently miss a future database version or a non-default data root.
-    for pattern in ('.codex/state_*.sqlite', '.codex/thread_history_*.sqlite', '.local/share/opencode/*.db'):
+    for pattern in ('.codex/state_*.sqlite', '.codex/thread_history_*.sqlite'):
         for path in home.glob(pattern):
             if str(path.relative_to(home)) not in DATABASES:
                 raise SyncError(f'Unsupported chat database: {path}')
@@ -262,7 +247,13 @@ def snapshot(home, dest, *, private=False):
 
 
 def read_manifest(root):
-    return json.loads((root / 'manifest.json').read_text())
+    manifest = json.loads((root / 'manifest.json').read_text())
+    # Old baselines/backups may include OpenCode. Ignore those entries even on
+    # restore; never read, merge, overwrite or delete the user's OpenCode data.
+    for section in ('files', 'databases'):
+        manifest[section] = {rel: value for rel, value in manifest[section].items()
+                             if not rel.startswith('.local/share/opencode/')}
+    return manifest
 
 
 def choose(a, b, base, label, resolver=None, key=None):
@@ -353,17 +344,11 @@ def row_group(db, table, row):
 
 
 def project_metadata(db, table, left, right):
-    """Shared Git project IDs have host-specific timestamps, even for unrelated chats."""
+    """Keep the newest project metadata when both devices updated it."""
     cols = [r[1] for r in db.execute(f'PRAGMA table_info({quote(table)})')]
     timestamp = next((c for c in ('updated_at_ms', 'time_updated') if c in cols), None)
     rank = lambda row: ((row[cols.index(timestamp)] or 0) if timestamp else 0, repr(row))
     result = list(max((left, right), key=rank))
-    if 'sandboxes' in cols:
-        i = cols.index('sandboxes')
-        values = [json.loads(row[i]) for row in (left, right)]
-        if not all(isinstance(value, list) and all(isinstance(p, str) for p in value) for value in values):
-            raise SyncError('Unexpected OpenCode project sandboxes format')
-        result[i] = json.dumps(sorted(set(values[0] + values[1])), separators=(',', ':'))
     return tuple(result)
 
 
@@ -528,8 +513,7 @@ class Endpoint:
     def __init__(self, home):
         self.home = home.resolve()
         for variable, default in (('CODEX_HOME', self.home / '.codex'),
-                                  ('CLAUDE_CONFIG_DIR', self.home / '.claude'),
-                                  ('XDG_DATA_HOME', self.home / '.local/share')):
+                                  ('CLAUDE_CONFIG_DIR', self.home / '.claude')):
             if os.environ.get(variable) and Path(os.environ[variable]).resolve() != default:
                 raise SyncError(f'Non-default {variable} is not supported')
         self.state = safe_path(self.home, '.local/state/chat-sync')

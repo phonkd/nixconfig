@@ -1,5 +1,10 @@
 # Two-way local chat sync
 
+**Current scope:** Claude Code and Codex only. At the user's request, OpenCode
+was removed from snapshots, transfers, merge, restore and process checks. Older
+OpenCode manifest entries are ignored without deleting existing data or backups.
+Validated with 26 tests, including exclusion and legacy-backup restore coverage.
+
 **Repo:** nixconfig **Status:** done
 
 ## Follow-up: interactive conflicts and direction

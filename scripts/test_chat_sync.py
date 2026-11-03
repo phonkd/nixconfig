@@ -182,16 +182,6 @@ class ChatSyncTests(unittest.TestCase):
         self.assertFalse((self.a / rel).exists())
         self.assertEqual(self.rows(self.root / 'backup'), [('a', 'A'), ('b', 'B')])
 
-    def test_opencode_merge_and_foreign_keys(self):
-        for home, sid in ((self.a, 'a'), (self.b, 'b')):
-            path = self.db(home, [(sid, sid)], rel=OC)
-            with sqlite3.connect(path) as db:
-                db.execute('INSERT INTO message VALUES (?,?,?)', ('msg-' + sid, sid, 'text'))
-        out = self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
-        self.assertEqual(len(self.rows(out, 'message', OC)), 2)
-        self.assertEqual(self.rows(out, 'account', OC), [])
-        self.apply(self.a, out)
-        self.assertEqual(self.rows(self.a, 'account', OC), [('auth', 'local')])
 
     def test_symlinks_and_traversal_rejected(self):
         (self.a / '.claude').symlink_to(self.b)
@@ -199,6 +189,53 @@ class ChatSyncTests(unittest.TestCase):
             self.snap(self.a, 'left')
         with self.assertRaises(sync.SyncError):
             sync.safe_path(self.a, '../escape')
+
+    def test_opencode_is_not_inspected_or_copied(self):
+        # Even invalid/new OpenCode databases and a conflicting snapshot cache
+        # must not participate in a Claude/Codex sync.
+        for home, data in ((self.a, b'local'), (self.b, b'peer')):
+            self.db(home, [(data.decode(), data.decode())])
+            sync.atomic(home / OC, b'not a SQLite database')
+            sync.atomic(home / '.local/share/opencode/new-version.db', b'unknown format')
+            sync.atomic(home / '.local/share/opencode/snapshot/repo/hooks/test', data)
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        out = self.merged(left, right)
+        for root in (left, right, out):
+            manifest = sync.read_manifest(root)
+            self.assertFalse(any('opencode' in rel for section in ('files', 'databases') for rel in manifest[section]))
+            self.assertFalse((root / '.local/share/opencode').exists())
+
+    def test_legacy_backup_restore_ignores_opencode_entries(self):
+        self.db(self.a, [('a', 'original')])
+        saved = self.root / 'saved'
+        sync.snapshot(self.a, saved, private=True)
+        manifest = sync.read_manifest(saved)
+        old_file = '.local/share/opencode/snapshot/repo/hooks/test'
+        manifest['files'][old_file] = 'old-checksum'
+        manifest['databases'][OC] = 'old-checksum'
+        # No backing OpenCode snapshot files: proves restore never reads them.
+        sync.atomic(saved / 'manifest.json', sync.json_bytes(manifest))
+        sync.atomic(self.a / OC, b'keep current OpenCode database')
+        sync.atomic(self.a / old_file, b'keep current OpenCode snapshot')
+        with sqlite3.connect(self.a / REL) as db:
+            db.execute("UPDATE threads SET title='modified'")
+        before = sync.snapshot(self.a, self.root / 'before')
+        sync.apply_snapshot(self.a, saved, before, self.root / 'backup', restore=True)
+        self.assertEqual(self.rows(self.a), [('a', 'original')])
+        self.assertEqual((self.a / OC).read_bytes(), b'keep current OpenCode database')
+        self.assertEqual((self.a / old_file).read_bytes(), b'keep current OpenCode snapshot')
+
+    def test_old_baseline_opencode_entries_do_not_reenter_merge(self):
+        self.db(self.a, [('a', 'A')])
+        self.db(self.b, [('b', 'B')])
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        manifest = sync.read_manifest(left)
+        manifest['databases'][OC] = 'old-checksum'
+        manifest['files']['.local/share/opencode/snapshot/old'] = 'old-checksum'
+        sync.atomic(left / 'manifest.json', sync.json_bytes(manifest))
+        out = self.merged(left, right, left)
+        self.assertEqual(self.rows(out), [('a', 'A'), ('b', 'B')])
+        self.assertFalse((out / '.local/share/opencode').exists())
 
     def test_tampered_snapshot_rejected(self):
         sync.atomic(self.a / '.claude/history.jsonl', b'{}\n')
@@ -251,77 +288,9 @@ class ChatSyncTests(unittest.TestCase):
         endpoint = sync.Endpoint(self.a)
         endpoint.close()
 
-    def test_unknown_event_types_are_not_exported(self):
-        self.db(self.a, [('a', 'A')], rel=OC)
-        with sqlite3.connect(self.a / OC) as db:
-            db.executescript("CREATE TABLE event(id TEXT PRIMARY KEY, type TEXT);"
-                             "INSERT INTO event VALUES ('x','credential.created');")
-        with self.assertRaisesRegex(sync.SyncError, 'unsupported event types'):
-            self.snap(self.a, 'snapshot')
-
-    def test_shared_project_metadata_does_not_block_independent_chats(self):
-        for home, sid, timestamp in ((self.a, 'a', 1), (self.b, 'b', 2)):
-            self.db(home, [(sid, sid)], rel=OC)
-            with sqlite3.connect(home / OC) as db:
-                db.execute('CREATE TABLE project(id TEXT PRIMARY KEY, time_updated INTEGER, sandboxes TEXT)')
-                db.execute('INSERT INTO project VALUES (?,?,?)', ('same-git-id', timestamp, json.dumps([sid])))
-        out = self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
-        self.assertEqual(self.rows(out, 'project', OC), [('same-git-id', 2, '["a","b"]')])
-
-    def add_session_context_tables(self, home, sid):
-        with sqlite3.connect(home / OC) as db:
-            db.executescript('''
-                CREATE TABLE session_context_epoch(
-                    session_id TEXT PRIMARY KEY REFERENCES session(id),
-                    baseline TEXT NOT NULL, snapshot TEXT NOT NULL, baseline_seq INTEGER NOT NULL);
-                CREATE TABLE session_input(
-                    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES session(id),
-                    prompt TEXT NOT NULL, delivery TEXT NOT NULL, admitted_seq INTEGER NOT NULL,
-                    promoted_seq INTEGER, time_created INTEGER NOT NULL);
-            ''')
-            db.execute('INSERT INTO session_context_epoch VALUES (?,?,?,?)', (sid, '{}', '{}', 1))
-            db.execute('INSERT INTO session_input VALUES (?,?,?,?,?,?,?)',
-                       ('input-' + sid, sid, '{"text":"hello"}', 'normal', 1, 2, 1))
-
-    def test_new_opencode_context_and_promoted_inputs_roundtrip(self):
-        for home, sid in ((self.a, 'a'), (self.b, 'b')):
-            self.db(home, [(sid, sid)], rel=OC)
-            self.add_session_context_tables(home, sid)
-        out = self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
-        for table in ('session_context_epoch', 'session_input'):
-            self.assertEqual(len(self.rows(out, table, OC)), 2)
-        self.apply(self.a, out)
-        self.assertEqual(len(self.rows(self.a, 'session_input', OC)), 2)
-
-    def test_new_context_participates_in_session_conflict_detection(self):
-        for home in (self.a, self.b):
-            self.db(home, [('a', 'A')], rel=OC)
-            self.add_session_context_tables(home, 'a')
-        base = self.snap(self.a, 'base')
-        with sqlite3.connect(self.a / OC) as db:
-            db.execute("UPDATE session_context_epoch SET baseline_seq=3")
-        with sqlite3.connect(self.b / OC) as db:
-            db.execute("UPDATE session_input SET promoted_seq=4")
-        with self.assertRaisesRegex(sync.SyncError, 'Conflict'):
-            self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'), base)
-
-    def test_pending_inputs_are_not_transferred_for_automatic_replay(self):
-        self.db(self.a, [('a', 'A')], rel=OC)
-        self.add_session_context_tables(self.a, 'a')
-        with sqlite3.connect(self.a / OC) as db:
-            db.execute('UPDATE session_input SET promoted_seq=NULL')
-        with self.assertRaisesRegex(sync.SyncError, 'pending OpenCode session inputs'):
-            self.snap(self.a, 'left')
-
-    def test_missing_context_tables_report_actual_schema_mismatch(self):
-        self.db(self.a, [('a', 'A')], rel=OC)
-        self.db(self.b, [('b', 'B')], rel=OC)
-        self.add_session_context_tables(self.b, 'b')
-        with self.assertRaisesRegex(sync.SyncError, 'peer-only tables: session_context_epoch, session_input'):
-            self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
 
     def test_interactive_file_conflict_keeps_selected_device(self):
-        rel = '.local/share/opencode/snapshot/repo/hooks/applypatch-msg.sample'
+        rel = '.claude/plans/shared.md'
         sync.atomic(self.a / rel, b'z14 hook')
         sync.atomic(self.b / rel, b'blac hook')
         left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
