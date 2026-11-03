@@ -90,8 +90,12 @@ class ConflictResolver:
         self.choices[key] = side
         atomic(self.run / 'conflict-choices.json', json_bytes({
             'local': self.local_name, 'peer': self.peer_name, 'choices': self.choices}))
-        # A later DB conflict can affect an already-staged transcript or another DB.
-        raise RestartMerge()
+        # Only Codex session choices can affect an already-staged transcript or
+        # another database. Ordinary files (including Git snapshot caches) can
+        # be resolved in place without restarting the entire merge for each one.
+        if key.startswith('codex:session:'):
+            raise RestartMerge()
+        return side
 
 
 def digest(data):
@@ -606,7 +610,7 @@ def apply_merged(local, remote, result, direction):
         raise SyncError('Post-sync verification failed; baseline not advanced. Backups retained.')
 
 
-def sync(peer, dry_run, direction='both'):
+def sync(peer, dry_run, direction='both', prefer_local=False):
     local = Endpoint(Path.home())
     remote = None
     try:
@@ -633,6 +637,9 @@ def sync(peer, dry_run, direction='both'):
             previous.rename(baseline)
         print(f'Comparison snapshots: {local.run} (not installed into local app data)')
         resolver = ConflictResolver(local_name, peer_name, local.run)
+        if prefer_local:
+            resolver.remaining = 'left'
+            print(f'Conflict policy: keep {local_name} (local) without prompting.')
         result = merge(local.run / 'before', local.run / 'remote', baseline, local.run / 'merged', resolver)
         print(f'Merged {len(result["files"])} files and {len(result["databases"])} databases.')
         print(f'Review snapshots: {local.run}')
@@ -686,6 +693,8 @@ def main():
     sp.add_argument('--dry-run', action='store_true', help='Snapshot and merge without changing app data')
     sp.add_argument('--direction', choices=('both', 'push'), default='both',
                     help='both: update both hosts (default); push: update only the peer, preserving peer-only chats')
+    sp.add_argument('--prefer-local', action='store_true',
+                    help='automatically keep this device\'s version of every conflict; preserve peer-only chats')
     sub.add_parser('backups', help='List local pre-sync backups')
     rp = sub.add_parser('restore', help='Restore local chat data; back up the current state first')
     rp.add_argument('backup', help='Backup directory printed by sync/backups')
@@ -694,7 +703,7 @@ def main():
         if args.worker:
             worker()
         elif args.command == 'sync':
-            sync(args.peer, args.dry_run, args.direction)
+            sync(args.peer, args.dry_run, args.direction, args.prefer_local)
         elif args.command == 'backups':
             for path in sorted((Path.home() / '.local/state/chat-sync/backups').glob('*/manifest.json')):
                 print(path.parent)

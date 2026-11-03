@@ -346,6 +346,30 @@ class ChatSyncTests(unittest.TestCase):
         for name in ('one', 'two'):
             self.assertEqual((self.root / 'merged/.claude/plans' / name).read_bytes(), b'local')
 
+    def test_prefer_local_resolves_files_and_sessions_without_terminal(self):
+        rel = '.claude/plans/shared.md'
+        for home, title in ((self.a, 'local'), (self.b, 'peer')):
+            self.db(home, [('shared', title)])
+            sync.atomic(home / rel, title.encode())
+        with sqlite3.connect(self.b / REL) as db:
+            db.execute("INSERT INTO threads VALUES ('peer-only','keep me')")
+        left, right = self.snap(self.a, 'left'), self.snap(self.b, 'right')
+        resolver = sync.ConflictResolver('z14', 'blac', self.root)
+        resolver.remaining = 'left'
+        with patch.object(sys.stdin, 'isatty', return_value=False), patch('builtins.input') as ask:
+            sync.merge(left, right, self.root / 'absent', self.root / 'merged', resolver)
+        ask.assert_not_called()
+        self.assertEqual((self.root / 'merged' / rel).read_bytes(), b'local')
+        self.assertEqual(self.rows(self.root / 'merged'), [('peer-only', 'keep me'), ('shared', 'local')])
+
+    def test_prefer_local_file_conflicts_do_not_restart_whole_merge(self):
+        resolver = sync.ConflictResolver('z14', 'blac', self.root)
+        resolver.remaining = 'left'
+        with patch('builtins.input') as ask:
+            for i in range(10):
+                self.assertEqual(sync.choose('local', 'peer', None, f'file-{i}', resolver), 'local')
+        ask.assert_not_called()
+
     def test_conflict_prompt_abort_and_noninteractive_fail_closed(self):
         resolver = sync.ConflictResolver('z14', 'blac', self.root)
         with patch.object(sys.stdin, 'isatty', return_value=True), patch('builtins.input', return_value=''), contextlib.redirect_stdout(io.StringIO()):

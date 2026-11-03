@@ -38,6 +38,9 @@ python3 scripts/chat-sync.py sync blac --direction both
 # z14 -> blac only. z14's app data stays unchanged; blac-only chats stay on blac.
 python3 scripts/chat-sync.py sync blac --direction push
 
+# Same push, automatically keeping z14's version of every conflict.
+python3 scripts/chat-sync.py sync blac --direction push --prefer-local
+
 # List backups on this machine.
 python3 scripts/chat-sync.py backups
 
@@ -121,6 +124,11 @@ unresolved conflicts stop the run. Dry runs also ask for conflict choices, but
 do not apply them. Both original snapshots remain available, and the pre-apply
 backups retain any replaced data. Schema mismatches still stop the run; choosing
 a device cannot safely resolve a difference in database format.
+
+`--prefer-local` preselects local for every conflict, including in a noninteractive
+terminal. It applies in either direction mode. It does not delete peer-only chats,
+override schema checks, or replace a non-conflicting continuation just because it
+was written on the peer. OpenCode remains included with this option.
 
 After an app upgrade, both schemas must match. If the saved baseline uses an old
 schema, the script also stops rather than guessing a migration. Keep its backup
