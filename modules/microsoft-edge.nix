@@ -91,27 +91,29 @@
         services.gnome.gnome-keyring.enable = true;
         security.pam.services.greetd.enableGnomeKeyring = true;
 
-        # WebKitGTK on NVIDIA can either exit with Wayland error 71 or leave
-        # the sign-in form unpainted (GBM buffer allocation fails). Use the
-        # native session D-Bus launch configuration to scope software rendering
-        # to this broker. Edge, Teams and other desktop apps keep acceleration.
-        # Current-system paths follow the broker package selected above.
-        home-manager.users.${config.noughty.user.name}.xdg.dataFile."dbus-1/services/com.microsoft.identity.broker1.service" =
-          lib.mkIf config.noughty.host.gpu.hasNvidia {
-            text = ''
-              [D-BUS Service]
-              Name=com.microsoft.identity.broker1
-              Exec=/run/current-system/sw/bin/env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 /run/current-system/sw/bin/microsoft-identity-broker
-            '';
-          };
+        home-manager.users.${config.noughty.user.name} = {
+          # WebKitGTK on NVIDIA can either exit with Wayland error 71 or leave
+          # the sign-in form unpainted (GBM buffer allocation fails). Use the
+          # native session D-Bus launch configuration to scope software rendering
+          # to this broker. Edge, Teams and other desktop apps keep acceleration.
+          # Current-system paths follow the broker package selected above.
+          xdg.dataFile."dbus-1/services/com.microsoft.identity.broker1.service" =
+            lib.mkIf config.noughty.host.gpu.hasNvidia {
+              text = ''
+                [D-BUS Service]
+                Name=com.microsoft.identity.broker1
+                Exec=/run/current-system/sw/bin/env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 /run/current-system/sw/bin/microsoft-identity-broker
+              '';
+            };
 
-        home-manager.users.${config.noughty.user.name}.programs.microsoft-edge = {
-          enable = true;
-          package = pkgs.microsoft-edge; # Stable, from the locked Nixpkgs.
-          # Hyprland isn't auto-detected as a GNOME desktop. Use the existing
-          # Secret Service consistently, including PWA launches, through HM's
-          # native option. NIXOS_OZONE_WL comes from the desktop baseline.
-          commandLineArgs = [ "--password-store=gnome-libsecret" ];
+          programs.microsoft-edge = {
+            enable = true;
+            package = pkgs.microsoft-edge; # Stable, from the locked Nixpkgs.
+            # Hyprland isn't auto-detected as a GNOME desktop. Use the existing
+            # Secret Service consistently, including PWA launches, through HM's
+            # native option. NIXOS_OZONE_WL comes from the desktop baseline.
+            commandLineArgs = [ "--password-store=gnome-libsecret" ];
+          };
         };
 
         # The NixOS chromium policy module doesn't target Edge. Recommendations
