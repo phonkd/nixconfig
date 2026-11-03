@@ -23,6 +23,7 @@
         # secretspec + Bitwarden CLI, pointed at Vaultwarden. On `gui` not
         # `desktop-nixos-specific` so the Mac gets it too.
         self.homeModules.secretspec
+        self.homeModules.hf-teams
       ];
       home.packages = with pkgs; [
         android-tools
