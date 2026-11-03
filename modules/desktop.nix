@@ -302,6 +302,18 @@
       networking.firewall.trustedInterfaces = [ "virbr0" ];
       services.flatpak = {
         enable = true;
+        packages = [
+          {
+            appId = "ai.storyteller.gridcraft";
+            # Upstream release bundle; keep the checksum in both fields so
+            # fetchurl verifies it and nix-flatpak detects version changes.
+            sha256 = "f40412d5bc4f39c577d2a7b202ac5707e0648150f019697649d4031d4db02db8";
+            bundle = toString (pkgs.fetchurl {
+              url = "https://github.com/storytold/gridcraft/releases/download/v0.13.0/gridcraft-0.13.0-linux-x86_64.flatpak";
+              sha256 = "f40412d5bc4f39c577d2a7b202ac5707e0648150f019697649d4031d4db02db8";
+            });
+          }
+        ];
         remotes = [
           {
             name = "flathub";
