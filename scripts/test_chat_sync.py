@@ -159,6 +159,26 @@ class ChatSyncTests(unittest.TestCase):
             sync.apply_snapshot(self.a, self.root / 'before', before, self.root / 'backup')
         self.assertEqual(self.rows(self.a), [('a', 'changed')])
 
+    def test_vacuum_removed_unused_sqlite_sequence_does_not_block_apply(self):
+        path = self.db(self.a, [('a', 'original')], 'keep-local-auth')
+        with sqlite3.connect(path) as db:
+            db.executescript('CREATE TABLE retired(id INTEGER PRIMARY KEY AUTOINCREMENT); DROP TABLE retired;')
+            self.assertIn('sqlite_sequence', sync.tables(db))
+        source = self.root / 'source'
+        before = sync.snapshot(self.a, source)
+        with contextlib.closing(sync.connect(source / REL)) as db:
+            self.assertNotIn('sqlite_sequence', sync.tables(db))
+        with sqlite3.connect(source / REL) as db:
+            db.execute("INSERT INTO threads VALUES ('b','incoming')")
+        target = sync.read_manifest(source)
+        target['databases'][REL] = sync.db_digest(source / REL, REL)
+        sync.atomic(source / 'manifest.json', sync.json_bytes(target))
+        sync.apply_snapshot(self.a, source, before, self.root / 'backup')
+        self.assertEqual(self.rows(self.a), [('a', 'original'), ('b', 'incoming')])
+        self.assertEqual(self.rows(self.a, 'remote_control_enrollments'), [('auth', 'keep-local-auth')])
+        self.assertEqual(self.rows(self.root / 'backup'), [('a', 'original')])
+        self.assertEqual(sync.snapshot(self.a, self.root / 'verified'), target)
+
     def test_retry_after_only_peer_applied_is_idempotent(self):
         self.db(self.a, [('a', 'A')])
         self.db(self.b, [('b', 'B')])

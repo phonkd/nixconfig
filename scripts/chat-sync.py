@@ -162,8 +162,11 @@ def connect(path):
 
 
 def schema(db):
+    # VACUUM can remove an unused sqlite_sequence left by a dropped AUTOINCREMENT
+    # table. It is SQLite bookkeeping, not an application schema difference.
+    # Actual AUTOINCREMENT declarations remain in the compared table SQL.
     return list(db.execute("SELECT type,name,tbl_name,sql FROM sqlite_master "
-                           "WHERE sql IS NOT NULL ORDER BY type,name"))
+                           "WHERE sql IS NOT NULL AND name != 'sqlite_sequence' ORDER BY type,name"))
 
 
 def tables(db):
