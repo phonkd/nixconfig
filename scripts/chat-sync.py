@@ -32,7 +32,8 @@ CODEX_STATE = set('threads thread_dynamic_tools thread_spawn_edges thread_sectio
                   'project_roots project_idempotency_keys thread_attachments guardian_review_feedback'.split())
 CODEX_HISTORY = set('thread_turns thread_items thread_history_projection_state thread_realtime_items'.split())
 OPENCODE = set('project project_directory message part session todo event_sequence event workspace '
-               'session_message session_v2 instruction_blob instruction_entry instruction_state worktree'.split())
+               'session_message session_v2 session_context_epoch session_input '
+               'instruction_blob instruction_entry instruction_state worktree'.split())
 SKIP = set('_sqlx_migrations sqlite_sequence backfill_state remote_control_enrollments '
            'external_agent_config_imports rollout_migration_state rollout_migration_skipped_rollouts '
            'thread_read_receipts __drizzle_migrations account account_state control_account credential '
@@ -136,6 +137,9 @@ def validate_db(db, rel):
         raise SyncError(f'{rel}: unsupported tables: {", ".join(sorted(unknown))}; update adapter first')
     if db.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
         raise SyncError(f'{rel}: SQLite integrity check failed')
+    if 'session_input' in tables(db):
+        if db.execute('SELECT 1 FROM session_input WHERE promoted_seq IS NULL LIMIT 1').fetchone():
+            raise SyncError(f'{rel}: pending OpenCode session inputs; finish or discard them in OpenCode before syncing')
     if 'event' in tables(db):
         kinds = [row[0] for row in db.execute('SELECT DISTINCT type FROM event')]
         if any(not str(kind).startswith(('session.', 'message.', 'part.', 'project.')) for kind in kinds):
@@ -306,8 +310,20 @@ def merge_db(a, b, base, out, rel):
     with contextlib.ExitStack() as stack:
         left, right = [stack.enter_context(contextlib.closing(connect(p))) for p in (a, b)]
         old = stack.enter_context(contextlib.closing(connect(base))) if base else None
-        if schema(left) != schema(right) or (old and schema(old) != schema(left)):
-            raise SyncError(f'{rel}: schema mismatch; use matching app versions on both hosts')
+        if schema(left) != schema(right):
+            local_only = ', '.join(sorted(tables(left) - tables(right))) or 'none'
+            peer_only = ', '.join(sorted(tables(right) - tables(left))) or 'none'
+            changed = ', '.join(sorted(
+                table for table in tables(left) & tables(right)
+                if list(left.execute(f'PRAGMA table_info({quote(table)})')) !=
+                   list(right.execute(f'PRAGMA table_info({quote(table)})')))) or 'none'
+            raise SyncError(f'{rel}: schema mismatch (local-only tables: {local_only}; '
+                            f'peer-only tables: {peer_only}; changed columns: {changed}). '
+                            'Use matching app versions and let each app migrate its own database '
+                            'on both hosts, then close them and retry. No chat data was applied.')
+        if old and schema(old) != schema(left):
+            raise SyncError(f'{rel}: saved baseline schema differs from both hosts; '
+                            'the baseline needs migration before syncing')
         ga, gb = conversation_groups(left, rel), conversation_groups(right, rel)
         gc = conversation_groups(old, rel) if old else {}
         winners = {}

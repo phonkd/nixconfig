@@ -61,6 +61,17 @@ database. Runtime jobs, pending queues, authentication tables, remote-control
 enrollments, permissions and app configuration are not exchanged. Codex's separate
 generated memory database is not a chat database and is not synced.
 
+OpenCode's `session_context_epoch` and already-promoted `session_input` records
+are included in the session's history and conflict detection. If an input has not
+yet been promoted, sync stops: finish or discard that queued input in OpenCode
+first so copying it cannot cause the prompt to run on a second machine.
+
+For a schema mismatch, the error lists differing tables and columns. Install the
+same app versions on both hosts and open each app normally so its own migrations
+run, then close both before retrying. The sync script does not perform app schema
+migrations or drop legacy tables. If native migration leaves different schemas,
+keep the error details for an adapter update; do not delete a database to match it.
+
 Referenced files outside these locations (repositories, OS temporary attachments,
 external images) must be transferred separately. Symlinks in selected data paths
 are rejected rather than followed. Internal database schemas and event formats

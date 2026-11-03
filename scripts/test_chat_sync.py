@@ -267,6 +267,58 @@ class ChatSyncTests(unittest.TestCase):
         out = self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
         self.assertEqual(self.rows(out, 'project', OC), [('same-git-id', 2, '["a","b"]')])
 
+    def add_session_context_tables(self, home, sid):
+        with sqlite3.connect(home / OC) as db:
+            db.executescript('''
+                CREATE TABLE session_context_epoch(
+                    session_id TEXT PRIMARY KEY REFERENCES session(id),
+                    baseline TEXT NOT NULL, snapshot TEXT NOT NULL, baseline_seq INTEGER NOT NULL);
+                CREATE TABLE session_input(
+                    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES session(id),
+                    prompt TEXT NOT NULL, delivery TEXT NOT NULL, admitted_seq INTEGER NOT NULL,
+                    promoted_seq INTEGER, time_created INTEGER NOT NULL);
+            ''')
+            db.execute('INSERT INTO session_context_epoch VALUES (?,?,?,?)', (sid, '{}', '{}', 1))
+            db.execute('INSERT INTO session_input VALUES (?,?,?,?,?,?,?)',
+                       ('input-' + sid, sid, '{"text":"hello"}', 'normal', 1, 2, 1))
+
+    def test_new_opencode_context_and_promoted_inputs_roundtrip(self):
+        for home, sid in ((self.a, 'a'), (self.b, 'b')):
+            self.db(home, [(sid, sid)], rel=OC)
+            self.add_session_context_tables(home, sid)
+        out = self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
+        for table in ('session_context_epoch', 'session_input'):
+            self.assertEqual(len(self.rows(out, table, OC)), 2)
+        self.apply(self.a, out)
+        self.assertEqual(len(self.rows(self.a, 'session_input', OC)), 2)
+
+    def test_new_context_participates_in_session_conflict_detection(self):
+        for home in (self.a, self.b):
+            self.db(home, [('a', 'A')], rel=OC)
+            self.add_session_context_tables(home, 'a')
+        base = self.snap(self.a, 'base')
+        with sqlite3.connect(self.a / OC) as db:
+            db.execute("UPDATE session_context_epoch SET baseline_seq=3")
+        with sqlite3.connect(self.b / OC) as db:
+            db.execute("UPDATE session_input SET promoted_seq=4")
+        with self.assertRaisesRegex(sync.SyncError, 'Conflict'):
+            self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'), base)
+
+    def test_pending_inputs_are_not_transferred_for_automatic_replay(self):
+        self.db(self.a, [('a', 'A')], rel=OC)
+        self.add_session_context_tables(self.a, 'a')
+        with sqlite3.connect(self.a / OC) as db:
+            db.execute('UPDATE session_input SET promoted_seq=NULL')
+        with self.assertRaisesRegex(sync.SyncError, 'pending OpenCode session inputs'):
+            self.snap(self.a, 'left')
+
+    def test_missing_context_tables_report_actual_schema_mismatch(self):
+        self.db(self.a, [('a', 'A')], rel=OC)
+        self.db(self.b, [('b', 'B')], rel=OC)
+        self.add_session_context_tables(self.b, 'b')
+        with self.assertRaisesRegex(sync.SyncError, 'peer-only tables: session_context_epoch, session_input'):
+            self.merged(self.snap(self.a, 'left'), self.snap(self.b, 'right'))
+
 
 if __name__ == '__main__':
     unittest.main()
