@@ -91,6 +91,15 @@
         services.gnome.gnome-keyring.enable = true;
         security.pam.services.greetd.enableGnomeKeyring = true;
 
+        # WebKitGTK's DMA-BUF renderer can terminate the broker's sign-in
+        # window with Wayland error 71 on NVIDIA (WebKit bug 280210).
+        # The broker is session D-Bus activated, so configure its user-manager
+        # environment. This affects WebKit, not Edge/Teams Chromium rendering.
+        home-manager.users.${config.noughty.user.name}.xdg.configFile."environment.d/60-webkit-nvidia.conf" =
+          lib.mkIf config.noughty.host.gpu.hasNvidia {
+            text = "WEBKIT_DISABLE_DMABUF_RENDERER=1\n";
+          };
+
         home-manager.users.${config.noughty.user.name}.programs.microsoft-edge = {
           enable = true;
           package = pkgs.microsoft-edge; # Stable, from the locked Nixpkgs.
