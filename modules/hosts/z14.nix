@@ -147,11 +147,15 @@
       boot.loader.limine.enable = true;
       boot.loader.efi.canTouchEfiVariables = true;
 
+      # Track the newest stable kernel rather than the 6.18 LTS default. The
+      # Bluetooth patches below are rebased onto 7.3.1 and must follow bumps.
+      boot.kernelPackages = pkgs.linuxPackages_latest;
+
       # nixos-hardware's cpu/amd/pstate.nix would pick "active" for kernel
-      # >=6.3 (we're on 6.18) -- lets the CPU scale itself vs acpi-cpufreq.
+      # >=6.3 -- lets the CPU scale itself vs acpi-cpufreq.
       boot.kernelParams = [ "amd_pstate=active" ];
 
-      # Experimental MT7922 LE Audio microphone fix. Linux 6.18.57 lacks
+      # Experimental MT7922 LE Audio microphone fix. Linux 7.3.1 still lacks
       # bluetooth-next's October 2026 ISO receive/parser and transfer-size
       # fixes; our trace contains empty/lost microphone SDUs. Keep this
       # scoped to z14 and remove once the kernel carries the three commits.

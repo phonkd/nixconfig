@@ -1,6 +1,6 @@
 Bluetooth: preserve central CIS SDU limits on establishment
 
-Local experimental fix against Linux 6.18.57.
+Local experimental fix, rebased onto Linux 7.3.1 (first written against 6.18.57).
 
 The central supplies Max_SDU_C_To_P and Max_SDU_P_To_C through LE Set CIG
 Parameters, using conn->iso_qos. LE CIS Established instead reports Max_PDU
@@ -17,7 +17,7 @@ No packet-size bypass or assumed PDU-to-SDU multiplier is required.
 
 --- a/net/bluetooth/hci_event.c
 +++ b/net/bluetooth/hci_event.c
-@@ -6939,8 +6939,14 @@
+@@ -7039,8 +7039,14 @@
  		qos->ucast.in.latency =
  			DIV_ROUND_CLOSEST(get_unaligned_le24(ev->p_latency),
  					  1000);
@@ -31,6 +31,6 @@ No packet-size bypass or assumed PDU-to-SDU multiplier is required.
 +			qos->ucast.out.sdu = 0;
 +		if (!ev->p_bn)
 +			qos->ucast.in.sdu = 0;
- 		qos->ucast.out.phy = ev->c_phy;
- 		qos->ucast.in.phy = ev->p_phy;
+ 		qos->ucast.out.phys = le_phy_qos(ev->c_phy);
+ 		qos->ucast.in.phys = le_phy_qos(ev->p_phy);
  		break;

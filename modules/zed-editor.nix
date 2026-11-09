@@ -26,8 +26,5 @@
           }
         ];
       };
-      home.packages = [
-        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.zed-discord-presence
-      ];
     };
 }
