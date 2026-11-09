@@ -1,13 +1,13 @@
 Retain Bluetooth SPA device settings across connection property updates.
 
-The 0.5.18 monitor only stores connected devices. Its native object-info
+The 0.5.19 monitor only stores connected devices. Its native object-info
 handler also destroys an existing child before emitting each connection update.
 Retain disconnected devices in Lua and preserve api.bluez5.device children on
 property updates in the native handler. Real object removal still releases them,
 and all other SPA factories keep their existing replacement behavior.
 Reuse the retained device and install its signal handlers only once.
 
-Local fix against 0.5.18; remove when upstream provides equivalent lifetime.
+Local fix rebased onto 0.5.19; remove when upstream provides equivalent lifetime.
 
 --- a/src/scripts/monitors/bluez/create-device.lua
 +++ b/src/scripts/monitors/bluez/create-device.lua
@@ -21,14 +21,14 @@ Local fix against 0.5.18; remove when upstream provides equivalent lifetime.
 +        -- per-device codec settings, which BlueZ needs before profile negotiation.
 +        local device = monitor:get_managed_object (id)
          if device == nil then
--          log:warning ("Failed to create '" .. factory .. "' device")
+-          log:notice ("Could not create '" .. factory .. "' device")
 -          transition:advance ()
 -          event:stop_processing ()
 -          return
 +          -- Create the BT device
 +          device = SpaDevice (factory, properties)
 +          if device == nil then
-+            log:warning ("Failed to create '" .. factory .. "' device")
++            log:notice ("Could not create '" .. factory .. "' device")
 +            transition:advance ()
 +            event:stop_processing ()
 +            return
@@ -100,7 +100,7 @@ Local fix against 0.5.18; remove when upstream provides equivalent lifetime.
            EventDispatcher.push_event (e)
 --- a/lib/wp/device.c
 +++ b/lib/wp/device.c
-@@ -623,7 +623,12 @@
+@@ -640,7 +640,12 @@
      wp_debug_object (self, "object info: id:%u type:%s factory:%s",
          id, type, factory_name);
  
