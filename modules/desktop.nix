@@ -11,7 +11,7 @@
     { pkgs, ... }:
     {
       home.packages = with pkgs; [
-        # nicotine-plus
+        nicotine-plus
         localsend
         (discord.override {
           #withOpenASAR = true;
