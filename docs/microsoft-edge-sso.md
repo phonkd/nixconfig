@@ -201,6 +201,17 @@ authentication path accepts NixOS; authenticated renewal remains a manual test.
 
 ## Validation record
 
+### Blank sign-in form on AMD z14 (2026-11-10)
+
+After a flake update moved the broker's WebKitGTK from 2.54.1 to 2.54.2 (GLib
+2.88 to 2.90), z14 (AMD Krackan) showed the same symptom: the broker window
+opened, but only the "Terms of use" footer was drawn. Teams/Edge then asked for
+sign-in again, because AAD answered silent requests with `invalid_grant` /
+`basic_action`. The device was still registered and had a valid PRT. The
+software-rendering D-Bus launcher below now applies to every work desktop, not
+only NVIDIA hosts. It was installed live in `~/.local/share/dbus-1/services/`.
+The next Home Manager switch replaces it and keeps the old file as `.hm-backup`.
+
 ### NVIDIA rendering failure on blac (2026-11-03)
 
 Edge reported `4ulu5` because broker 3.0.2 exited with Wayland protocol error
@@ -209,7 +220,7 @@ the crash but left the page blank. An independent WebKit test loaded the login
 form and scripts but failed to paint them, reporting a GBM buffer allocation
 error. Proxy checks successfully fetched the public login page and its scripts.
 
-On NVIDIA work desktops, the per-user D-Bus service description now launches
+On work desktops (originally NVIDIA only), the per-user D-Bus service description now launches
 only the broker with `GDK_BACKEND=x11`, `WEBKIT_DISABLE_DMABUF_RENDERER=1`,
 `WEBKIT_DISABLE_COMPOSITING_MODE=1` and `LIBGL_ALWAYS_SOFTWARE=1`. This uses
 software rendering for the authentication window; Edge and Teams retain their

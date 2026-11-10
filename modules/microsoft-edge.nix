@@ -92,19 +92,18 @@
         security.pam.services.greetd.enableGnomeKeyring = true;
 
         home-manager.users.${config.noughty.user.name} = {
-          # WebKitGTK on NVIDIA can either exit with Wayland error 71 or leave
-          # the sign-in form unpainted (GBM buffer allocation fails). Use the
-          # native session D-Bus launch configuration to scope software rendering
-          # to this broker. Edge, Teams and other desktop apps keep acceleration.
+          # The broker's WebKitGTK sign-in window fails to paint its form under
+          # Hyprland: on NVIDIA (blac, 2026-11-03) it exited with Wayland error
+          # 71 or stayed blank; on AMD (z14) it went blank after WebKitGTK
+          # 2.54.2 (2026-11-10), with only the page footer drawn. Use the native
+          # session D-Bus launch configuration to scope software rendering to
+          # this broker. Edge, Teams and other desktop apps keep acceleration.
           # Current-system paths follow the broker package selected above.
-          xdg.dataFile."dbus-1/services/com.microsoft.identity.broker1.service" =
-            lib.mkIf config.noughty.host.gpu.hasNvidia {
-              text = ''
-                [D-BUS Service]
-                Name=com.microsoft.identity.broker1
-                Exec=/run/current-system/sw/bin/env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 /run/current-system/sw/bin/microsoft-identity-broker
-              '';
-            };
+          xdg.dataFile."dbus-1/services/com.microsoft.identity.broker1.service".text = ''
+            [D-BUS Service]
+            Name=com.microsoft.identity.broker1
+            Exec=/run/current-system/sw/bin/env GDK_BACKEND=x11 WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 /run/current-system/sw/bin/microsoft-identity-broker
+          '';
 
           programs.microsoft-edge = {
             enable = true;
