@@ -79,7 +79,7 @@
         defaultCacheTtl = 7200;
       };
     };
-  flake.nixosModules.system-minimal = { pkgs, ... }: {
+  flake.nixosModules.system-minimal = { config, pkgs, ... }: {
     imports = [
       inputs.sops-nix.nixosModules.sops
     ];
@@ -103,6 +103,14 @@
       keyFile = "/home/phonkd/.config/sops/age/keys.txt";
     };
     nix.settings.experimental-features = [ "nix-command" "flakes" ];
+    # CUDA is unfree, so Hydra never puts ollama-cuda & co. on cache.nixos.org;
+    # without this CUDA hosts build them from source (ollama-cuda ~3h).
+    nix.settings.extra-substituters = lib.mkIf config.noughty.host.gpu.hasCuda [
+      "https://cache.nixos-cuda.org"
+    ];
+    nix.settings.extra-trusted-public-keys = lib.mkIf config.noughty.host.gpu.hasCuda [
+      "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
+    ];
     programs.zsh.enable = true;
     nixpkgs.config.allowUnfree = true;
   };
