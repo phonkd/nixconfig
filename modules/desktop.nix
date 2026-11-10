@@ -15,7 +15,10 @@
         localsend
         (discord.override {
           #withOpenASAR = true;
-          withVencord = true; # can do this here too
+          # Off until nixos-26.05 ships vencord >= 1.15.16: 1.15.13 crashes on
+          # Discord's Nov 2026 web build ("i.A is not a constructor") and the
+          # client loops at startup. Re-enable after a flake update picks it up.
+          withVencord = false;
         })
         scrcpy
         nvtopPackages.full
