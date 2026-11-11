@@ -40,25 +40,27 @@
     }:
     let
       unstable = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
-      # Pinned to the 12.1 line; see the nixpkgs-ghidra input in flake.nix.
-      ghidra = inputs.nixpkgs-ghidra.legacyPackages.${pkgs.system}.ghidra;
+      # GUI Ghidra from rea-flake's nixpkgs, so it matches the 12.1.x that REA uses.
+      ghidra = inputs.rea-flake.inputs.nixpkgs.legacyPackages.${pkgs.system}.ghidra;
+      # Android/APK decompilation bridge for REA; the exact release REA audits.
+      jadxMcpJar = pkgs.fetchurl {
+        url = "https://github.com/1013503897/jadx-headless-mcp/releases/download/v0.7.1/jadx-headless-mcp-0.7.1-all.jar";
+        sha256 = "6e5eacf500b64292bfb73c49797c1958f6ee44646e43e868039ae7feb573ff75";
+      };
     in
     {
-      # REA (Reverse Engineer Anything) MCP server, picked up by Claude Code and
-      # opencode through programs.mcp. Codex keeps its own mutable config.toml.
+      imports = [ inputs.rea-flake.homeManagerModules.default ];
+      programs.rea.enable = true;
+
+      # REA MCP server, picked up by Claude Code and opencode through
+      # programs.mcp. Codex keeps its own mutable config.toml. The rea wrapper
+      # already defaults GHIDRA_INSTALL_DIR/JAVA_HOME to Ghidra 12.1 + JDK 21.
       programs.mcp = {
         enable = true;
         servers.rea = {
-          command = "${config.home.profileDirectory}/bin/npx";
-          args = [
-            "-y"
-            "rea-agents@6.5.0"
-            "mcp"
-          ];
-          env = {
-            GHIDRA_INSTALL_DIR = "${ghidra}/lib/ghidra";
-            JAVA_HOME = "${unstable.jdk21}/lib/openjdk";
-          };
+          command = lib.getExe config.programs.rea.package;
+          args = [ "mcp" ];
+          env.REA_JADX_MCP_JAR = "${jadxMcpJar}";
         };
       };
       programs.claude-code.enableMcpIntegration = true;
@@ -75,7 +77,6 @@
         inputs.llm-agents.packages.${pkgs.system}.codex
         # Official desktop app, with NixOS fixes for its downloaded agent runtime.
         inputs.llm-agents.packages.${pkgs.system}.chatgpt
-        # REA's native analysis provider needs Ghidra 12.1 and a full JDK.
         ghidra
         unstable.jdk21
       ];

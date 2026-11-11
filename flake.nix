@@ -7,9 +7,10 @@
     # 2026-08-01 rev carrying 0.17.0, which fails at runtime with "Provider
     # backend 'bw' not found". Re-check `secretspec --version` if you re-pin.
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
-    # Ghidra 12.1.x for REA (rea-agents only accepts the 12.1 line; unstable is
-    # on 12.2). Drop once REA ships 12.2 support and use nixpkgs-unstable again.
-    nixpkgs-ghidra.url = "github:nixos/nixpkgs/3ec636362e1816bc2f0888fa0fa2c69f1bc9e504";
+    # REA (Reverse Engineer Anything) as a pinned Nix package, wrapped with
+    # Ghidra/JDK from its own nixpkgs. Deliberately NOT following our nixpkgs:
+    # rea-agents only accepts Ghidra 12.1.x, and its lock keeps it there.
+    rea-flake.url = "github:Fractal-Tess/rea-flake";
     nixpkgs-fork.url = "github:phonkd/nixpkgs/master";
     # Headscale 0.29.6 + Go 1.27.3 security fixes, scoped to observability.
     # Stable and our unstable pin predate the complete HTTP/2 dependency fix.
