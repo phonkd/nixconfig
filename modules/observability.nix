@@ -314,6 +314,11 @@
               # Mimir serves the Prometheus query API under /prometheus.
               url = "http://127.0.0.1:${toString mimirHttpPort}/prometheus";
               isDefault = true;
+              # Alloy's prometheus.scrape default interval is 60s. Without
+              # this Grafana assumes 15s, so $__rate_interval shrinks to ~75s
+              # on 24h views — one sample per window — and every rate()
+              # panel (CPU, network, disk) shows "No data" while gauges work.
+              jsonData.timeInterval = "60s";
             }
             {
               name = "Mimir Alertmanager";
