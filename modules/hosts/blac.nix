@@ -14,6 +14,15 @@
       # Shared desktop baseline lives in modules/desktop.nix, gated on
       # noughty.host.is.nixosDesktop.
 
+      # blac is mouse-only: undo the shared 0.25 Hyprland scroll factor (tuned
+      # for z14's touchpad) and the kitty multipliers that compensate for it.
+      home-manager.users.phonkd.wayland.windowManager.hyprland.settings.input.scroll_factor =
+        lib.mkForce 1.0;
+      home-manager.users.phonkd.programs.kitty.settings = {
+        wheel_scroll_multiplier = lib.mkForce 5.0;
+        touch_scroll_multiplier = lib.mkForce 1.0;
+      };
+
       # Match z14's mail client; Owl is Betterbird's Exchange add-on.
       home-manager.users.phonkd.programs.thunderbird.enable = lib.mkForce false;
       # Windows is firmware entry 0000; BootNext leaves the normal boot order intact.
