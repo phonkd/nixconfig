@@ -198,7 +198,18 @@
         configuration = {
           multitenancy_enabled = false;
           usage_stats.enabled = false;
-          limits.max_global_series_per_user = 400000;
+          limits = {
+            max_global_series_per_user = 400000;
+            # Defaults are 10000/s and 200000. Steady state is under that,
+            # but after any Mimir outage every Alloy replays its WAL at
+            # once and the 10k cap 429s the backlog until it ages out.
+            ingestion_rate = 50000;
+            ingestion_burst_size = 1000000;
+          };
+          # Default 100 queued queries per tenant. Node Exporter Full fires
+          # well over 100 panel queries on load, so the query-scheduler
+          # answered the overflow with 429 "too many outstanding requests".
+          query_scheduler.max_outstanding_requests_per_tenant = 1000;
           # "all" deliberately excludes the alertmanager and overrides-exporter
           # components — Mimir won't start the Alertmanager (or expose it on
           # the admin page) unless it's opted into the target list explicitly.
