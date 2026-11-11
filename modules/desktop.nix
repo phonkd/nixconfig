@@ -38,7 +38,29 @@
       config,
       ...
     }:
+    let
+      unstable = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
+    in
     {
+      # REA (Reverse Engineer Anything) MCP server, picked up by Claude Code and
+      # opencode through programs.mcp. Codex keeps its own mutable config.toml.
+      programs.mcp = {
+        enable = true;
+        servers.rea = {
+          command = "${config.home.profileDirectory}/bin/npx";
+          args = [
+            "-y"
+            "rea-agents@6.5.0"
+            "mcp"
+          ];
+          env = {
+            GHIDRA_INSTALL_DIR = "${unstable.ghidra}/lib/ghidra";
+            JAVA_HOME = "${unstable.jdk21}/lib/openjdk";
+          };
+        };
+      };
+      programs.claude-code.enableMcpIntegration = true;
+
       services.easyeffects.enable = true;
       home.packages = with pkgs; [
         dracula-theme
@@ -52,8 +74,8 @@
         # Official desktop app, with NixOS fixes for its downloaded agent runtime.
         inputs.llm-agents.packages.${pkgs.system}.chatgpt
         # REA's native analysis provider needs Ghidra 12.1 and a full JDK.
-        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.ghidra
-        inputs.nixpkgs-unstable.legacyPackages.${pkgs.system}.jdk21
+        unstable.ghidra
+        unstable.jdk21
       ];
       qt = {
         enable = true;
