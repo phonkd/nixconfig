@@ -40,6 +40,8 @@
     }:
     let
       unstable = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
+      # Pinned to the 12.1 line; see the nixpkgs-ghidra input in flake.nix.
+      ghidra = inputs.nixpkgs-ghidra.legacyPackages.${pkgs.system}.ghidra;
     in
     {
       # REA (Reverse Engineer Anything) MCP server, picked up by Claude Code and
@@ -54,7 +56,7 @@
             "mcp"
           ];
           env = {
-            GHIDRA_INSTALL_DIR = "${unstable.ghidra}/lib/ghidra";
+            GHIDRA_INSTALL_DIR = "${ghidra}/lib/ghidra";
             JAVA_HOME = "${unstable.jdk21}/lib/openjdk";
           };
         };
@@ -74,7 +76,7 @@
         # Official desktop app, with NixOS fixes for its downloaded agent runtime.
         inputs.llm-agents.packages.${pkgs.system}.chatgpt
         # REA's native analysis provider needs Ghidra 12.1 and a full JDK.
-        unstable.ghidra
+        ghidra
         unstable.jdk21
       ];
       qt = {
