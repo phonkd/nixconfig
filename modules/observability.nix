@@ -381,6 +381,18 @@
         mimirHttpPort
       ];
 
+      # Mimir's own /metrics (cortex_* / mimir_* self-monitoring), for the
+      # "Mimir Overview" dashboard. This host is also an observability-sender,
+      # so its Alloy already has the nixvms remote_write this forwards to.
+      # Monolithic mode (target=all) means one target serves every component.
+      environment.etc."alloy/mimir.alloy".text = ''
+        prometheus.scrape "mimir" {
+          targets    = [{"__address__" = "127.0.0.1:${toString mimirHttpPort}"}]
+          job_name   = "mimir"
+          forward_to = [prometheus.remote_write.nixvms.receiver]
+        }
+      '';
+
       # ── Mimir alerting rules ─────────────────────────────────────────────────
       # Pushed into Mimir's ruler via its config API (mimirtool, bundled with
       # the mimir package) rather than dropped as a raw file — the "filesystem"
