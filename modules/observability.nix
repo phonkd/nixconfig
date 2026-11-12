@@ -653,6 +653,10 @@
         enable = true;
         port = 9256;
         user = "root";
+        # Forget a group once its last process exits. Without this every
+        # name ever seen (one-off commands, per-connection process titles) is
+        # reported as 0 forever and pins series in Mimir.
+        extraFlags = [ "-remove-empty-groups" ];
         settings.process_names = [
           {
             name = "{{.ExeBase}}";
@@ -708,6 +712,22 @@
             obsHost = if hostname == "ext-mail" then "10.0.0.3" else "100.64.0.4";
             lokiendpoint = "http://${obsHost}:3100/loki/api/v1/push";
             mimirendpoint = "http://${obsHost}:9009/api/v1/push";
+            # integrations/process groupnames to DROP (RE2, fully anchored by
+            # Alloy). Each entry is a name that churns, so it would create new
+            # series indefinitely. Bracket classes stand in for \( etc. so
+            # nothing needs escaping through Nix and Alloy strings.
+            processGroupExcludes = [
+              # Postgres retitles each backend with the client address and
+              # port: "postgres: affine affine 127.0.0.1(51630) idle". One
+              # group per connection (~11.7k on 203-media).
+              "postgres: [^ ]+ [^ ]+ ([[]local[]]|[0-9a-f.:]+[(][0-9]+[)]).*"
+              # Per-client samba / ssh session processes.
+              "smbd: client .*"
+              "sshd-session: .*"
+              # Nix store-hash-prefixed names ("(<32-char hash>-getty)")
+              # change on every rebuild.
+              "[(][0-9a-z]{32}-.*[)]"
+            ];
           in
           ''
             prometheus.exporter.unix "gagu" {
@@ -737,7 +757,20 @@
             prometheus.scrape "process" {
               targets    = [{"__address__" = "127.0.0.1:9256"}]
               job_name   = "integrations/process"
+              forward_to = [prometheus.relabel.process_exclude.receiver]
+            }
+
+            // Exclude list for process groups. process-exporter can only
+            // include (first-match allowlist, RE2 has no negative lookahead),
+            // so the catch-all above stays and noisy groups are dropped here
+            // before they reach Mimir.
+            prometheus.relabel "process_exclude" {
               forward_to = [prometheus.remote_write.nixvms.receiver]
+              rule {
+                source_labels = ["groupname"]
+                regex         = "${lib.concatStringsSep "|" processGroupExcludes}"
+                action        = "drop"
+              }
             }
 
             prometheus.remote_write "nixvms" {
