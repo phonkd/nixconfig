@@ -30,6 +30,34 @@
       #news.display = "silent";
       programs.nix-index.enableZshIntegration = true;
       programs.home-manager.enable = true;
+
+      # Homelab Grafana MCP for coding agents, next to the work repo's
+      # `grafana` (bedag) server. Reached over the tailnet (grafana.phonkd.net
+      # resolves to traefik on 100.64.0.5; .phonkd.net is in NO_PROXY, so the
+      # work proxy is bypassed). The service-account token stays out of Nix:
+      # ~/.config/mcp/grafana-phonkd.env (mode 0600) holds
+      #   GRAFANA_SERVICE_ACCOUNT_TOKEN=glsa_...
+      programs.mcp = {
+        enable = true;
+        servers.grafana-phonkd = {
+          command = "/bin/sh";
+          args = [
+            "-c"
+            ''
+              set -a
+              . "$HOME/.config/mcp/grafana-phonkd.env" || exit
+              set +a
+              export GRAFANA_URL=https://grafana.phonkd.net
+              exec ${pkgs.mcp-grafana}/bin/mcp-grafana --transport stdio
+            ''
+          ];
+        };
+      };
+      programs.claude-code = {
+        enable = true;
+        package = null;
+        enableMcpIntegration = true;
+      };
     };
   flake.homeModules.desktop-nixos-specific =
     {
