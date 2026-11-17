@@ -144,6 +144,9 @@
     # Daily-updated AI agent packages for NixOS desktops. Keep upstream's
     # nixpkgs pin so its prebuilt packages use the Numtide cache.
     llm-agents.url = "github:numtide/llm-agents.nix";
+    # Official Kimi Code CLI. Keep its nixpkgs pin: the native build requires
+    # Node.js 24.15 or newer and upstream checks that requirement at eval time.
+    kimi-code.url = "github:MoonshotAI/kimi-code";
     nixflix = {
       url = "github:kiriwalawren/nixflix";
       inputs.nixpkgs.follows = "nixpkgs";
