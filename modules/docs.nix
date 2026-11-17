@@ -279,9 +279,14 @@ in
   # ── client half ───────────────────────────────────────────────────────
   # Imported from flake.homeModules.gui-nixos (modules/hosts/types/gui).
   flake.homeModules.docs =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     let
-      unstable = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
+      # This package set has its own license policy; allow only Obsidian rather
+      # than enabling every unfree package from nixpkgs-unstable.
+      unstable = import inputs.nixpkgs-unstable {
+        inherit (pkgs.stdenv.hostPlatform) system;
+        config.allowUnfreePredicate = pkg: lib.getName pkg == "obsidian";
+      };
       # Upstream's AppImage, not nixpkgs' `affine`: that is still 0.26 (see
       # the version note at the top).
       src = pkgs.fetchurl {
