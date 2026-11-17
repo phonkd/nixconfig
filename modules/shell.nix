@@ -158,6 +158,7 @@
         ripgrep
         gh
         iftop
+        ncdu
         gnused
         zsh-forgit
       ];
