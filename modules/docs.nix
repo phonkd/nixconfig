@@ -281,6 +281,7 @@ in
   flake.homeModules.docs =
     { pkgs, ... }:
     let
+      unstable = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
       # Upstream's AppImage, not nixpkgs' `affine`: that is still 0.26 (see
       # the version note at the top).
       src = pkgs.fetchurl {
@@ -292,7 +293,10 @@ in
     in
     {
       home.packages = [
-        pkgs.obsidian
+        # Obsidian 1.15.0 renders correctly with native Wayland and GPU
+        # acceleration on NVIDIA; stable's 1.13.7 needed --disable-gpu.
+        # Keep Obsidian's own updater disabled so it cannot outrun the installer.
+        unstable.obsidian
         (pkgs.appimageTools.wrapType2 {
           inherit pname version src;
           # Under Hyprland Electron finds no keyring backend and falls back
@@ -308,21 +312,6 @@ in
           '';
         })
       ];
-
-      # Electron's Vulkan renderer can leave Obsidian's native-Wayland window
-      # completely black on NVIDIA. X11 avoids that but is blurry at fractional
-      # scales, so keep native Wayland and disable GPU compositing for launcher
-      # starts only; terminal launches and the package itself remain unchanged.
-      xdg.desktopEntries.obsidian = {
-        name = "Obsidian";
-        comment = "Knowledge base";
-        exec = "obsidian --disable-gpu %u";
-        icon = "obsidian";
-        terminal = false;
-        categories = [ "Office" ];
-        mimeType = [ "x-scheme-handler/obsidian" ];
-        settings.StartupWMClass = "md.obsidian.Obsidian";
-      };
 
       # The AppImage ships no desktop entry outside the image. This one also
       # registers the affine:// handler that sign-in redirects back through.
