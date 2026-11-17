@@ -87,6 +87,12 @@
     # Track the latest tested upstream release; the package's own Nix version
     # remains hardcoded to 1.0.0 even for the 2.x releases.
     caelestia.url = "github:caelestia-dots/shell/v2.5.0";
+    # Prebuilt Vicinae extension packages; the application itself comes from
+    # nixpkgs and uses Home Manager's native programs.vicinae module.
+    vicinae-extensions = {
+      url = "github:vicinaehq/extensions";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     sops-nix.url = "github:Mic92/sops-nix";
     # clan-core builds the hosts listed in modules/builder.nix's `clanHosts`
     # (plans/clan-lol-migration.md). The 26.05 branch pins nixos-26.05, same as

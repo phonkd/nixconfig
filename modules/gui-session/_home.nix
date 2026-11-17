@@ -39,7 +39,7 @@ in
     lib.mkMerge [
       (section ./_shell.nix)
       (import ./_session.nix {
-        inherit config lib pkgs scope;
+        inherit config lib pkgs scope inputs;
         monique = inputs.monique.packages.${pkgs.system}.default;
       })
       (import ./_theming.nix {

@@ -4,6 +4,7 @@
   lib,
   pkgs,
   scope,
+  inputs,
   monique,
 }:
 let
@@ -64,6 +65,15 @@ in
     # which rofi resolves through $XDG_DATA_HOME/rofi/themes (the file
     # below). A string also stops HM generating a theme file of its own.
     theme = "matugen";
+  };
+
+  programs.vicinae = {
+    enable = true;
+    systemd.enable = true;
+    # Available through root search as "Output Devices". Alt+0 deliberately
+    # stays on hypr-sink-switcher: this extension lists easyeffects_sink as an
+    # output, while the existing switcher excludes that processing stage.
+    extensions = [ inputs.vicinae-extensions.packages.${pkgs.system}.pulseaudio ];
   };
 
   home.packages = (with pkgs; [

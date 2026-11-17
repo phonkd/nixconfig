@@ -84,7 +84,9 @@ let
           # Desktop tools.
           "SUPER, P, exec, ${monique}/bin/monique"
           "SUPER, C, exec, ${pkgs.hyprpicker}/bin/hyprpicker -a"
-          "SUPER, V, exec, ${pkgs.cliphist}/bin/cliphist list | ${pkgs.rofi}/bin/rofi -dmenu | ${pkgs.cliphist}/bin/cliphist decode | ${pkgs.wl-clipboard}/bin/wl-copy"
+          # Vicinae stores its own history; cliphist stays enabled during the
+          # trial so its history remains intact and rollback is a bind change.
+          "SUPER, V, exec, ${lib.getExe config.programs.vicinae.package} 'vicinae://launch/clipboard/history?toggle=true'"
           "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start gui-wallpaper.service"
           "SUPER, code:19, exec, ${sinkSwitcher}"
         ] ++ workspaceBinds;
