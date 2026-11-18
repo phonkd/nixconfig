@@ -10,6 +10,9 @@
       lib,
       ...
     }:
+    let
+      scaledResolve = "${pkgs.coreutils}/bin/env QT_SCALE_FACTOR=1.25 QT_SCALE_FACTOR_ROUNDING_POLICY=PassThrough ${pkgs.davinci-resolve-studio}/bin/davinci-resolve-studio";
+    in
     lib.mkIf (config.noughty.host.name == "blac") {
       # Shared desktop baseline lives in modules/desktop.nix, gated on
       # noughty.host.is.nixosDesktop.
@@ -85,6 +88,27 @@
         cudatoolkit
         davinci-resolve-studio
       ];
+
+      # Resolve ships only an XCB Qt backend. At this monitor's 1.25 scale,
+      # XWayland otherwise enlarges its 1x buffer and makes the UI pixelated.
+      # Render X11 clients at native pixels and let Resolve scale itself instead.
+      # Override the user desktop entry and shell alias so both launch paths match.
+      home-manager.users.phonkd.wayland.windowManager.hyprland.settings.xwayland.force_zero_scaling =
+        true;
+      home-manager.users.phonkd.xdg.desktopEntries.davinci-resolve-studio = {
+        name = "DaVinci Resolve Studio";
+        genericName = "Video Editor";
+        exec = scaledResolve;
+        icon = "davinci-resolve-studio";
+        terminal = false;
+        categories = [
+          "AudioVideo"
+          "AudioVideoEditing"
+          "Graphics"
+        ];
+        settings.StartupWMClass = "resolve";
+      };
+      home-manager.users.phonkd.programs.zsh.shellAliases.davinci-resolve-studio = scaledResolve;
 
       services.sunshine = {
         enable = false;
