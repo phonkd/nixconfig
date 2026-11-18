@@ -83,6 +83,7 @@
 
       environment.systemPackages = with pkgs; [
         cudatoolkit
+        davinci-resolve-studio
       ];
 
       services.sunshine = {
