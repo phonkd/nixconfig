@@ -27,6 +27,7 @@
             path = "/Users/phonkd/.ssh/nixremote_ed25519";
           };
         }
+        self.homeModules.grafana-phonkd-mcp-secret
         {
           # Syncthing as a launchd user agent (nix-darwin has no module for
           # it). GUI on 127.0.0.1:8384, paired with 201-mono like the servers.

@@ -89,7 +89,12 @@
       '';
     in
     lib.mkIf (config.noughty.host.name == "z14") {
-      home-manager.users.phonkd.imports = [ self.homeModules.z14-blur-rule ];
+      home-manager.users.phonkd.imports = [
+        self.homeModules.z14-blur-rule
+        inputs.sops-nix.homeManagerModules.sops
+        self.homeModules.grafana-phonkd-mcp-secret
+        { sops.age.keyFile = "/home/phonkd/.config/sops/age/keys.txt"; }
+      ];
 
       # Keep EasyEffects off while investigating interference with LC3 duplex.
       home-manager.users.phonkd.services.easyeffects.enable = lib.mkForce false;

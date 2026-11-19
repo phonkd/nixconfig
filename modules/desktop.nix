@@ -34,9 +34,10 @@
       # Homelab Grafana MCP for coding agents, next to the work repo's
       # `grafana` (bedag) server. Reached over the tailnet (grafana.phonkd.net
       # resolves to traefik on 100.64.0.5; .phonkd.net is in NO_PROXY, so the
-      # work proxy is bypassed). The service-account token stays out of Nix:
-      # ~/.config/mcp/grafana-phonkd.env (mode 0600) holds
-      #   GRAFANA_SERVICE_ACCOUNT_TOKEN=glsa_...
+      # work proxy is bypassed). The service-account token comes from sops
+      # (`grafana-phonkd-mcp-token` in global-secrets), rendered to
+      # ~/.config/mcp/grafana-phonkd.env by homeModules.grafana-phonkd-mcp-secret
+      # on hosts with HM sops (z14, Mac).
       programs.mcp = {
         enable = true;
         servers.grafana-phonkd = {
@@ -57,6 +58,19 @@
         enable = true;
         package = null;
         enableMcpIntegration = true;
+      };
+    };
+  # Needs sops-nix's HM module + an age key; imported per host (z14, Mac).
+  flake.homeModules.grafana-phonkd-mcp-secret =
+    { config, ... }:
+    {
+      sops.defaultSopsFile = ./homelab/global-secrets/secret.yaml;
+      sops.secrets.grafana-phonkd-mcp-token = { };
+      sops.templates."grafana-phonkd-mcp.env" = {
+        path = "${config.xdg.configHome}/mcp/grafana-phonkd.env";
+        content = ''
+          GRAFANA_SERVICE_ACCOUNT_TOKEN=${config.sops.placeholder.grafana-phonkd-mcp-token}
+        '';
       };
     };
   flake.homeModules.desktop-nixos-specific =
