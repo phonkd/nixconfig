@@ -102,6 +102,13 @@
       # GPG needs an explicit pinentry path for private-key imports and signing.
       home-manager.users.phonkd.services.gpg-agent.pinentry.package = pkgs.pinentry-curses;
 
+      # Kimi Code stays on this laptop only. Prefer llm-agents' package over
+      # upstream's flake: same release, plus smoke tests, disabled self-updates
+      # and the existing Numtide binary cache.
+      home-manager.users.phonkd.home.packages = [
+        inputs.llm-agents.packages.${pkgs.system}.kimi-code
+      ];
+
       # projectM 4 matches Spotifast's engine API and fractional fade duration.
       # Esc opens the built-in preset browser/settings. The package has no
       # desktop entry; capture playback through PipeWire's PulseAudio server.
