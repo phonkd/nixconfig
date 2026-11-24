@@ -333,13 +333,29 @@
         enable = true;
         packages = [
           {
-            appId = "ai.storyteller.gridcraft";
-            # Upstream release bundle; keep the checksum in both fields so
-            # fetchurl verifies it and nix-flatpak detects version changes.
-            sha256 = "f40412d5bc4f39c577d2a7b202ac5707e0648150f019697649d4031d4db02db8";
+            appId = "ai.storyteller.wordcraft";
+            # Upstream release bundles; keep the checksums in both fields so
+            # fetchurl verifies them and nix-flatpak detects version changes.
+            sha256 = "7f3923f3537c020521318307428211d80848cd9ccb055265b23d6139216616a9";
             bundle = toString (pkgs.fetchurl {
-              url = "https://github.com/storytold/gridcraft/releases/download/v0.13.0/gridcraft-0.13.0-linux-x86_64.flatpak";
-              sha256 = "f40412d5bc4f39c577d2a7b202ac5707e0648150f019697649d4031d4db02db8";
+              url = "https://github.com/storytold/wordcraft/releases/download/v0.18.1/wordcraft-0.18.1-linux-x86_64.flatpak";
+              sha256 = "7f3923f3537c020521318307428211d80848cd9ccb055265b23d6139216616a9";
+            });
+          }
+          {
+            appId = "ai.storyteller.gridcraft";
+            sha256 = "535289047c3891e5a238feaa186096ca3c0c283cdfde1e0fff72240f5f475d02";
+            bundle = toString (pkgs.fetchurl {
+              url = "https://github.com/storytold/gridcraft/releases/download/v0.19.1/gridcraft-0.19.1-linux-x86_64.flatpak";
+              sha256 = "535289047c3891e5a238feaa186096ca3c0c283cdfde1e0fff72240f5f475d02";
+            });
+          }
+          {
+            appId = "ai.storyteller.deckcraft";
+            sha256 = "080cd8a4d2f74ca9ef554125476e6d2aa80eb8dc72eab5d41247a7b17f2d6c2d";
+            bundle = toString (pkgs.fetchurl {
+              url = "https://github.com/storytold/deckcraft/releases/download/v0.18.1/deckcraft-0.18.1-linux-x86_64.flatpak";
+              sha256 = "080cd8a4d2f74ca9ef554125476e6d2aa80eb8dc72eab5d41247a7b17f2d6c2d";
             });
           }
         ];
