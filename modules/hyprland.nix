@@ -88,7 +88,7 @@ let
           # trial so its history remains intact and rollback is a bind change.
           "SUPER, V, exec, ${lib.getExe config.programs.vicinae.package} 'vicinae://launch/clipboard/history?toggle=true'"
           "SUPER, W, exec, ${pkgs.systemd}/bin/systemctl --user start gui-wallpaper.service"
-          "SUPER, code:19, exec, ${sinkSwitcher}"
+          "${mod}, code:19, exec, ${lib.getExe config.programs.vicinae.package} cmd launch '@rastsislaux/vicinae-extension-pulseaudio-0:outputDevices'"
         ] ++ workspaceBinds;
         bindel = [
           # Volume and brightness repeat while the keys are held.

@@ -70,9 +70,9 @@ in
   programs.vicinae = {
     enable = true;
     systemd.enable = true;
-    # Available through root search as "Output Devices". Alt+0 deliberately
-    # stays on hypr-sink-switcher: this extension lists easyeffects_sink as an
-    # output, while the existing switcher excludes that processing stage.
+    # Alt+0 opens "Output Devices" (modules/hyprland.nix). Unlike the Rofi
+    # switcher, this intentionally includes easyeffects_sink as a choice.
+    # The Rofi audio mode remains available as a fallback.
     extensions = [ inputs.vicinae-extensions.packages.${pkgs.system}.pulseaudio ];
   };
 
